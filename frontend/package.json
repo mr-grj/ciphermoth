@@ -11,7 +11,7 @@
     "@mui/icons-material": "^9.2.0",
     "@mui/material": "^9.2.0",
     "@mui/x-data-grid": "^9.8.0",
-    "axios": "^1.18.1",
+    "axios": "^1.20.0",
     "easy-peasy": "^6.1.1",
     "notistack": "^3.0.2",
     "react": "^19.2.0",
