@@ -39,16 +39,16 @@ const SPIKE_ENV: &[&str] = &[
     "CIPHERMOTH_SPIKE_FAIL_STARTUP",
 ];
 
-fn core_executable(app: &tauri::AppHandle) -> PathBuf {
+fn core_executable(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     if cfg!(debug_assertions) {
         if let Ok(path) = std::env::var("CIPHERMOTH_CORE_PATH") {
-            return PathBuf::from(path);
+            return Ok(PathBuf::from(path));
         }
     }
     app.path()
         .resource_dir()
         .map(|dir| dir.join("core").join(CORE_EXE))
-        .unwrap_or_else(|_| PathBuf::from(CORE_EXE))
+        .map_err(|error| format!("cannot locate the bundled core: {error}"))
 }
 
 fn core_config(app: &tauri::AppHandle) -> CoreConfig {

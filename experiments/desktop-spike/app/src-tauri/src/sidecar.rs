@@ -55,7 +55,7 @@ pub struct Status {
 }
 
 pub struct CoreConfig {
-    pub executable: PathBuf,
+    pub executable: Result<PathBuf, String>,
     pub data_dir: PathBuf,
     pub log_dir: PathBuf,
     pub env: Vec<(String, String)>,
@@ -274,8 +274,7 @@ impl Supervisor {
                         Err(error) => {
                             self.set_status(|s| {
                                 s.state = "failed";
-                                s.reason =
-                                    Some(format!("could not start the core: {:?}", error.kind()));
+                                s.reason = Some(format!("could not start the core: {error}"));
                             });
                         }
                     }
@@ -417,7 +416,11 @@ fn spawn_core(config: &CoreConfig) -> std::io::Result<Child> {
         fs::set_permissions(&config.data_dir, fs::Permissions::from_mode(0o700))?;
         fs::set_permissions(&config.log_dir, fs::Permissions::from_mode(0o700))?;
     }
-    let mut command = Command::new(&config.executable);
+    let executable = config
+        .executable
+        .as_ref()
+        .map_err(|reason| std::io::Error::new(std::io::ErrorKind::NotFound, reason.clone()))?;
+    let mut command = Command::new(executable);
     command
         .arg("--data-dir")
         .arg(&config.data_dir)

@@ -15,11 +15,22 @@ ATTACHMENT_CANARY = b"CANARY-ATTACHMENT-91c4"
 MIB = 1024 * 1024
 
 
+def listening_now() -> set:
+    return {
+        (c.family, str(c.laddr))
+        for c in psutil.net_connections(kind="inet")
+        if c.status == psutil.CONN_LISTEN
+    }
+
+
 @pytest.fixture
 def workspace(tmp_path: Path) -> dict:
     temp = tmp_path / "tmp"
     temp.mkdir()
     return {
+        "listening_before": listening_now()
+        if sys.platform.startswith("linux")
+        else set(),
         "data": tmp_path / "data",
         "log": tmp_path / "core.log",
         "env": {"TMPDIR": str(temp), "TEMP": str(temp), "TMP": str(temp)},
@@ -325,13 +336,16 @@ def test_startup_failure_without_ready(workspace: dict) -> None:
         core.kill()
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="POSIX permissions")
+@pytest.mark.skipif(
+    sys.platform == "win32" or os.geteuid() == 0, reason="POSIX permissions, not root"
+)
 def test_unwritable_data_dir_fails_before_ready(
     tmp_path: Path, workspace: dict
 ) -> None:
     locked = tmp_path / "locked"
     locked.mkdir()
     locked.chmod(0o500)
+    core = None
     try:
         core = Core(
             locked / "data", workspace["log"], workspace["env"], wait_ready=False
@@ -339,6 +353,8 @@ def test_unwritable_data_dir_fails_before_ready(
         assert core.next_frame(timeout=60) is None
         assert core.exit_code() == 1
     finally:
+        if core is not None:
+            core.kill()
         locked.chmod(0o700)
 
 
@@ -351,7 +367,12 @@ def test_no_sockets_and_no_canary_on_disk(core: Core, workspace: dict) -> None:
         ).header["status"]
         == 200
     )
-    connections = psutil.Process(core.proc.pid).net_connections(kind="all")
+    try:
+        connections = psutil.Process(core.proc.pid).net_connections(kind="all")
+    except psutil.AccessDenied:
+        assert sys.platform.startswith("linux")
+        connections = []
+        assert listening_now() <= workspace["listening_before"]
     assert [c for c in connections if c.status == psutil.CONN_LISTEN] == []
     assert [c for c in connections if c.family in (2, 10, 23)] == []
     core.close_stdin()

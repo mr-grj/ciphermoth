@@ -3,6 +3,7 @@ import { coreAxios } from "./axiosAdapter";
 import { CoreError, coreCancel, coreJson, coreRequest, coreStatus } from "./core";
 
 const MASTER = "Canary-Master-7Qx-ciphermoth";
+const ATTACHMENT_CANARY = "CANARY-ATTACHMENT-91c4";
 const MIB = 1024 * 1024;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -136,6 +137,7 @@ export async function runSuite(onProgress = () => {}) {
 
   await check("5 MiB attachment round trip (FormData -> pipe -> Fernet -> SQLite)", async () => {
     const data = randomBytes(5 * MIB);
+    data.set(new TextEncoder().encode(ATTACHMENT_CANARY), 0);
     const form = new FormData();
     form.append("file", new Blob([data]), "synthetic.bin");
     const encodeStarted = performance.now();

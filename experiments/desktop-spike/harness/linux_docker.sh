@@ -8,7 +8,7 @@ name="cm-spike-$(echo "$platform" | tr '/' '-')"
 mkdir -p "$out"
 
 docker rm -f "$name" >/dev/null 2>&1 || true
-docker run -d --name "$name" --platform "$platform" --shm-size=1g ubuntu:22.04 sleep infinity >/dev/null
+docker run -d --init --name "$name" --platform "$platform" --shm-size=1g ubuntu:22.04 sleep infinity >/dev/null
 trap 'docker rm -f "$name" >/dev/null 2>&1 || true' EXIT
 
 git -C "$repo" archive --format=tar HEAD | docker exec -i "$name" sh -c 'mkdir -p /src && tar -x -C /src'

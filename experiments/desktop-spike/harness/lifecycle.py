@@ -1,9 +1,11 @@
 import argparse
+import base64
 import json
 import os
 import platform
 import shutil
 import signal
+import sqlite3
 import statistics
 import subprocess
 import sys
@@ -24,6 +26,11 @@ WEBVIEW_NAMES = (
 )
 
 
+MASTER = "Canary-Master-7Qx-ciphermoth"
+ATTACHMENT_CANARY = b"CANARY-ATTACHMENT-91c4"
+BUNDLE_ID = "com.ciphermoth.desktop-spike"
+
+
 def core_processes() -> list[psutil.Process]:
     found = []
     for proc in psutil.process_iter(["name", "exe", "cmdline"]):
@@ -36,10 +43,32 @@ def core_processes() -> list[psutil.Process]:
     return found
 
 
+BASELINE: set[int] = set()
+
+
+def live(proc: psutil.Process) -> bool:
+    try:
+        return proc.status() != psutil.STATUS_ZOMBIE
+    except psutil.NoSuchProcess:
+        return False
+
+
+def listening_snapshot() -> set:
+    try:
+        return {
+            (c.family, str(c.laddr))
+            for c in psutil.net_connections(kind="inet")
+            if c.status == psutil.CONN_LISTEN
+        }
+    except psutil.AccessDenied:
+        return set()
+
+
 def leftover_cores(before: list[int] | None = None, timeout: float = 5) -> list[int]:
     deadline = time.perf_counter() + timeout
+    ignored = set(before or []) | BASELINE
     while True:
-        alive = [p.pid for p in core_processes() if p.pid not in (before or [])]
+        alive = [p.pid for p in core_processes() if p.pid not in ignored and live(p)]
         if not alive or time.perf_counter() > deadline:
             return alive
         time.sleep(0.05)
@@ -118,7 +147,7 @@ class Launch:
             return [
                 p
                 for p in self.tree()
-                if any(p.name().startswith(n) for n in WEBVIEW_NAMES)
+                if any(safe_name(p).startswith(n) for n in WEBVIEW_NAMES)
             ]
         found = []
         for proc in psutil.process_iter(["name", "create_time"]):
@@ -135,7 +164,7 @@ class Launch:
             try:
                 if proc.name().startswith("ciphermoth-core"):
                     return proc
-            except psutil.NoSuchProcess:
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
                 continue
         return None
 
@@ -152,14 +181,14 @@ class Launch:
         self.out.close()
 
 
-def sockets(processes: list[psutil.Process]) -> dict:
-    listening, inet = [], []
+def sockets(processes: list[psutil.Process], baseline: set) -> dict:
+    listening, inet, uninspectable = [], [], []
     for proc in processes:
         try:
             for conn in proc.net_connections(kind="inet"):
                 entry = {
                     "pid": proc.pid,
-                    "name": proc.name(),
+                    "name": safe_name(proc),
                     "status": conn.status,
                     "laddr": str(conn.laddr),
                     "raddr": str(conn.raddr),
@@ -167,9 +196,16 @@ def sockets(processes: list[psutil.Process]) -> dict:
                 inet.append(entry)
                 if conn.status == psutil.CONN_LISTEN:
                     listening.append(entry)
-        except (psutil.NoSuchProcess, psutil.AccessDenied) as exc:
-            inet.append({"pid": proc.pid, "error": type(exc).__name__})
-    return {"listening": listening, "inet": inet}
+        except psutil.AccessDenied:
+            uninspectable.append(safe_name(proc))
+        except psutil.NoSuchProcess:
+            continue
+    return {
+        "listening": listening,
+        "inet": inet,
+        "uninspectable": uninspectable,
+        "namespace_new_listeners": sorted(map(str, listening_snapshot() - baseline)),
+    }
 
 
 def lsof_listen(pids: list[int]) -> str:
@@ -187,16 +223,29 @@ def memory(proc: psutil.Process | None) -> dict | None:
     if proc is None:
         return None
     try:
+        name = proc.name()
+    except (psutil.NoSuchProcess, psutil.AccessDenied):
+        name = "?"
+    try:
         info = proc.memory_full_info()
         return {
+            "name": name,
             "rss_mb": round(info.rss / 2**20, 1),
             "uss_mb": round(getattr(info, "uss", 0) / 2**20, 1),
         }
     except (psutil.NoSuchProcess, psutil.AccessDenied):
-        try:
-            return {"rss_mb": round(proc.memory_info().rss / 2**20, 1)}
-        except psutil.NoSuchProcess:
-            return None
+        pass
+    try:
+        return {"name": name, "rss_mb": round(proc.memory_info().rss / 2**20, 1)}
+    except (psutil.NoSuchProcess, psutil.AccessDenied):
+        return {"name": name, "rss_mb": None}
+
+
+def safe_name(proc: psutil.Process) -> str:
+    try:
+        return proc.name()
+    except (psutil.NoSuchProcess, psutil.AccessDenied):
+        return "?"
 
 
 def terminate_gracefully(launch: Launch) -> str:
@@ -266,6 +315,7 @@ def scenario_exit(app: Path, root: Path, scenario: str) -> dict:
 
 
 def scenario_kill(app: Path, root: Path, mode: str) -> dict:
+    baseline = listening_snapshot()
     launch = Launch(app, "idle", root / f"kill-{mode}")
     try:
         report = launch.report()
@@ -274,8 +324,8 @@ def scenario_kill(app: Path, root: Path, mode: str) -> dict:
         time.sleep(1.5)
         core_pid = report["marks"]["core_ready"]["core_pid"]
         tree = launch.tree() + launch.webviews()
-        names = sorted({p.name() for p in tree})
-        net = sockets(tree)
+        names = sorted({safe_name(p) for p in tree})
+        net = sockets(tree, baseline)
         lsof = lsof_listen([p.pid for p in tree])
         idle = {
             "app": memory(launch.ps),
@@ -308,7 +358,8 @@ def scenario_kill(app: Path, root: Path, mode: str) -> dict:
         "ok": gone is not None
         and gone <= 5
         and not net["listening"]
-        and not [c for c in net["inet"] if "status" in c],
+        and not net["inet"]
+        and not net["namespace_new_listeners"],
         "how": how,
         "exit_code": code,
         "core_pid": core_pid,
@@ -363,13 +414,14 @@ def scenario_startup_failure(app: Path, root: Path, variant: str) -> dict:
             shutil.copytree(bundle, copy_root / bundle.name, symlinks=True)
             target = copy_root / bundle.name / "Contents" / "MacOS" / app.name
             shutil.rmtree(copy_root / bundle.name / "Contents" / "Resources" / "core")
-        else:
+        elif sys.platform == "win32":
             shutil.copytree(app.parent, copy_root, symlinks=True)
             target = copy_root / app.name
-            core_dir = copy_root / "core"
-            if not core_dir.exists():
-                return {"ok": False, "error": f"unexpected layout, no {core_dir}"}
-            shutil.rmtree(core_dir)
+            shutil.rmtree(copy_root / "core")
+        else:
+            copy_root.mkdir(parents=True)
+            target = copy_root / app.name
+            shutil.copy2(app, target)
     launch = Launch(target, "idle", root / f"startup-{variant}", extra)
     try:
         report = launch.report(timeout=60)
@@ -440,6 +492,113 @@ def scenario_repeated(app: Path, root: Path, count: int) -> dict:
     }
 
 
+def derive_vault_key(database: Path) -> str | None:
+    from cryptography.hazmat.primitives.kdf.argon2 import Argon2id
+
+    if not database.exists():
+        return None
+    with sqlite3.connect(database) as conn:
+        row = conn.execute("SELECT salt FROM spike_vault").fetchone()
+    if row is None:
+        return None
+    kdf = Argon2id(salt=row[0], length=32, iterations=3, lanes=4, memory_cost=65536)
+    return base64.urlsafe_b64encode(kdf.derive(MASTER.encode())).decode()
+
+
+def platform_dirs() -> list[Path]:
+    home = Path.home()
+    if sys.platform == "darwin":
+        library = home / "Library"
+        return [
+            library / "WebKit" / BUNDLE_ID,
+            library / "Caches" / BUNDLE_ID,
+            library / "Application Support" / BUNDLE_ID,
+            library / "HTTPStorages",
+            library / "Saved Application State" / f"{BUNDLE_ID}.savedState",
+            library / "Logs" / "DiagnosticReports",
+            Path(tempfile.gettempdir()),
+        ]
+    if sys.platform == "win32":
+        local = Path(os.environ["LOCALAPPDATA"])
+        return [
+            local / BUNDLE_ID,
+            local / "CrashDumps",
+            local / "Temp",
+            Path(tempfile.gettempdir()),
+        ]
+    return [
+        home / ".local" / "share" / BUNDLE_ID,
+        home / ".cache" / BUNDLE_ID,
+        home / ".config" / BUNDLE_ID,
+        Path("/var/crash"),
+        Path(tempfile.gettempdir()),
+    ]
+
+
+def scan(roots: list[Path], needles: dict[str, bytes], since: float) -> dict:
+    hits, scanned, skipped = [], 0, 0
+    for root in roots:
+        if not root.exists():
+            continue
+        for path in root.rglob("*"):
+            try:
+                if (
+                    not path.is_file()
+                    or path.is_symlink()
+                    or path.stat().st_mtime < since
+                ):
+                    continue
+                if path.stat().st_size > 256 * 2**20:
+                    skipped += 1
+                    continue
+                content = path.read_bytes()
+            except OSError:
+                skipped += 1
+                continue
+            scanned += 1
+            for label, needle in needles.items():
+                if needle in content:
+                    hits.append({"file": str(path), "needle": label})
+    return {"hits": hits, "scanned_files": scanned, "unreadable_or_large": skipped}
+
+
+def scenario_canary(app: Path, root: Path) -> dict:
+    since = time.time() - 1
+    workdir = root / "canary"
+    launch = Launch(app, "ipc", workdir)
+    try:
+        code = launch.wait_exit(240)
+    finally:
+        launch.cleanup()
+    report = (
+        json.loads(launch.report_path.read_text())
+        if launch.report_path.exists()
+        else {}
+    )
+    key = derive_vault_key(workdir / "vault" / "data" / "spike.db")
+    if key is None:
+        return {"ok": False, "error": "no vault salt to derive the key"}
+    needles = {
+        "master_password_utf8": MASTER.encode(),
+        "master_password_utf16": MASTER.encode("utf-16-le"),
+        "attachment_canary": ATTACHMENT_CANARY,
+        "attachment_canary_utf16": ATTACHMENT_CANARY.decode().encode("utf-16-le"),
+        "vault_key_base64": key.encode(),
+        "vault_key_raw": base64.urlsafe_b64decode(key),
+    }
+    roots = [workdir, *platform_dirs()]
+    found = scan(roots, needles, since)
+    return {
+        "ok": code == 0
+        and bool(report.get("result", {}).get("ok"))
+        and not found["hits"],
+        "exit_code": code,
+        "selftest_ok": report.get("result", {}).get("ok"),
+        "roots": [str(r) for r in roots if r.exists()],
+        **found,
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--app", type=Path, required=True)
@@ -449,8 +608,9 @@ def main() -> int:
     parser.add_argument("--skip", nargs="*", default=[])
     args = parser.parse_args()
     app = args.app.resolve()
-    root = Path(tempfile.mkdtemp(prefix="cm-spike-"))
+    root = Path(os.path.realpath(tempfile.mkdtemp(prefix="cm-spike-")))
     before = [p.pid for p in core_processes()]
+    BASELINE.update(before)
     plan = {
         "repeated_launches": lambda: scenario_repeated(app, root, args.repeat),
         "ipc_selftest": lambda: scenario_ipc(app, root),
@@ -459,6 +619,7 @@ def main() -> int:
         "force_kill_shell": lambda: scenario_kill(app, root, "force"),
         "graceful_terminate_shell": lambda: scenario_kill(app, root, "graceful"),
         "core_killed_externally": lambda: scenario_kill_core(app, root),
+        "canary_scan": lambda: scenario_canary(app, root),
         "startup_failure_core_error": lambda: scenario_startup_failure(
             app, root, "core-error"
         ),
