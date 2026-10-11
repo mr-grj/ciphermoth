@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-core-request"
+description = "Enables the core_request command without any pre-configured scope."
+commands.allow = ["core_request"]
+
+[[permission]]
+identifier = "deny-core-request"
+description = "Denies the core_request command without any pre-configured scope."
+commands.deny = ["core_request"]

@@ -1,0 +1,14 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "The only things the renderer may do: talk to the core through the Rust bridge and listen for core status events.",
+  "windows": ["main"],
+  "permissions": [
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+    "allow-core-request",
+    "allow-core-cancel",
+    "allow-core-status",
+    "allow-core-restart"
+  ]
+}

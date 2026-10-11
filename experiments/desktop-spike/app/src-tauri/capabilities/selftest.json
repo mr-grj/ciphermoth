@@ -1,0 +1,6 @@
+{
+  "identifier": "selftest",
+  "description": "Added at runtime only when CIPHERMOTH_SPIKE_SCENARIO is set in a selftest build.",
+  "windows": ["main"],
+  "permissions": ["allow-selftest-scenario", "allow-selftest-mark", "allow-selftest-finish"]
+}

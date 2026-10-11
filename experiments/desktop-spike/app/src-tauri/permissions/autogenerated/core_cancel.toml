@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-core-cancel"
+description = "Enables the core_cancel command without any pre-configured scope."
+commands.allow = ["core_cancel"]
+
+[[permission]]
+identifier = "deny-core-cancel"
+description = "Denies the core_cancel command without any pre-configured scope."
+commands.deny = ["core_cancel"]

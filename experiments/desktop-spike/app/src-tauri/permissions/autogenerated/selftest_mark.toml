@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-selftest-mark"
+description = "Enables the selftest_mark command without any pre-configured scope."
+commands.allow = ["selftest_mark"]
+
+[[permission]]
+identifier = "deny-selftest-mark"
+description = "Denies the selftest_mark command without any pre-configured scope."
+commands.deny = ["selftest_mark"]

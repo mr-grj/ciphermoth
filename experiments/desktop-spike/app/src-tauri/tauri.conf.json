@@ -1,0 +1,52 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "CipherMoth Spike",
+  "version": "0.1.0",
+  "identifier": "com.ciphermoth.desktop-spike",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://127.0.0.1:1420",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [
+      {
+        "label": "main",
+        "title": "CipherMoth Desktop Spike",
+        "width": 900,
+        "height": 760,
+        "minWidth": 640,
+        "minHeight": 560,
+        "center": true,
+        "backgroundColor": "#0b0b0c"
+      }
+    ],
+    "security": {
+      "capabilities": ["default"],
+      "csp": {
+        "default-src": "'self'",
+        "script-src": "'self'",
+        "style-src": "'self' 'unsafe-inline'",
+        "img-src": "'self' data: blob:",
+        "font-src": "'self' data:",
+        "connect-src": "ipc: http://ipc.localhost",
+        "object-src": "'none'",
+        "base-uri": "'none'",
+        "form-action": "'none'",
+        "frame-ancestors": "'none'"
+      },
+      "freezePrototype": false
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
+    "resources": { "../../core/dist/ciphermoth-core/": "core/" },
+    "macOS": { "hardenedRuntime": true, "signingIdentity": null, "minimumSystemVersion": "11.0" },
+    "linux": { "deb": { "depends": [] } },
+    "windows": { "nsis": { "installMode": "currentUser" } }
+  }
+}
