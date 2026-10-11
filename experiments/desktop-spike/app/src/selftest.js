@@ -278,7 +278,7 @@ export async function runSuite(onProgress = () => {}) {
     );
     await sleep(100);
     await expectError(
-      coreRequest({ method: "POST", path: "/spike/crash", query: "mode=segv" }),
+      coreRequest({ method: "POST", path: "/spike/crash", query: "mode=abort" }),
       "core_exited"
     );
     const inflightError = await inflight;

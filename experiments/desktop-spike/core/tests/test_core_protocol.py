@@ -289,6 +289,8 @@ def test_stray_output_cannot_corrupt_the_protocol(core: Core, workspace: dict) -
 
 @pytest.mark.parametrize("mode", ["exit", "abort", "segv"])
 def test_core_crash_is_visible_as_eof(core: Core, mode: str) -> None:
+    if mode == "segv" and sys.platform == "win32":
+        pytest.skip("ctypes turns an access violation into OSError on Windows")
     core.submit("POST", "/spike/crash", query=f"mode={mode}")
     assert core.next_frame(timeout=10) is None
     code = core.exit_code()
