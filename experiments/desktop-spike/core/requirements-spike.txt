@@ -1,0 +1,4 @@
+aiosqlite==0.22.1
+greenlet==3.5.3
+pyinstaller==6.22.3
+pyinstaller-hooks-contrib==2026.8

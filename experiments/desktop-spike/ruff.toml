@@ -1,0 +1,10 @@
+line-length = 88
+target-version = "py313"
+
+[lint]
+select = ["E", "W", "F", "I", "B", "UP"]
+ignore = ["B008"]
+
+[lint.isort]
+known-first-party = ["spike_core", "core_client"]
+known-third-party = ["helpers", "schemas", "api", "main"]
