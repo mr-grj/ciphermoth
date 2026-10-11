@@ -55,6 +55,7 @@ async def _serve(
 
 
 def main(started: float) -> int:
+    os.environ["CRYPTOGRAPHY_OPENSSL_NO_LEGACY"] = "1"
     args = _arguments()
     if args.version:
         print(CORE_VERSION)

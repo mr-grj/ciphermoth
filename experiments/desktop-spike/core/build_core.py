@@ -40,6 +40,7 @@ def main() -> int:
     )
     parser.add_argument("--report", type=Path)
     parser.add_argument("--skip-install", action="store_true")
+    parser.add_argument("--find-links", type=Path)
     args = parser.parse_args()
 
     build = args.build_dir.resolve()
@@ -79,6 +80,7 @@ def main() -> int:
                 str(requirements),
                 "-r",
                 str(HERE / "requirements-spike.txt"),
+                *(["--find-links", str(args.find_links)] if args.find_links else []),
             ]
         )
         timings["install_s"] = round(time.perf_counter() - started, 1)
