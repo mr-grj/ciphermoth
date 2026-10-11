@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from . import memory
 
 ATTACHMENT_LIMIT = 5 * 1024 * 1024
+EXCEPTION_CANARY = "-".join(["synthetic failure CANARY", "EXCEPTION", "7f3a"])
 
 metadata = sa.MetaData()
 
@@ -216,7 +217,7 @@ def build_spike_app(state: CoreState, test_hooks: bool) -> FastAPI:
 
     @app.get("/spike/raise")
     async def explode() -> dict:
-        raise RuntimeError("synthetic failure CANARY-EXCEPTION-7f3a")
+        raise RuntimeError(EXCEPTION_CANARY)
 
     @app.post("/spike/entries/seed")
     async def seed(
