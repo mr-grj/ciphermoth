@@ -290,7 +290,12 @@ class Stages:
         )
 
     def appimage(self) -> None:
-        target_dir = Path((self.out / "target_dir.txt").read_text())
+        recorded = self.out / "target_dir.txt"
+        target_dir = (
+            Path(recorded.read_text())
+            if recorded.exists()
+            else TAURI / "target" / "release"
+        )
         images = glob.glob(str(target_dir / "bundle/appimage/*.AppImage"))
         if not images:
             return
