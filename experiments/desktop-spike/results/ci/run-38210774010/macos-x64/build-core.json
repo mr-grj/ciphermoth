@@ -1,0 +1,132 @@
+{
+  "target": "macos-x64",
+  "host": {
+    "platform": "macOS-15.7.9-x86_64-i386-64bit-Mach-O",
+    "machine": "x86_64"
+  },
+  "python": "3.13.15 x86_64",
+  "timings": {
+    "install_s": 1.9,
+    "pyinstaller_s": 55.0
+  },
+  "core_dir_bytes": 55719350,
+  "core_file_count": 89,
+  "largest_files": [
+    {
+      "bytes": 17924208,
+      "path": "_internal/libpython3.13.dylib"
+    },
+    {
+      "bytes": 12039840,
+      "path": "ciphermoth-core"
+    },
+    {
+      "bytes": 11313520,
+      "path": "_internal/cryptography/hazmat/bindings/_rust.abi3.so"
+    },
+    {
+      "bytes": 4947264,
+      "path": "_internal/pydantic_core/_pydantic_core.cpython-313-darwin.so"
+    },
+    {
+      "bytes": 1964064,
+      "path": "_internal/uvloop/loop.cpython-313-darwin.so"
+    },
+    {
+      "bytes": 1409168,
+      "path": "_internal/base_library.zip"
+    },
+    {
+      "bytes": 1000192,
+      "path": "_internal/asyncpg/protocol/protocol.cpython-313-darwin.so"
+    },
+    {
+      "bytes": 760688,
+      "path": "_internal/Cryptodome/PublicKey/_ec_ws.abi3.so"
+    },
+    {
+      "bytes": 588512,
+      "path": "_internal/bcrypt/_bcrypt.abi3.so"
+    },
+    {
+      "bytes": 388128,
+      "path": "_internal/yaml/_yaml.cpython-313-darwin.so"
+    },
+    {
+      "bytes": 385088,
+      "path": "_internal/asyncpg/pgproto/pgproto.cpython-313-darwin.so"
+    },
+    {
+      "bytes": 212016,
+      "path": "_internal/_cffi_backend.cpython-313-darwin.so"
+    },
+    {
+      "bytes": 134928,
+      "path": "_internal/greenlet/_greenlet.cpython-313-darwin.so"
+    },
+    {
+      "bytes": 109397,
+      "path": "_internal/pydantic-2.13.4.dist-info/METADATA"
+    },
+    {
+      "bytes": 86864,
+      "path": "_internal/wrapt/_wrappers.cpython-313-darwin.so"
+    }
+  ],
+  "executable": "/Users/runner/work/ciphermoth/ciphermoth/experiments/desktop-spike/core/dist/ciphermoth-core/ciphermoth-core",
+  "packages": [
+    "aiosqlite==0.22.1",
+    "alembic==1.18.5",
+    "altgraph==0.17.5",
+    "annotated-doc==0.0.4",
+    "annotated-types==0.7.0",
+    "anyio==4.14.2",
+    "asyncpg==0.31.0",
+    "bcrypt==5.0.0",
+    "certifi==2026.6.17",
+    "cffi==2.1.0",
+    "click==8.4.2",
+    "cryptography==50.0.0",
+    "deprecated==1.3.1",
+    "fastapi==0.139.0",
+    "greenlet==3.5.3",
+    "h11==0.16.0",
+    "httpcore==1.0.9",
+    "httptools==0.8.0",
+    "httpx==0.28.1",
+    "idna==3.18",
+    "limits==5.8.0",
+    "macholib==1.16.4",
+    "mako==1.4.2",
+    "markdown-it-py==4.2.0",
+    "markupsafe==3.0.3",
+    "mdurl==0.1.2",
+    "packaging==26.2",
+    "pycparser==3.0",
+    "pycryptodomex==3.23.0",
+    "pydantic==2.13.4",
+    "pydantic-core==2.46.4",
+    "pydantic-settings==2.14.2",
+    "pygments==2.20.0",
+    "pyinstaller==6.22.3",
+    "pyinstaller-hooks-contrib==2026.8",
+    "python-dotenv==1.2.2",
+    "python-multipart==0.0.32",
+    "pyyaml==6.0.3",
+    "pyzipper==0.4.0",
+    "rich==15.0.0",
+    "setuptools==84.0.0",
+    "shellingham==1.5.4",
+    "slowapi==0.1.10",
+    "sqlalchemy==2.0.51",
+    "starlette==1.3.1",
+    "typer==0.26.8",
+    "typing-extensions==4.16.0",
+    "typing-inspection==0.4.2",
+    "uvicorn==0.51.0",
+    "uvloop==0.22.1",
+    "watchfiles==1.2.0",
+    "websockets==16.0",
+    "wrapt==2.2.2"
+  ]
+}

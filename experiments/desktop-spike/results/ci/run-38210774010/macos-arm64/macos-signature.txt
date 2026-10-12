@@ -1,0 +1,17 @@
+Executable=/Users/runner/cm-spike-install/CipherMoth Spike.app/Contents/MacOS/ciphermoth-desktop-spike
+Identifier=ciphermoth_desktop_spike-32efbdccbc3ec51d
+Format=app bundle with Mach-O thin (arm64)
+CodeDirectory v=20400 size=37288 flags=0x20002(adhoc,linker-signed) hashes=1161+0 location=embedded
+Signature=adhoc
+Info.plist=not bound
+TeamIdentifier=not set
+Sealed Resources=none
+Internal requirements=none
+/Users/runner/cm-spike-install/CipherMoth Spike.app: code has no resources but signature indicates they must be present
+/Users/runner/cm-spike-install/CipherMoth Spike.app: code has no resources but signature indicates they must be present
+arm64
+      cmd LC_BUILD_VERSION
+  cmdsize 32
+ platform 1
+    minos 11.0
+      sdk 15.5

@@ -1,0 +1,454 @@
+[
+  {
+    "target": "macos-arm64",
+    "vectors": {
+      "ok": true,
+      "seconds": 12.6,
+      "passed": 133,
+      "failed": [],
+      "identical_digest": true,
+      "digest": "08b13d45d708e5ca9669acd305bd759171a7ace0a0e44d2d6e49ea03e13bd80a",
+      "environment": {
+        "frozen": true,
+        "python": "3.13.15",
+        "platform": "macOS-15.7.9-arm64-arm-64bit-Mach-O",
+        "machine": "arm64",
+        "cryptography": "50.0.0",
+        "openssl": "OpenSSL 4.0.1 9 Jun 2026",
+        "bcrypt": "5.0.0",
+        "fastapi": "0.139.0",
+        "pydantic": "2.13.4",
+        "sqlalchemy": "2.0.51",
+        "sqlite": "3.53.1"
+      }
+    },
+    "protocol_tests": true,
+    "lifecycle_pass": 11,
+    "lifecycle_total": 11,
+    "failed_scenarios": [],
+    "ipc_checks": "20/20",
+    "core_dir": "54.0",
+    "shell": "4.6",
+    "bundles": {
+      "CipherMoth Spike.app": "58.7",
+      "CipherMoth Spike_0.1.0_aarch64.dmg": "29.3"
+    },
+    "core_build_s": 30.7,
+    "core_install_s": 1.4,
+    "app_build_s": 187.8,
+    "first_core_ready": "1963",
+    "warm_core_ready": "1205",
+    "first_ui_ready": "3659",
+    "warm_ui_ready": "2345",
+    "latency": {
+      "mean": 1.16,
+      "p50": 1,
+      "p95": 2,
+      "p99": 2
+    },
+    "attachment": {
+      "download_mb_s": 125,
+      "download_ms": 40,
+      "formdata_encode_ms": 10,
+      "upload_mb_s": 74.63,
+      "upload_ms": 67
+    },
+    "listing": {
+      "max": 33,
+      "min": 22
+    },
+    "restart_ms": 1241,
+    "kdf": {
+      "argon2id_ms": 702.4,
+      "peak_rss_after": 162775040,
+      "peak_rss_before": 94748672,
+      "rss_after": null
+    },
+    "core_peak_sampled": 250.7,
+    "idle": [
+      "72",
+      "90",
+      "82",
+      "244"
+    ],
+    "kill_gone_s": 0.339,
+    "webview_connections": 0,
+    "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+  },
+  {
+    "target": "macos-x64",
+    "vectors": {
+      "ok": true,
+      "seconds": 5.3,
+      "passed": 133,
+      "failed": [],
+      "identical_digest": true,
+      "digest": "08b13d45d708e5ca9669acd305bd759171a7ace0a0e44d2d6e49ea03e13bd80a",
+      "environment": {
+        "frozen": true,
+        "python": "3.13.15",
+        "platform": "macOS-15.7.9-x86_64-i386-64bit-Mach-O",
+        "machine": "x86_64",
+        "cryptography": "50.0.0",
+        "openssl": "OpenSSL 4.0.1 9 Jun 2026",
+        "bcrypt": "5.0.0",
+        "fastapi": "0.139.0",
+        "pydantic": "2.13.4",
+        "sqlalchemy": "2.0.51",
+        "sqlite": "3.53.1"
+      }
+    },
+    "protocol_tests": true,
+    "lifecycle_pass": 11,
+    "lifecycle_total": 11,
+    "failed_scenarios": [],
+    "ipc_checks": "20/20",
+    "core_dir": "53.1",
+    "shell": "5.0",
+    "bundles": {
+      "CipherMoth Spike.app": "58.2",
+      "CipherMoth Spike_0.1.0_x64.dmg": "29.7"
+    },
+    "core_build_s": 57.0,
+    "core_install_s": 1.9,
+    "app_build_s": 356.6,
+    "first_core_ready": "3735",
+    "warm_core_ready": "1779",
+    "first_ui_ready": "3249",
+    "warm_ui_ready": "857",
+    "latency": {
+      "mean": 2.11,
+      "p50": 2,
+      "p95": 3,
+      "p99": 3
+    },
+    "attachment": {
+      "download_mb_s": 40.32,
+      "download_ms": 124,
+      "formdata_encode_ms": 23,
+      "upload_mb_s": 32.47,
+      "upload_ms": 154
+    },
+    "listing": {
+      "max": 66,
+      "min": 64
+    },
+    "restart_ms": 1419,
+    "kdf": {
+      "argon2id_ms": 102.4,
+      "peak_rss_after": 152199168,
+      "peak_rss_before": 84471808,
+      "rss_after": null
+    },
+    "core_peak_sampled": 146.9,
+    "idle": [
+      "47",
+      "81",
+      "72",
+      "200"
+    ],
+    "kill_gone_s": 0.353,
+    "webview_connections": 0,
+    "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+  },
+  {
+    "target": "windows-x64",
+    "vectors": {
+      "ok": true,
+      "seconds": 5.2,
+      "passed": 133,
+      "failed": [],
+      "identical_digest": true,
+      "digest": "08b13d45d708e5ca9669acd305bd759171a7ace0a0e44d2d6e49ea03e13bd80a",
+      "environment": {
+        "frozen": true,
+        "python": "3.13.15",
+        "platform": "Windows-2025Server-10.0.26100-SP0",
+        "machine": "AMD64",
+        "cryptography": "50.0.0",
+        "openssl": "OpenSSL 4.0.1 9 Jun 2026",
+        "bcrypt": "5.0.0",
+        "fastapi": "0.139.0",
+        "pydantic": "2.13.4",
+        "sqlalchemy": "2.0.51",
+        "sqlite": "3.53.1"
+      }
+    },
+    "protocol_tests": true,
+    "lifecycle_pass": 10,
+    "lifecycle_total": 10,
+    "failed_scenarios": [],
+    "ipc_checks": "20/20",
+    "core_dir": "52.7",
+    "shell": "4.8",
+    "bundles": {
+      "CipherMoth Spike_0.1.0_x64-setup.exe": "24.1"
+    },
+    "core_build_s": 36.8,
+    "core_install_s": 1.2,
+    "app_build_s": 367.6,
+    "first_core_ready": "6810",
+    "warm_core_ready": "1616",
+    "first_ui_ready": "6167",
+    "warm_ui_ready": "703",
+    "latency": {
+      "mean": 2.58,
+      "p50": 2.4,
+      "p95": 3.1,
+      "p99": 4
+    },
+    "attachment": {
+      "download_mb_s": 50.05,
+      "download_ms": 99.9,
+      "formdata_encode_ms": 11.9,
+      "upload_mb_s": 6.73,
+      "upload_ms": 742.4
+    },
+    "listing": {
+      "max": 40.9,
+      "min": 38.6
+    },
+    "restart_ms": 1294,
+    "kdf": {
+      "argon2id_ms": 91.2,
+      "peak_rss_after": 158425088,
+      "peak_rss_before": 90738688,
+      "rss_after": 91262976
+    },
+    "core_peak_sampled": 152.5,
+    "idle": [
+      "30",
+      "87",
+      "300",
+      "416"
+    ],
+    "kill_gone_s": 0.027,
+    "webview_connections": 4,
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36 Edg/153.0.0.0"
+  },
+  {
+    "target": "windows-arm64",
+    "vectors": {
+      "ok": true,
+      "seconds": 6.1,
+      "passed": 133,
+      "failed": [],
+      "identical_digest": true,
+      "digest": "08b13d45d708e5ca9669acd305bd759171a7ace0a0e44d2d6e49ea03e13bd80a",
+      "environment": {
+        "frozen": true,
+        "python": "3.13.15",
+        "platform": "Windows-11-10.0.26200-SP0",
+        "machine": "ARM64",
+        "cryptography": "50.0.0",
+        "openssl": "OpenSSL 3.6.5 29 Sep 2026",
+        "bcrypt": "5.0.0",
+        "fastapi": "0.139.0",
+        "pydantic": "2.13.4",
+        "sqlalchemy": "2.0.51",
+        "sqlite": "3.53.1"
+      }
+    },
+    "protocol_tests": true,
+    "lifecycle_pass": 10,
+    "lifecycle_total": 10,
+    "failed_scenarios": [],
+    "ipc_checks": "20/20",
+    "core_dir": "53.7",
+    "shell": "4.5",
+    "bundles": {
+      "CipherMoth Spike_0.1.0_arm64-setup.exe": "23.3"
+    },
+    "core_build_s": 42.6,
+    "core_install_s": 4.1,
+    "app_build_s": 373.1,
+    "first_core_ready": "2670",
+    "warm_core_ready": "1495",
+    "first_ui_ready": "1800",
+    "warm_ui_ready": "581",
+    "latency": {
+      "mean": 2.49,
+      "p50": 2.5,
+      "p95": 2.8,
+      "p99": 3.1
+    },
+    "attachment": {
+      "download_mb_s": 35.79,
+      "download_ms": 139.7,
+      "formdata_encode_ms": 8.5,
+      "upload_mb_s": 10.58,
+      "upload_ms": 472.6
+    },
+    "listing": {
+      "max": 33.4,
+      "min": 30.9
+    },
+    "restart_ms": 1325.3,
+    "kdf": {
+      "argon2id_ms": 74.4,
+      "peak_rss_after": 161927168,
+      "peak_rss_before": 94011392,
+      "rss_after": 94777344
+    },
+    "core_peak_sampled": 154.4,
+    "idle": [
+      "30",
+      "88",
+      "323",
+      "440"
+    ],
+    "kill_gone_s": 0.027,
+    "webview_connections": 0,
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36 Edg/154.0.0.0"
+  },
+  {
+    "target": "linux-x64",
+    "vectors": {
+      "ok": true,
+      "seconds": 5.5,
+      "passed": 133,
+      "failed": [],
+      "identical_digest": true,
+      "digest": "08b13d45d708e5ca9669acd305bd759171a7ace0a0e44d2d6e49ea03e13bd80a",
+      "environment": {
+        "frozen": true,
+        "python": "3.13.15",
+        "platform": "Linux-6.8.0-1064-azure-x86_64-with-glibc2.35",
+        "machine": "x86_64",
+        "cryptography": "50.0.0",
+        "openssl": "OpenSSL 4.0.1 9 Jun 2026",
+        "bcrypt": "5.0.0",
+        "fastapi": "0.139.0",
+        "pydantic": "2.13.4",
+        "sqlalchemy": "2.0.51",
+        "sqlite": "3.53.1"
+      }
+    },
+    "protocol_tests": true,
+    "lifecycle_pass": 10,
+    "lifecycle_total": 10,
+    "failed_scenarios": [],
+    "ipc_checks": "20/20",
+    "core_dir": "104.3",
+    "shell": "5.4",
+    "bundles": {
+      "CipherMoth Spike_0.1.0_amd64.deb": "43.1"
+    },
+    "core_build_s": 24.8,
+    "core_install_s": 0.5,
+    "app_build_s": 196.4,
+    "first_core_ready": "1215",
+    "warm_core_ready": "1042",
+    "first_ui_ready": "1385",
+    "warm_ui_ready": "444",
+    "latency": {
+      "mean": 0.82,
+      "p50": 1,
+      "p95": 1,
+      "p99": 1
+    },
+    "attachment": {
+      "download_mb_s": 49.5,
+      "download_ms": 101,
+      "formdata_encode_ms": 26,
+      "upload_mb_s": 33.78,
+      "upload_ms": 148
+    },
+    "listing": {
+      "max": 38,
+      "min": 32
+    },
+    "restart_ms": 1087,
+    "kdf": {
+      "argon2id_ms": 106.9,
+      "peak_rss_after": 162996224,
+      "peak_rss_before": 94838784,
+      "rss_after": 96153600
+    },
+    "core_peak_sampled": 168.7,
+    "idle": [
+      "138",
+      "91",
+      "230",
+      "459"
+    ],
+    "kill_gone_s": 0.0,
+    "webview_connections": 0,
+    "user_agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/60.5 Safari/605.1.15"
+  },
+  {
+    "target": "linux-arm64",
+    "vectors": {
+      "ok": true,
+      "seconds": 3.8,
+      "passed": 133,
+      "failed": [],
+      "identical_digest": true,
+      "digest": "08b13d45d708e5ca9669acd305bd759171a7ace0a0e44d2d6e49ea03e13bd80a",
+      "environment": {
+        "frozen": true,
+        "python": "3.13.15",
+        "platform": "Linux-6.8.0-1064-azure-aarch64-with-glibc2.35",
+        "machine": "aarch64",
+        "cryptography": "50.0.0",
+        "openssl": "OpenSSL 4.0.1 9 Jun 2026",
+        "bcrypt": "5.0.0",
+        "fastapi": "0.139.0",
+        "pydantic": "2.13.4",
+        "sqlalchemy": "2.0.51",
+        "sqlite": "3.53.1"
+      }
+    },
+    "protocol_tests": true,
+    "lifecycle_pass": 10,
+    "lifecycle_total": 10,
+    "failed_scenarios": [],
+    "ipc_checks": "20/20",
+    "core_dir": "96.2",
+    "shell": "5.0",
+    "bundles": {
+      "CipherMoth Spike_0.1.0_arm64.deb": "41.0"
+    },
+    "core_build_s": 21.8,
+    "core_install_s": 0.5,
+    "app_build_s": 162.9,
+    "first_core_ready": "1282",
+    "warm_core_ready": "761",
+    "first_ui_ready": "1743",
+    "warm_ui_ready": "311",
+    "latency": {
+      "mean": 0.97,
+      "p50": 1,
+      "p95": 1,
+      "p99": 2
+    },
+    "attachment": {
+      "download_mb_s": 104.17,
+      "download_ms": 48,
+      "formdata_encode_ms": 11,
+      "upload_mb_s": 51.55,
+      "upload_ms": 97
+    },
+    "listing": {
+      "max": 25,
+      "min": 24
+    },
+    "restart_ms": 887,
+    "kdf": {
+      "argon2id_ms": 63.4,
+      "peak_rss_after": 161640448,
+      "peak_rss_before": 103219200,
+      "rss_after": 94973952
+    },
+    "core_peak_sampled": 176.2,
+    "idle": [
+      "130",
+      "90",
+      "228",
+      "448"
+    ],
+    "kill_gone_s": 0.0,
+    "webview_connections": 0,
+    "user_agent": "Mozilla/5.0 (X11; Ubuntu; Linux aarch64) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/60.5 Safari/605.1.15"
+  }
+]

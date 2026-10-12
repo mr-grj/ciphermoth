@@ -1,0 +1,16 @@
+{
+  "target": "linux-arm64",
+  "host": {
+    "platform": "Linux-6.8.0-1064-azure-aarch64-with-glibc2.35",
+    "machine": "aarch64",
+    "processor": "aarch64",
+    "cpu_count": 4
+  },
+  "stages": {
+    "appimage_lifecycle": {
+      "ok": true,
+      "seconds": 16.7
+    }
+  },
+  "ok": true
+}

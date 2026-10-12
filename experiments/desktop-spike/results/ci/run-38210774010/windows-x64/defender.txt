@@ -1,0 +1,26 @@
+
+AMServiceEnabled          : True
+AntivirusEnabled          : True
+RealTimeProtectionEnabled : False
+AntivirusSignatureVersion : 1.459.680.0
+AMEngineVersion           : 1.1.26080.3
+
+=== experiments\desktop-spike\core\dist\ciphermoth-core
+Scan starting...
+Scan finished.
+Scanning D:\a\ciphermoth\ciphermoth\experiments\desktop-spike\core\dist\ciphermoth-core found no threats.
+exit=0
+=== experiments\desktop-spike\app\src-tauri\target\release\bundle\nsis
+Scan starting...
+Scan finished.
+Scanning D:\a\ciphermoth\ciphermoth\experiments\desktop-spike\app\src-tauri\target\release\bundle\nsis found no threats.
+exit=0
+
+SignerCertificate      : 
+TimeStamperCertificate : 
+Status                 : NotSigned
+StatusMessage          : The file D:\a\ciphermoth\ciphermoth\experiments\desktop-spike\app\src-tauri\target\release\bundle\nsis\CipherMoth Spike_0.1.0_x64-setup.exe is not digitally signed. You cannot run this script on the current system. For more information about running scripts and setting execution policy, see about_Execution_Policies at https://go.microsoft.com/fwlink/?LinkID=135170
+Path                   : D:\a\ciphermoth\ciphermoth\experiments\desktop-spike\app\src-tauri\target\release\bundle\nsis\CipherMoth Spike_0.1.0_x64-setup.exe
+SignatureType          : None
+IsOSBinary             : False
+

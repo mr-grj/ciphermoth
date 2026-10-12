@@ -1,0 +1,77 @@
+{
+  "target": "linux-arm64",
+  "host": {
+    "platform": "Linux-6.8.0-1064-azure-aarch64-with-glibc2.35",
+    "machine": "aarch64",
+    "processor": "aarch64",
+    "cpu_count": 4
+  },
+  "stages": {
+    "build_core": {
+      "ok": true,
+      "seconds": 21.8,
+      "core_dir_bytes": 100876385,
+      "timings": {
+        "install_s": 0.5,
+        "pyinstaller_s": 21.2
+      }
+    },
+    "vectors": {
+      "ok": true,
+      "seconds": 3.8,
+      "passed": 133,
+      "failed": [],
+      "identical_digest": true,
+      "digest": "08b13d45d708e5ca9669acd305bd759171a7ace0a0e44d2d6e49ea03e13bd80a",
+      "environment": {
+        "frozen": true,
+        "python": "3.13.15",
+        "platform": "Linux-6.8.0-1064-azure-aarch64-with-glibc2.35",
+        "machine": "aarch64",
+        "cryptography": "50.0.0",
+        "openssl": "OpenSSL 4.0.1 9 Jun 2026",
+        "bcrypt": "5.0.0",
+        "fastapi": "0.139.0",
+        "pydantic": "2.13.4",
+        "sqlalchemy": "2.0.51",
+        "sqlite": "3.53.1"
+      }
+    },
+    "core_protocol_tests": {
+      "ok": true,
+      "seconds": 29.3
+    },
+    "build_app": {
+      "ok": true,
+      "seconds": 162.9,
+      "bundles": {
+        "CipherMoth Spike_0.1.0_arm64.deb": 42980242
+      },
+      "shell_binary_bytes": 5235968,
+      "core_dir_bytes": 100876385
+    },
+    "install": {
+      "ok": true,
+      "seconds": 5.7,
+      "how": "apt install ./deb",
+      "executable": "/usr/bin/ciphermoth-desktop-spike"
+    },
+    "lifecycle": {
+      "ok": true,
+      "seconds": 32.6,
+      "scenarios": {
+        "repeated_launches": true,
+        "ipc_selftest": true,
+        "normal_quit": true,
+        "window_close": true,
+        "force_kill_shell": true,
+        "graceful_terminate_shell": true,
+        "core_killed_externally": true,
+        "canary_scan": true,
+        "startup_failure_core_error": true,
+        "startup_failure_missing_core": true
+      }
+    }
+  },
+  "ok": true
+}

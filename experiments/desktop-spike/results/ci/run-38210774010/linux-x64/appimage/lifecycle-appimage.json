@@ -1,0 +1,300 @@
+{
+  "host": {
+    "platform": "Linux-6.8.0-1064-azure-x86_64-with-glibc2.35",
+    "machine": "x86_64",
+    "cpu_count": 4,
+    "memory_gb": 15.6
+  },
+  "app": "/home/runner/work/ciphermoth/ciphermoth/experiments/desktop-spike/app/src-tauri/target/release/bundle/appimage/CipherMoth Spike_0.1.0_amd64.AppImage",
+  "preexisting_cores": [],
+  "scenarios": {
+    "repeated_launches": {
+      "ok": true,
+      "first_launch_core_ready_ms": 1023,
+      "warm_core_ready_ms_median": 1042.5,
+      "warm_core_ready_ms_max": 1043,
+      "first_launch_ui_ready_ms": 505,
+      "warm_ui_ready_ms_median": 489.0,
+      "leftover_cores": [],
+      "runs": [
+        {
+          "exit_code": 0,
+          "core_ready_since_launch_ms": 1023,
+          "spawn_to_ready_ms": 930,
+          "ui_ready_since_launch_ms": 505,
+          "wall_s": 2.564
+        },
+        {
+          "exit_code": 0,
+          "core_ready_since_launch_ms": 1042,
+          "spawn_to_ready_ms": 946,
+          "ui_ready_since_launch_ms": 486,
+          "wall_s": 2.562
+        },
+        {
+          "exit_code": 0,
+          "core_ready_since_launch_ms": 1043,
+          "spawn_to_ready_ms": 951,
+          "ui_ready_since_launch_ms": 492,
+          "wall_s": 2.541
+        }
+      ]
+    },
+    "ipc_selftest": {
+      "ok": true,
+      "exit_code": 0,
+      "checks": [
+        {
+          "name": "core ready",
+          "ok": true,
+          "ms": 603,
+          "error": null
+        },
+        {
+          "name": "real CipherMoth route through axios adapter",
+          "ok": true,
+          "ms": 28,
+          "error": null
+        },
+        {
+          "name": "create vault in core, key stays in core",
+          "ok": true,
+          "ms": 385,
+          "error": null
+        },
+        {
+          "name": "small request latency (500 x health)",
+          "ok": true,
+          "ms": 416,
+          "error": null
+        },
+        {
+          "name": "binary echo is byte-identical",
+          "ok": true,
+          "ms": 39,
+          "error": null
+        },
+        {
+          "name": "5 MiB attachment round trip (FormData -> pipe -> Fernet -> SQLite)",
+          "ok": true,
+          "ms": 330,
+          "error": null
+        },
+        {
+          "name": "FormData through the axios adapter",
+          "ok": true,
+          "ms": 24,
+          "error": null
+        },
+        {
+          "name": "1000-entry decrypted listing end to end",
+          "ok": true,
+          "ms": 226,
+          "error": null
+        },
+        {
+          "name": "listing not blocked behind a 5 MiB upload",
+          "ok": true,
+          "ms": 174,
+          "error": null
+        },
+        {
+          "name": "concurrent requests resolve by id",
+          "ok": true,
+          "ms": 312,
+          "error": null
+        },
+        {
+          "name": "timeout cancels the core task",
+          "ok": true,
+          "ms": 410,
+          "error": null
+        },
+        {
+          "name": "explicit cancellation",
+          "ok": true,
+          "ms": 158,
+          "error": null
+        },
+        {
+          "name": "python exception maps to a generic 500",
+          "ok": true,
+          "ms": 14,
+          "error": null
+        },
+        {
+          "name": "renderer cannot reach paths outside the allowlist",
+          "ok": true,
+          "ms": 20,
+          "error": null
+        },
+        {
+          "name": "renderer cannot set arbitrary headers",
+          "ok": true,
+          "ms": 13,
+          "error": null
+        },
+        {
+          "name": "renderer cannot call Tauri APIs outside its capability",
+          "ok": true,
+          "ms": 16,
+          "error": null
+        },
+        {
+          "name": "core environment is scrubbed",
+          "ok": true,
+          "ms": 12,
+          "error": null
+        },
+        {
+          "name": "oversized request refused in Rust before the pipe",
+          "ok": true,
+          "ms": 149,
+          "error": null
+        },
+        {
+          "name": "core crash fails in-flight requests, restarts locked",
+          "ok": true,
+          "ms": 1157,
+          "error": null
+        },
+        {
+          "name": "memory during Argon2id",
+          "ok": true,
+          "ms": 111,
+          "error": null
+        }
+      ],
+      "metrics": {
+        "attachment_5mib": {
+          "download_mb_s": 54.35,
+          "download_ms": 92,
+          "formdata_encode_ms": 26,
+          "upload_mb_s": 33.11,
+          "upload_ms": 151
+        },
+        "core_ready": {
+          "generation": 1,
+          "info": {
+            "core_version": "0.1.0-spike",
+            "frozen": true,
+            "hardening": [
+              "rlimit_core=0",
+              "pr_set_dumpable=0",
+              "pr_set_pdeathsig=SIGKILL"
+            ],
+            "pid": 17477,
+            "protocol": 1,
+            "python": "3.13.15",
+            "ready": true,
+            "since_launch_ms": 1041,
+            "sqlite": "3.53.1",
+            "startup_ms": 753.6,
+            "test_hooks": true
+          },
+          "ready_ms": 946,
+          "reason": null,
+          "restarts": 0,
+          "state": "ready"
+        },
+        "kdf": {
+          "argon2id_ms": 105.1,
+          "peak_rss_after": 163692544,
+          "peak_rss_before": 95272960,
+          "rss_after": 96829440
+        },
+        "listing_1000_ms": {
+          "max": 35,
+          "min": 32
+        },
+        "restart_after_crash_ms": 1028,
+        "small_latency_ms": {
+          "mean": 0.82,
+          "p50": 1,
+          "p95": 1,
+          "p99": 1
+        }
+      },
+      "core_stats": {
+        "cancelled": 0,
+        "env_injected": [],
+        "env_names": [
+          "CIPHERMOTH_SPIKE_TEST_HOOKS",
+          "CRYPTOGRAPHY_OPENSSL_NO_LEGACY",
+          "HOME",
+          "LANG",
+          "LD_LIBRARY_PATH",
+          "PATH",
+          "POSTGRES_HOST",
+          "TMPDIR",
+          "_PYI_ARCHIVE_FILE",
+          "_PYI_LINUX_PROCESS_NAME",
+          "_PYI_PARENT_PROCESS_LEVEL"
+        ],
+        "frozen": true,
+        "machine": "x86_64",
+        "peak_rss_bytes": 163692544,
+        "pid": 17580,
+        "platform": "Linux-6.8.0-1064-azure-x86_64-with-glibc2.35",
+        "python": "3.13.15",
+        "rss_bytes": 96829440,
+        "sqlite_version": "3.53.1",
+        "unlocked": false,
+        "uptime_s": 0.142
+      },
+      "user_agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/60.5 Safari/605.1.15",
+      "core_rss_peak_mb_sampled": 178.4,
+      "leftover_cores": []
+    },
+    "force_kill_shell": {
+      "ok": true,
+      "how": "SIGKILL (real shell under a launcher)",
+      "exit_code": 127,
+      "core_pid": 17673,
+      "core_gone_after_s": 0.0,
+      "sockets": {
+        "listening": [],
+        "inet": [],
+        "core_external": [],
+        "webview_connections": [],
+        "uninspectable": [
+          "ciphermoth-core"
+        ],
+        "namespace_new_listeners": []
+      },
+      "lsof_inet": "",
+      "idle_memory": {
+        "app": {
+          "name": "CipherMoth Spik",
+          "rss_mb": 22.3,
+          "uss_mb": 22.3
+        },
+        "core": {
+          "name": "ciphermoth-core",
+          "rss_mb": 91.4
+        },
+        "webviews": [
+          {
+            "name": "WebKitNetworkProcess",
+            "rss_mb": 49.6,
+            "uss_mb": 10.4
+          },
+          {
+            "name": "WebKitWebProcess",
+            "rss_mb": 185.0,
+            "uss_mb": 86.4
+          }
+        ]
+      },
+      "processes": [
+        "CipherMoth Spik",
+        "WebKitNetworkProcess",
+        "WebKitWebProcess",
+        "ciphermoth-core",
+        "ciphermoth-desktop-spike"
+      ]
+    }
+  },
+  "final_leftover_cores": [],
+  "ok": true
+}

@@ -1,0 +1,19 @@
+{
+  "preexisting_listeners": [
+    {
+      "laddr": "addr(ip='0.0.0.0', port=80)",
+      "pid": 4,
+      "name": "System"
+    },
+    {
+      "laddr": "addr(ip='::', port=80)",
+      "pid": 4,
+      "name": "System"
+    }
+  ],
+  "sinks": [
+    "127.0.0.1:80 bind failed: [WinError 10013] An attempt was made to access a socket in a way forbidden by its access permissions",
+    "::1:80 bind failed: [WinError 10013] An attempt was made to access a socket in a way forbidden by its access permissions"
+  ],
+  "connections": []
+}

@@ -1,0 +1,18 @@
+{
+  "passed": 133,
+  "failed": [],
+  "results_sha256": "08b13d45d708e5ca9669acd305bd759171a7ace0a0e44d2d6e49ea03e13bd80a",
+  "environment": {
+    "frozen": true,
+    "python": "3.13.15",
+    "platform": "Linux-6.8.0-1064-azure-aarch64-with-glibc2.35",
+    "machine": "aarch64",
+    "cryptography": "50.0.0",
+    "openssl": "OpenSSL 4.0.1 9 Jun 2026",
+    "bcrypt": "5.0.0",
+    "fastapi": "0.139.0",
+    "pydantic": "2.13.4",
+    "sqlalchemy": "2.0.51",
+    "sqlite": "3.53.1"
+  }
+}

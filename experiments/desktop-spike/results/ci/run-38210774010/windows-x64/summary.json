@@ -1,0 +1,77 @@
+{
+  "target": "windows-x64",
+  "host": {
+    "platform": "Windows-2025Server-10.0.26100-SP0",
+    "machine": "AMD64",
+    "processor": "AMD64 Family 25 Model 1 Stepping 1, AuthenticAMD",
+    "cpu_count": 4
+  },
+  "stages": {
+    "build_core": {
+      "ok": true,
+      "seconds": 36.8,
+      "core_dir_bytes": 55294491,
+      "timings": {
+        "install_s": 1.2,
+        "pyinstaller_s": 35.3
+      }
+    },
+    "vectors": {
+      "ok": true,
+      "seconds": 5.2,
+      "passed": 133,
+      "failed": [],
+      "identical_digest": true,
+      "digest": "08b13d45d708e5ca9669acd305bd759171a7ace0a0e44d2d6e49ea03e13bd80a",
+      "environment": {
+        "frozen": true,
+        "python": "3.13.15",
+        "platform": "Windows-2025Server-10.0.26100-SP0",
+        "machine": "AMD64",
+        "cryptography": "50.0.0",
+        "openssl": "OpenSSL 4.0.1 9 Jun 2026",
+        "bcrypt": "5.0.0",
+        "fastapi": "0.139.0",
+        "pydantic": "2.13.4",
+        "sqlalchemy": "2.0.51",
+        "sqlite": "3.53.1"
+      }
+    },
+    "core_protocol_tests": {
+      "ok": true,
+      "seconds": 48.1
+    },
+    "build_app": {
+      "ok": true,
+      "seconds": 367.6,
+      "bundles": {
+        "CipherMoth Spike_0.1.0_x64-setup.exe": 25235627
+      },
+      "shell_binary_bytes": 5017088,
+      "core_dir_bytes": 55294491
+    },
+    "install": {
+      "ok": true,
+      "seconds": 12.1,
+      "how": "NSIS /S (currentUser)",
+      "executable": "C:\\Users\\runneradmin\\AppData\\Local\\CipherMoth Spike\\ciphermoth-desktop-spike.exe"
+    },
+    "lifecycle": {
+      "ok": true,
+      "seconds": 69.4,
+      "scenarios": {
+        "repeated_launches": true,
+        "ipc_selftest": true,
+        "normal_quit": true,
+        "window_close": true,
+        "force_kill_shell": true,
+        "graceful_terminate_shell": true,
+        "core_killed_externally": true,
+        "canary_scan": true,
+        "startup_failure_core_error": true,
+        "startup_failure_missing_core": true
+      }
+    }
+  },
+  "ok": true
+}

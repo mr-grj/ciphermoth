@@ -1,0 +1,16 @@
+{
+  "target": "linux-x64",
+  "host": {
+    "platform": "Linux-6.8.0-1064-azure-x86_64-with-glibc2.35",
+    "machine": "x86_64",
+    "processor": "x86_64",
+    "cpu_count": 4
+  },
+  "stages": {
+    "appimage_lifecycle": {
+      "ok": true,
+      "seconds": 19.9
+    }
+  },
+  "ok": true
+}

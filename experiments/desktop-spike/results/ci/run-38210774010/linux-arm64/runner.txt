@@ -1,0 +1,10 @@
+runner=ubuntu-22.04-arm
+Linux runnervmznin2 6.8.0-1064-azure #72~22.04.1-Ubuntu SMP Wed Jul 22 22:38:59 UTC 2026 aarch64 aarch64 aarch64 GNU/Linux
+Distributor ID:	Ubuntu
+Description:	Ubuntu 22.04.5 LTS
+Release:	22.04
+Codename:	jammy
+4
+               total        used        free      shared  buff/cache   available
+Mem:           15949         876       13794          42        1279       14796
+Swap:           3071           0        3071

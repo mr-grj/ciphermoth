@@ -1,0 +1,453 @@
+{
+  "host": {
+    "platform": "macOS-15.7.9-x86_64-i386-64bit-Mach-O",
+    "machine": "x86_64",
+    "cpu_count": 4,
+    "memory_gb": 14.0
+  },
+  "app": "/Users/runner/cm-spike-install/CipherMoth Spike.app/Contents/MacOS/ciphermoth-desktop-spike",
+  "preexisting_cores": [],
+  "scenarios": {
+    "repeated_launches": {
+      "ok": true,
+      "first_launch_core_ready_ms": 3735,
+      "warm_core_ready_ms_median": 1779,
+      "warm_core_ready_ms_max": 1874,
+      "first_launch_ui_ready_ms": 3249,
+      "warm_ui_ready_ms_median": 857,
+      "leftover_cores": [],
+      "runs": [
+        {
+          "exit_code": 0,
+          "core_ready_since_launch_ms": 3735,
+          "spawn_to_ready_ms": 2322,
+          "ui_ready_since_launch_ms": 3249,
+          "wall_s": 4.298
+        },
+        {
+          "exit_code": 0,
+          "core_ready_since_launch_ms": 1817,
+          "spawn_to_ready_ms": 1439,
+          "ui_ready_since_launch_ms": 926,
+          "wall_s": 2.492
+        },
+        {
+          "exit_code": 0,
+          "core_ready_since_launch_ms": 1723,
+          "spawn_to_ready_ms": 1385,
+          "ui_ready_since_launch_ms": 886,
+          "wall_s": 2.36
+        },
+        {
+          "exit_code": 0,
+          "core_ready_since_launch_ms": 1547,
+          "spawn_to_ready_ms": 1327,
+          "ui_ready_since_launch_ms": 692,
+          "wall_s": 2.198
+        },
+        {
+          "exit_code": 0,
+          "core_ready_since_launch_ms": 1797,
+          "spawn_to_ready_ms": 1515,
+          "ui_ready_since_launch_ms": 778,
+          "wall_s": 2.382
+        },
+        {
+          "exit_code": 0,
+          "core_ready_since_launch_ms": 1779,
+          "spawn_to_ready_ms": 1473,
+          "ui_ready_since_launch_ms": 857,
+          "wall_s": 2.386
+        },
+        {
+          "exit_code": 0,
+          "core_ready_since_launch_ms": 1874,
+          "spawn_to_ready_ms": 1518,
+          "ui_ready_since_launch_ms": 980,
+          "wall_s": 2.659
+        },
+        {
+          "exit_code": 0,
+          "core_ready_since_launch_ms": 1531,
+          "spawn_to_ready_ms": 1299,
+          "ui_ready_since_launch_ms": 691,
+          "wall_s": 2.201
+        }
+      ]
+    },
+    "ipc_selftest": {
+      "ok": true,
+      "exit_code": 0,
+      "checks": [
+        {
+          "name": "core ready",
+          "ok": true,
+          "ms": 937,
+          "error": null
+        },
+        {
+          "name": "real CipherMoth route through axios adapter",
+          "ok": true,
+          "ms": 43,
+          "error": null
+        },
+        {
+          "name": "create vault in core, key stays in core",
+          "ok": true,
+          "ms": 338,
+          "error": null
+        },
+        {
+          "name": "small request latency (500 x health)",
+          "ok": true,
+          "ms": 1064,
+          "error": null
+        },
+        {
+          "name": "binary echo is byte-identical",
+          "ok": true,
+          "ms": 38,
+          "error": null
+        },
+        {
+          "name": "5 MiB attachment round trip (FormData -> pipe -> Fernet -> SQLite)",
+          "ok": true,
+          "ms": 388,
+          "error": null
+        },
+        {
+          "name": "FormData through the axios adapter",
+          "ok": true,
+          "ms": 93,
+          "error": null
+        },
+        {
+          "name": "1000-entry decrypted listing end to end",
+          "ok": true,
+          "ms": 412,
+          "error": null
+        },
+        {
+          "name": "listing not blocked behind a 5 MiB upload",
+          "ok": true,
+          "ms": 176,
+          "error": null
+        },
+        {
+          "name": "concurrent requests resolve by id",
+          "ok": true,
+          "ms": 316,
+          "error": null
+        },
+        {
+          "name": "timeout cancels the core task",
+          "ok": true,
+          "ms": 561,
+          "error": null
+        },
+        {
+          "name": "explicit cancellation",
+          "ok": true,
+          "ms": 161,
+          "error": null
+        },
+        {
+          "name": "python exception maps to a generic 500",
+          "ok": true,
+          "ms": 13,
+          "error": null
+        },
+        {
+          "name": "renderer cannot reach paths outside the allowlist",
+          "ok": true,
+          "ms": 23,
+          "error": null
+        },
+        {
+          "name": "renderer cannot set arbitrary headers",
+          "ok": true,
+          "ms": 10,
+          "error": null
+        },
+        {
+          "name": "renderer cannot call Tauri APIs outside its capability",
+          "ok": true,
+          "ms": 17,
+          "error": null
+        },
+        {
+          "name": "core environment is scrubbed",
+          "ok": true,
+          "ms": 7,
+          "error": null
+        },
+        {
+          "name": "oversized request refused in Rust before the pipe",
+          "ok": true,
+          "ms": 125,
+          "error": null
+        },
+        {
+          "name": "core crash fails in-flight requests, restarts locked",
+          "ok": true,
+          "ms": 1548,
+          "error": null
+        },
+        {
+          "name": "memory during Argon2id",
+          "ok": true,
+          "ms": 111,
+          "error": null
+        }
+      ],
+      "metrics": {
+        "attachment_5mib": {
+          "download_mb_s": 40.32,
+          "download_ms": 124,
+          "formdata_encode_ms": 23,
+          "upload_mb_s": 32.47,
+          "upload_ms": 154
+        },
+        "core_ready": {
+          "generation": 1,
+          "info": {
+            "core_version": "0.1.0-spike",
+            "frozen": true,
+            "hardening": [
+              "rlimit_core=0"
+            ],
+            "pid": 54531,
+            "protocol": 1,
+            "python": "3.13.15",
+            "ready": true,
+            "since_launch_ms": 1679,
+            "sqlite": "3.53.1",
+            "startup_ms": 1117.7,
+            "test_hooks": true
+          },
+          "ready_ms": 1448,
+          "reason": null,
+          "restarts": 0,
+          "state": "ready"
+        },
+        "kdf": {
+          "argon2id_ms": 102.4,
+          "peak_rss_after": 152199168,
+          "peak_rss_before": 84471808,
+          "rss_after": null
+        },
+        "listing_1000_ms": {
+          "max": 66,
+          "min": 64
+        },
+        "restart_after_crash_ms": 1419,
+        "small_latency_ms": {
+          "mean": 2.11,
+          "p50": 2,
+          "p95": 3,
+          "p99": 3
+        }
+      },
+      "core_stats": {
+        "cancelled": 0,
+        "env_injected": [],
+        "env_names": [
+          "CIPHERMOTH_SPIKE_TEST_HOOKS",
+          "CRYPTOGRAPHY_OPENSSL_NO_LEGACY",
+          "HOME",
+          "LANG",
+          "PATH",
+          "POSTGRES_HOST",
+          "TMPDIR",
+          "_PYI_ARCHIVE_FILE",
+          "_PYI_PARENT_PROCESS_LEVEL",
+          "__CF_USER_TEXT_ENCODING"
+        ],
+        "frozen": true,
+        "machine": "x86_64",
+        "peak_rss_bytes": 152440832,
+        "pid": 54601,
+        "platform": "macOS-15.7.9-x86_64-i386-64bit-Mach-O",
+        "python": "3.13.15",
+        "rss_bytes": null,
+        "sqlite_version": "3.53.1",
+        "unlocked": false,
+        "uptime_s": 0.172
+      },
+      "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)",
+      "core_rss_peak_mb_sampled": 146.9,
+      "leftover_cores": []
+    },
+    "normal_quit": {
+      "ok": true,
+      "exit_code": 0,
+      "core_pid": 54792,
+      "core_gone_after_s": 3.957399985665688e-05,
+      "marks": {
+        "core_ready": {
+          "core_pid": 54792,
+          "core_startup_ms": 1052.5,
+          "since_launch_ms": 1575,
+          "spawn_to_ready_ms": 1347
+        },
+        "ui_ready": {
+          "js_ms": 239.00000000000003,
+          "since_launch_ms": 694
+        }
+      }
+    },
+    "window_close": {
+      "ok": true,
+      "exit_code": 0,
+      "core_pid": 54802,
+      "core_gone_after_s": 3.588499998841144e-05,
+      "marks": {
+        "core_ready": {
+          "core_pid": 54802,
+          "core_startup_ms": 1028.0,
+          "since_launch_ms": 1558,
+          "spawn_to_ready_ms": 1320
+        },
+        "ui_ready": {
+          "js_ms": 236.00000000000003,
+          "since_launch_ms": 697
+        }
+      }
+    },
+    "force_kill_shell": {
+      "ok": true,
+      "how": "SIGKILL",
+      "exit_code": -9,
+      "core_pid": 54813,
+      "core_gone_after_s": 0.353,
+      "sockets": {
+        "listening": [],
+        "inet": [],
+        "core_external": [],
+        "webview_connections": [],
+        "uninspectable": [],
+        "namespace_new_listeners": []
+      },
+      "lsof_inet": "",
+      "idle_memory": {
+        "app": {
+          "name": "ciphermoth-desktop-spike",
+          "rss_mb": 47.2
+        },
+        "core": {
+          "name": "ciphermoth-core",
+          "rss_mb": 81.1
+        },
+        "webviews": [
+          {
+            "name": "com.apple.WebKit.GPU",
+            "rss_mb": 15.3
+          },
+          {
+            "name": "com.apple.WebKit.WebContent",
+            "rss_mb": 47.5
+          },
+          {
+            "name": "com.apple.WebKit.Networking",
+            "rss_mb": 8.8
+          }
+        ]
+      },
+      "processes": [
+        "ciphermoth-core",
+        "ciphermoth-desktop-spike",
+        "com.apple.WebKit.GPU",
+        "com.apple.WebKit.Networking",
+        "com.apple.WebKit.WebContent"
+      ]
+    },
+    "graceful_terminate_shell": {
+      "ok": true,
+      "how": "SIGTERM",
+      "exit_code": -15,
+      "core_pid": 54829,
+      "core_gone_after_s": 0.326,
+      "sockets": {
+        "listening": [],
+        "inet": [],
+        "core_external": [],
+        "webview_connections": [],
+        "uninspectable": [],
+        "namespace_new_listeners": []
+      },
+      "lsof_inet": "",
+      "idle_memory": {
+        "app": {
+          "name": "ciphermoth-desktop-spike",
+          "rss_mb": 47.0
+        },
+        "core": {
+          "name": "ciphermoth-core",
+          "rss_mb": 80.8
+        },
+        "webviews": [
+          {
+            "name": "com.apple.WebKit.GPU",
+            "rss_mb": 15.4
+          },
+          {
+            "name": "com.apple.WebKit.WebContent",
+            "rss_mb": 47.5
+          },
+          {
+            "name": "com.apple.WebKit.Networking",
+            "rss_mb": 8.9
+          }
+        ]
+      },
+      "processes": [
+        "ciphermoth-core",
+        "ciphermoth-desktop-spike",
+        "com.apple.WebKit.GPU",
+        "com.apple.WebKit.Networking",
+        "com.apple.WebKit.WebContent"
+      ]
+    },
+    "core_killed_externally": {
+      "ok": true,
+      "old_core": 55081,
+      "new_core": 55087,
+      "respawned_after_s": 0.483,
+      "app_survived": true,
+      "new_core_gone_after_app_kill_s": 1.1810524649999934
+    },
+    "canary_scan": {
+      "ok": true,
+      "exit_code": 0,
+      "selftest_ok": true,
+      "roots": [
+        "/private/var/folders/20/jp1_0n3n7kndh6rnbqb5344m0000gn/T/cm-spike-sfuqryq1/canary",
+        "/Users/runner/Library/WebKit/com.ciphermoth.desktop-spike",
+        "/Users/runner/Library/Caches/com.ciphermoth.desktop-spike",
+        "/Users/runner/Library/HTTPStorages",
+        "/Users/runner/Library/Logs/DiagnosticReports",
+        "/var/folders/20/jp1_0n3n7kndh6rnbqb5344m0000gn/T"
+      ],
+      "hits": [],
+      "scanned_files": 20,
+      "unreadable_or_large": 0
+    },
+    "startup_failure_core_error": {
+      "ok": true,
+      "reason_shown": "the core failed to start (exited, exit Some(1))",
+      "app_survived": true
+    },
+    "startup_failure_missing_core": {
+      "ok": true,
+      "reason_shown": "could not start the core: No such file or directory (os error 2)",
+      "app_survived": true
+    },
+    "symlinked_launch_fails_closed": {
+      "ok": true,
+      "reason_shown": "could not start the core: cannot locate the bundled core: unknown path",
+      "app_survived": true
+    }
+  },
+  "final_leftover_cores": [],
+  "ok": true
+}

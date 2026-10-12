@@ -1,0 +1,32 @@
+runner=windows-11-arm
+MINGW64_NT-10.0-26200-ARM64 runnervmyf5rf 3.6.10-5a1665c8.x86_64 2026-09-28 10:40 UTC x86_64 Msys
+
+Host Name:                     runnervmyf5rf
+OS Name:                       Microsoft Windows 11 Enterprise
+OS Version:                    10.0.26200 N/A Build 26200
+OS Manufacturer:               Microsoft Corporation
+OS Configuration:              Standalone Workstation
+OS Build Type:                 Multiprocessor Free
+Registered Owner:              N/A
+Registered Organization:       N/A
+Product ID:                    00329-00000-00003-AA046
+Original Install Date:         10/5/2026, 1:51:30 AM
+System Boot Time:              10/12/2026, 6:01:11 AM
+System Manufacturer:           Microsoft Corporation
+System Model:                  Virtual Machine
+System Type:                   ARM64-based PC
+Processor(s):                  1 Processor(s) Installed.
+                               [01]: ARMv8 (64-bit) Family 8 Model D49 Revision   0 MICROSOFT CORPORATION ~3397 Mhz
+BIOS Version:                  Microsoft Corporation Hyper-V UEFI Release v4.1, 4/22/2026
+Windows Directory:             C:\Windows
+System Directory:              C:\Windows\system32
+Boot Device:                   \Device\HarddiskVolume3
+System Locale:                 en-us;English (United States)
+Input Locale:                  en-us;English (United States)
+Time Zone:                     (UTC-08:00) Pacific Time (US & Canada)
+Total Physical Memory:         16,374 MB
+Available Physical Memory:     13,178 MB
+Virtual Memory: Max Size:      19,318 MB
+Virtual Memory: Available:     16,445 MB
+Virtual Memory: In Use:        2,873 MB
+Page File Location(s):         C:\pagefile.sys

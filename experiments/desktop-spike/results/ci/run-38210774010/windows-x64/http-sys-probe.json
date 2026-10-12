@@ -1,0 +1,9 @@
+{
+  "prefixes": [
+    "http://ipc.localhost:80/",
+    "http://localhost:80/",
+    "http://tauri.localhost:80/"
+  ],
+  "started": true,
+  "requests": []
+}

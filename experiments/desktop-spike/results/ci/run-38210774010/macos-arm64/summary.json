@@ -1,0 +1,79 @@
+{
+  "target": "macos-arm64",
+  "host": {
+    "platform": "macOS-15.7.9-arm64-arm-64bit-Mach-O",
+    "machine": "arm64",
+    "processor": "arm",
+    "cpu_count": 3
+  },
+  "stages": {
+    "build_core": {
+      "ok": true,
+      "seconds": 30.7,
+      "core_dir_bytes": 56619413,
+      "timings": {
+        "install_s": 1.4,
+        "pyinstaller_s": 29.2
+      }
+    },
+    "vectors": {
+      "ok": true,
+      "seconds": 12.6,
+      "passed": 133,
+      "failed": [],
+      "identical_digest": true,
+      "digest": "08b13d45d708e5ca9669acd305bd759171a7ace0a0e44d2d6e49ea03e13bd80a",
+      "environment": {
+        "frozen": true,
+        "python": "3.13.15",
+        "platform": "macOS-15.7.9-arm64-arm-64bit-Mach-O",
+        "machine": "arm64",
+        "cryptography": "50.0.0",
+        "openssl": "OpenSSL 4.0.1 9 Jun 2026",
+        "bcrypt": "5.0.0",
+        "fastapi": "0.139.0",
+        "pydantic": "2.13.4",
+        "sqlalchemy": "2.0.51",
+        "sqlite": "3.53.1"
+      }
+    },
+    "core_protocol_tests": {
+      "ok": true,
+      "seconds": 32.1
+    },
+    "build_app": {
+      "ok": true,
+      "seconds": 187.8,
+      "bundles": {
+        "CipherMoth Spike.app": 61569071,
+        "CipherMoth Spike_0.1.0_aarch64.dmg": 30706827
+      },
+      "shell_binary_bytes": 4790880,
+      "core_dir_bytes": 56619413
+    },
+    "install": {
+      "ok": true,
+      "seconds": 0.2,
+      "how": "ditto .app",
+      "executable": "/Users/runner/cm-spike-install/CipherMoth Spike.app/Contents/MacOS/ciphermoth-desktop-spike"
+    },
+    "lifecycle": {
+      "ok": true,
+      "seconds": 67.2,
+      "scenarios": {
+        "repeated_launches": true,
+        "ipc_selftest": true,
+        "normal_quit": true,
+        "window_close": true,
+        "force_kill_shell": true,
+        "graceful_terminate_shell": true,
+        "core_killed_externally": true,
+        "canary_scan": true,
+        "startup_failure_core_error": true,
+        "startup_failure_missing_core": true,
+        "symlinked_launch_fails_closed": true
+      }
+    }
+  },
+  "ok": true
+}

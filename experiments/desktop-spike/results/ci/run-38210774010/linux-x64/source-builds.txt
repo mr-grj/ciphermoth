@@ -1,0 +1,6 @@
+appimage_build_ok=1 appimage_build_s=162
+total 117288
+drwxr-xr-x 3 runner runner      4096 Oct 12 06:12 .
+drwxr-xr-x 4 runner runner      4096 Oct 12 06:12 ..
+drwxr-xr-x 4 runner runner      4096 Oct 12 06:12 CipherMoth Spike.AppDir
+-rwxr-xr-x 1 runner runner 120089080 Oct 12 06:12 CipherMoth Spike_0.1.0_amd64.AppImage

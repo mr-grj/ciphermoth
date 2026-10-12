@@ -1,0 +1,234 @@
+{
+  "host": {
+    "platform": "Windows-2025Server-10.0.26100-SP0",
+    "machine": "AMD64",
+    "cpu_count": 4,
+    "memory_gb": 16.0
+  },
+  "app": "C:\\Users\\runneradmin\\AppData\\Local\\CipherMoth Spike\\ciphermoth-desktop-spike.exe",
+  "preexisting_cores": [],
+  "scenarios": {
+    "ipc_selftest": {
+      "ok": true,
+      "exit_code": 0,
+      "checks": [
+        {
+          "name": "core ready",
+          "ok": true,
+          "ms": 1069.2,
+          "error": null
+        },
+        {
+          "name": "real CipherMoth route through axios adapter",
+          "ok": true,
+          "ms": 30.3,
+          "error": null
+        },
+        {
+          "name": "create vault in core, key stays in core",
+          "ok": true,
+          "ms": 398.1,
+          "error": null
+        },
+        {
+          "name": "small request latency (500 x health)",
+          "ok": true,
+          "ms": 1196.9,
+          "error": null
+        },
+        {
+          "name": "binary echo is byte-identical",
+          "ok": true,
+          "ms": 54,
+          "error": null
+        },
+        {
+          "name": "5 MiB attachment round trip (FormData -> pipe -> Fernet -> SQLite)",
+          "ok": true,
+          "ms": 1042.2,
+          "error": null
+        },
+        {
+          "name": "FormData through the axios adapter",
+          "ok": true,
+          "ms": 83.3,
+          "error": null
+        },
+        {
+          "name": "1000-entry decrypted listing end to end",
+          "ok": true,
+          "ms": 269.5,
+          "error": null
+        },
+        {
+          "name": "listing not blocked behind a 5 MiB upload",
+          "ok": true,
+          "ms": 829,
+          "error": null
+        },
+        {
+          "name": "concurrent requests resolve by id",
+          "ok": true,
+          "ms": 324.7,
+          "error": null
+        },
+        {
+          "name": "timeout cancels the core task",
+          "ok": true,
+          "ms": 476.5,
+          "error": null
+        },
+        {
+          "name": "explicit cancellation",
+          "ok": true,
+          "ms": 173.6,
+          "error": null
+        },
+        {
+          "name": "python exception maps to a generic 500",
+          "ok": true,
+          "ms": 13.9,
+          "error": null
+        },
+        {
+          "name": "renderer cannot reach paths outside the allowlist",
+          "ok": true,
+          "ms": 11.4,
+          "error": null
+        },
+        {
+          "name": "renderer cannot set arbitrary headers",
+          "ok": true,
+          "ms": 8,
+          "error": null
+        },
+        {
+          "name": "renderer cannot call Tauri APIs outside its capability",
+          "ok": true,
+          "ms": 26.4,
+          "error": null
+        },
+        {
+          "name": "core environment is scrubbed",
+          "ok": true,
+          "ms": 10.9,
+          "error": null
+        },
+        {
+          "name": "oversized request refused in Rust before the pipe",
+          "ok": true,
+          "ms": 341.9,
+          "error": null
+        },
+        {
+          "name": "core crash fails in-flight requests, restarts locked",
+          "ok": true,
+          "ms": 1469.1,
+          "error": null
+        },
+        {
+          "name": "memory during Argon2id",
+          "ok": true,
+          "ms": 103.1,
+          "error": null
+        }
+      ],
+      "metrics": {
+        "attachment_5mib": {
+          "download_mb_s": 47.48,
+          "download_ms": 105.3,
+          "formdata_encode_ms": 12,
+          "upload_mb_s": 5.52,
+          "upload_ms": 905.5
+        },
+        "core_ready": {
+          "generation": 1,
+          "info": {
+            "core_version": "0.1.0-spike",
+            "frozen": true,
+            "hardening": [
+              "seterrormode",
+              "wer_noheap"
+            ],
+            "pid": 6272,
+            "protocol": 1,
+            "python": "3.13.15",
+            "ready": true,
+            "since_launch_ms": 1768,
+            "sqlite": "3.53.1",
+            "startup_ms": 909.3,
+            "test_hooks": true
+          },
+          "ready_ms": 1250,
+          "reason": null,
+          "restarts": 0,
+          "state": "ready"
+        },
+        "kdf": {
+          "argon2id_ms": 91,
+          "peak_rss_after": 158511104,
+          "peak_rss_before": 90742784,
+          "rss_after": 91348992
+        },
+        "listing_1000_ms": {
+          "max": 40.8,
+          "min": 38.2
+        },
+        "restart_after_crash_ms": 1286.4,
+        "small_latency_ms": {
+          "mean": 2.38,
+          "p50": 2.3,
+          "p95": 2.9,
+          "p99": 3.6
+        }
+      },
+      "core_stats": {
+        "cancelled": 0,
+        "env_injected": [],
+        "env_names": [
+          "CIPHERMOTH_SPIKE_TEST_HOOKS",
+          "CRYPTOGRAPHY_OPENSSL_NO_LEGACY",
+          "LOCALAPPDATA",
+          "PATH",
+          "POSTGRES_HOST",
+          "SYSTEMROOT",
+          "TEMP",
+          "TMP",
+          "USERPROFILE",
+          "WINDIR",
+          "_PYI_ARCHIVE_FILE",
+          "_PYI_PARENT_PROCESS_LEVEL"
+        ],
+        "frozen": true,
+        "machine": "AMD64",
+        "peak_rss_bytes": 158511104,
+        "pid": 8384,
+        "platform": "Windows-2025Server-10.0.26100-SP0",
+        "python": "3.13.15",
+        "rss_bytes": 91549696,
+        "sqlite_version": "3.53.1",
+        "unlocked": false,
+        "uptime_s": 0.181
+      },
+      "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36 Edg/153.0.0.0",
+      "core_rss_peak_mb_sampled": 152.3,
+      "leftover_cores": []
+    },
+    "canary_scan": {
+      "ok": true,
+      "exit_code": 0,
+      "selftest_ok": true,
+      "roots": [
+        "C:\\Users\\runneradmin\\AppData\\Local\\Temp\\cm-spike-5u8asfuj\\canary",
+        "C:\\Users\\runneradmin\\AppData\\Local\\com.ciphermoth.desktop-spike",
+        "C:\\Users\\runneradmin\\AppData\\Local\\Temp",
+        "C:\\Users\\RUNNER~1\\AppData\\Local\\Temp"
+      ],
+      "hits": [],
+      "scanned_files": 60,
+      "unreadable_or_large": 0
+    }
+  },
+  "final_leftover_cores": [],
+  "ok": true
+}

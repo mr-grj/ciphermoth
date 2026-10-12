@@ -1,0 +1,8 @@
+runner=macos-15
+Darwin sjc22-bm213-26150cfd-8f44-4a7c-b517-1c9faae29c02-0A07CDC33A72.local 24.6.0 Darwin Kernel Version 24.6.0: Tue Jul 21 20:51:34 PDT 2026; root:xnu-11417.140.69.711.44~1/RELEASE_ARM64_VMAPPLE arm64
+ProductName:		macOS
+ProductVersion:		15.7.9
+BuildVersion:		24G830
+Apple M1 (Virtual)
+7516192768
+3

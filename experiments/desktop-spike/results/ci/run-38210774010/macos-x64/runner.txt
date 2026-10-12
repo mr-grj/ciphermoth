@@ -1,0 +1,8 @@
+runner=macos-15-intel
+Darwin sjc20-bb655-ed84f312-f42c-40c4-b363-f9091585c530-66E51AE0B85A.local 24.6.0 Darwin Kernel Version 24.6.0: Tue Jul 21 20:50:07 PDT 2026; root:xnu-11417.140.69.711.44~1/RELEASE_X86_64 x86_64
+ProductName:		macOS
+ProductVersion:		15.7.9
+BuildVersion:		24G830
+Intel(R) Core(TM) i7-8700B CPU @ 3.20GHz
+15032385536
+4

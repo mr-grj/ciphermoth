@@ -1,0 +1,651 @@
+{
+  "host": {
+    "platform": "Windows-2025Server-10.0.26100-SP0",
+    "machine": "AMD64",
+    "cpu_count": 4,
+    "memory_gb": 16.0
+  },
+  "app": "C:\\Users\\runneradmin\\AppData\\Local\\CipherMoth Spike\\ciphermoth-desktop-spike.exe",
+  "preexisting_cores": [],
+  "scenarios": {
+    "repeated_launches": {
+      "ok": true,
+      "first_launch_core_ready_ms": 6810,
+      "warm_core_ready_ms_median": 1616,
+      "warm_core_ready_ms_max": 1882,
+      "first_launch_ui_ready_ms": 6167,
+      "warm_ui_ready_ms_median": 703,
+      "leftover_cores": [],
+      "runs": [
+        {
+          "exit_code": 0,
+          "core_ready_since_launch_ms": 6810,
+          "spawn_to_ready_ms": 1250,
+          "ui_ready_since_launch_ms": 6167,
+          "wall_s": 7.258
+        },
+        {
+          "exit_code": 0,
+          "core_ready_since_launch_ms": 1882,
+          "spawn_to_ready_ms": 1273,
+          "ui_ready_since_launch_ms": 822,
+          "wall_s": 2.29
+        },
+        {
+          "exit_code": 0,
+          "core_ready_since_launch_ms": 1616,
+          "spawn_to_ready_ms": 1113,
+          "ui_ready_since_launch_ms": 706,
+          "wall_s": 2.023
+        },
+        {
+          "exit_code": 0,
+          "core_ready_since_launch_ms": 1587,
+          "spawn_to_ready_ms": 1101,
+          "ui_ready_since_launch_ms": 675,
+          "wall_s": 1.994
+        },
+        {
+          "exit_code": 0,
+          "core_ready_since_launch_ms": 1647,
+          "spawn_to_ready_ms": 1139,
+          "ui_ready_since_launch_ms": 718,
+          "wall_s": 2.058
+        },
+        {
+          "exit_code": 0,
+          "core_ready_since_launch_ms": 1611,
+          "spawn_to_ready_ms": 1105,
+          "ui_ready_since_launch_ms": 698,
+          "wall_s": 2.015
+        },
+        {
+          "exit_code": 0,
+          "core_ready_since_launch_ms": 1607,
+          "spawn_to_ready_ms": 1120,
+          "ui_ready_since_launch_ms": 692,
+          "wall_s": 2.013
+        },
+        {
+          "exit_code": 0,
+          "core_ready_since_launch_ms": 1693,
+          "spawn_to_ready_ms": 1182,
+          "ui_ready_since_launch_ms": 703,
+          "wall_s": 2.1
+        }
+      ]
+    },
+    "ipc_selftest": {
+      "ok": true,
+      "exit_code": 0,
+      "checks": [
+        {
+          "name": "core ready",
+          "ok": true,
+          "ms": 1066.5,
+          "error": null
+        },
+        {
+          "name": "real CipherMoth route through axios adapter",
+          "ok": true,
+          "ms": 39.2,
+          "error": null
+        },
+        {
+          "name": "create vault in core, key stays in core",
+          "ok": true,
+          "ms": 409.9,
+          "error": null
+        },
+        {
+          "name": "small request latency (500 x health)",
+          "ok": true,
+          "ms": 1299.2,
+          "error": null
+        },
+        {
+          "name": "binary echo is byte-identical",
+          "ok": true,
+          "ms": 48.9,
+          "error": null
+        },
+        {
+          "name": "5 MiB attachment round trip (FormData -> pipe -> Fernet -> SQLite)",
+          "ok": true,
+          "ms": 873.1,
+          "error": null
+        },
+        {
+          "name": "FormData through the axios adapter",
+          "ok": true,
+          "ms": 86.4,
+          "error": null
+        },
+        {
+          "name": "1000-entry decrypted listing end to end",
+          "ok": true,
+          "ms": 261.6,
+          "error": null
+        },
+        {
+          "name": "listing not blocked behind a 5 MiB upload",
+          "ok": true,
+          "ms": 775.6,
+          "error": null
+        },
+        {
+          "name": "concurrent requests resolve by id",
+          "ok": true,
+          "ms": 320.4,
+          "error": null
+        },
+        {
+          "name": "timeout cancels the core task",
+          "ok": true,
+          "ms": 459.4,
+          "error": null
+        },
+        {
+          "name": "explicit cancellation",
+          "ok": true,
+          "ms": 161.2,
+          "error": null
+        },
+        {
+          "name": "python exception maps to a generic 500",
+          "ok": true,
+          "ms": 11.9,
+          "error": null
+        },
+        {
+          "name": "renderer cannot reach paths outside the allowlist",
+          "ok": true,
+          "ms": 15,
+          "error": null
+        },
+        {
+          "name": "renderer cannot set arbitrary headers",
+          "ok": true,
+          "ms": 9.7,
+          "error": null
+        },
+        {
+          "name": "renderer cannot call Tauri APIs outside its capability",
+          "ok": true,
+          "ms": 27.7,
+          "error": null
+        },
+        {
+          "name": "core environment is scrubbed",
+          "ok": true,
+          "ms": 10,
+          "error": null
+        },
+        {
+          "name": "oversized request refused in Rust before the pipe",
+          "ok": true,
+          "ms": 322.9,
+          "error": null
+        },
+        {
+          "name": "core crash fails in-flight requests, restarts locked",
+          "ok": true,
+          "ms": 1495.1,
+          "error": null
+        },
+        {
+          "name": "memory during Argon2id",
+          "ok": true,
+          "ms": 100.1,
+          "error": null
+        }
+      ],
+      "metrics": {
+        "attachment_5mib": {
+          "download_mb_s": 50.05,
+          "download_ms": 99.9,
+          "formdata_encode_ms": 11.9,
+          "upload_mb_s": 6.73,
+          "upload_ms": 742.4
+        },
+        "core_ready": {
+          "generation": 1,
+          "info": {
+            "core_version": "0.1.0-spike",
+            "frozen": true,
+            "hardening": [
+              "seterrormode",
+              "wer_noheap"
+            ],
+            "pid": 624,
+            "protocol": 1,
+            "python": "3.13.15",
+            "ready": true,
+            "since_launch_ms": 1771,
+            "sqlite": "3.53.1",
+            "startup_ms": 896.4,
+            "test_hooks": true
+          },
+          "ready_ms": 1262,
+          "reason": null,
+          "restarts": 0,
+          "state": "ready"
+        },
+        "kdf": {
+          "argon2id_ms": 91.2,
+          "peak_rss_after": 158425088,
+          "peak_rss_before": 90738688,
+          "rss_after": 91262976
+        },
+        "listing_1000_ms": {
+          "max": 40.9,
+          "min": 38.6
+        },
+        "restart_after_crash_ms": 1294,
+        "small_latency_ms": {
+          "mean": 2.58,
+          "p50": 2.4,
+          "p95": 3.1,
+          "p99": 4
+        }
+      },
+      "core_stats": {
+        "cancelled": 0,
+        "env_injected": [],
+        "env_names": [
+          "CIPHERMOTH_SPIKE_TEST_HOOKS",
+          "CRYPTOGRAPHY_OPENSSL_NO_LEGACY",
+          "LOCALAPPDATA",
+          "PATH",
+          "POSTGRES_HOST",
+          "SYSTEMROOT",
+          "TEMP",
+          "TMP",
+          "USERPROFILE",
+          "WINDIR",
+          "_PYI_ARCHIVE_FILE",
+          "_PYI_PARENT_PROCESS_LEVEL"
+        ],
+        "frozen": true,
+        "machine": "AMD64",
+        "peak_rss_bytes": 158425088,
+        "pid": 2732,
+        "platform": "Windows-2025Server-10.0.26100-SP0",
+        "python": "3.13.15",
+        "rss_bytes": 91418624,
+        "sqlite_version": "3.53.1",
+        "unlocked": false,
+        "uptime_s": 0.182
+      },
+      "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36 Edg/153.0.0.0",
+      "core_rss_peak_mb_sampled": 152.5,
+      "leftover_cores": []
+    },
+    "normal_quit": {
+      "ok": true,
+      "exit_code": 0,
+      "core_pid": 3260,
+      "core_gone_after_s": 0.00010510000004160247,
+      "marks": {
+        "core_ready": {
+          "core_pid": 3260,
+          "core_startup_ms": 835.0,
+          "since_launch_ms": 1655,
+          "spawn_to_ready_ms": 1161
+        },
+        "ui_ready": {
+          "js_ms": 214.59999999997672,
+          "since_launch_ms": 694
+        }
+      }
+    },
+    "window_close": {
+      "ok": true,
+      "exit_code": 0,
+      "core_pid": 6396,
+      "core_gone_after_s": 8.270000000720756e-05,
+      "marks": {
+        "core_ready": {
+          "core_pid": 6396,
+          "core_startup_ms": 847.5,
+          "since_launch_ms": 1836,
+          "spawn_to_ready_ms": 1240
+        },
+        "ui_ready": {
+          "js_ms": 234.60000000009313,
+          "since_launch_ms": 816
+        }
+      }
+    },
+    "force_kill_shell": {
+      "ok": true,
+      "how": "TerminateProcess",
+      "exit_code": 15,
+      "core_pid": 6832,
+      "core_gone_after_s": 0.027,
+      "sockets": {
+        "listening": [],
+        "inet": [
+          {
+            "pid": 6832,
+            "name": "ciphermoth-core.exe",
+            "status": "ESTABLISHED",
+            "laddr": "addr(ip='127.0.0.1', port=54719)",
+            "raddr": "addr(ip='127.0.0.1', port=54720)",
+            "self_pair": true
+          },
+          {
+            "pid": 6832,
+            "name": "ciphermoth-core.exe",
+            "status": "ESTABLISHED",
+            "laddr": "addr(ip='127.0.0.1', port=54720)",
+            "raddr": "addr(ip='127.0.0.1', port=54719)",
+            "self_pair": true
+          },
+          {
+            "pid": 3916,
+            "name": "msedgewebview2.exe",
+            "status": "ESTABLISHED",
+            "laddr": "addr(ip='::1', port=54718)",
+            "raddr": "addr(ip='::1', port=80)",
+            "self_pair": false
+          },
+          {
+            "pid": 3916,
+            "name": "msedgewebview2.exe",
+            "status": "ESTABLISHED",
+            "laddr": "addr(ip='::1', port=64761)",
+            "raddr": "addr(ip='::1', port=80)",
+            "self_pair": false
+          },
+          {
+            "pid": 3916,
+            "name": "msedgewebview2.exe",
+            "status": "ESTABLISHED",
+            "laddr": "addr(ip='::1', port=54718)",
+            "raddr": "addr(ip='::1', port=80)",
+            "self_pair": false
+          },
+          {
+            "pid": 3916,
+            "name": "msedgewebview2.exe",
+            "status": "ESTABLISHED",
+            "laddr": "addr(ip='::1', port=64761)",
+            "raddr": "addr(ip='::1', port=80)",
+            "self_pair": false
+          }
+        ],
+        "core_external": [],
+        "webview_connections": [
+          {
+            "pid": 3916,
+            "name": "msedgewebview2.exe",
+            "status": "ESTABLISHED",
+            "laddr": "addr(ip='::1', port=54718)",
+            "raddr": "addr(ip='::1', port=80)",
+            "self_pair": false
+          },
+          {
+            "pid": 3916,
+            "name": "msedgewebview2.exe",
+            "status": "ESTABLISHED",
+            "laddr": "addr(ip='::1', port=64761)",
+            "raddr": "addr(ip='::1', port=80)",
+            "self_pair": false
+          },
+          {
+            "pid": 3916,
+            "name": "msedgewebview2.exe",
+            "status": "ESTABLISHED",
+            "laddr": "addr(ip='::1', port=54718)",
+            "raddr": "addr(ip='::1', port=80)",
+            "self_pair": false
+          },
+          {
+            "pid": 3916,
+            "name": "msedgewebview2.exe",
+            "status": "ESTABLISHED",
+            "laddr": "addr(ip='::1', port=64761)",
+            "raddr": "addr(ip='::1', port=80)",
+            "self_pair": false
+          }
+        ],
+        "uninspectable": [],
+        "namespace_new_listeners": []
+      },
+      "lsof_inet": "",
+      "idle_memory": {
+        "app": {
+          "name": "ciphermoth-desktop-spike.exe",
+          "rss_mb": 29.7,
+          "uss_mb": 10.1
+        },
+        "core": {
+          "name": "ciphermoth-core.exe",
+          "rss_mb": 86.9,
+          "uss_mb": 76.8
+        },
+        "webviews": [
+          {
+            "name": "msedgewebview2.exe",
+            "rss_mb": 111.4,
+            "uss_mb": 60.9
+          },
+          {
+            "name": "msedgewebview2.exe",
+            "rss_mb": 9.5,
+            "uss_mb": 1.5
+          },
+          {
+            "name": "msedgewebview2.exe",
+            "rss_mb": 46.1,
+            "uss_mb": 13.4
+          },
+          {
+            "name": "msedgewebview2.exe",
+            "rss_mb": 32.1,
+            "uss_mb": 8.5
+          },
+          {
+            "name": "msedgewebview2.exe",
+            "rss_mb": 17.7,
+            "uss_mb": 3.0
+          },
+          {
+            "name": "msedgewebview2.exe",
+            "rss_mb": 82.7,
+            "uss_mb": 50.7
+          }
+        ]
+      },
+      "processes": [
+        "ciphermoth-core.exe",
+        "ciphermoth-desktop-spike.exe",
+        "conhost.exe",
+        "msedgewebview2.exe"
+      ]
+    },
+    "graceful_terminate_shell": {
+      "ok": true,
+      "how": "taskkill (WM_CLOSE)",
+      "exit_code": 0,
+      "core_pid": 7816,
+      "core_gone_after_s": 0.0,
+      "sockets": {
+        "listening": [],
+        "inet": [
+          {
+            "pid": 7816,
+            "name": "ciphermoth-core.exe",
+            "status": "ESTABLISHED",
+            "laddr": "addr(ip='127.0.0.1', port=50371)",
+            "raddr": "addr(ip='127.0.0.1', port=50370)",
+            "self_pair": true
+          },
+          {
+            "pid": 7816,
+            "name": "ciphermoth-core.exe",
+            "status": "ESTABLISHED",
+            "laddr": "addr(ip='127.0.0.1', port=50370)",
+            "raddr": "addr(ip='127.0.0.1', port=50371)",
+            "self_pair": true
+          },
+          {
+            "pid": 2640,
+            "name": "msedgewebview2.exe",
+            "status": "ESTABLISHED",
+            "laddr": "addr(ip='::1', port=55929)",
+            "raddr": "addr(ip='::1', port=80)",
+            "self_pair": false
+          },
+          {
+            "pid": 2640,
+            "name": "msedgewebview2.exe",
+            "status": "ESTABLISHED",
+            "laddr": "addr(ip='::1', port=50369)",
+            "raddr": "addr(ip='::1', port=80)",
+            "self_pair": false
+          },
+          {
+            "pid": 2640,
+            "name": "msedgewebview2.exe",
+            "status": "ESTABLISHED",
+            "laddr": "addr(ip='::1', port=55929)",
+            "raddr": "addr(ip='::1', port=80)",
+            "self_pair": false
+          },
+          {
+            "pid": 2640,
+            "name": "msedgewebview2.exe",
+            "status": "ESTABLISHED",
+            "laddr": "addr(ip='::1', port=50369)",
+            "raddr": "addr(ip='::1', port=80)",
+            "self_pair": false
+          }
+        ],
+        "core_external": [],
+        "webview_connections": [
+          {
+            "pid": 2640,
+            "name": "msedgewebview2.exe",
+            "status": "ESTABLISHED",
+            "laddr": "addr(ip='::1', port=55929)",
+            "raddr": "addr(ip='::1', port=80)",
+            "self_pair": false
+          },
+          {
+            "pid": 2640,
+            "name": "msedgewebview2.exe",
+            "status": "ESTABLISHED",
+            "laddr": "addr(ip='::1', port=50369)",
+            "raddr": "addr(ip='::1', port=80)",
+            "self_pair": false
+          },
+          {
+            "pid": 2640,
+            "name": "msedgewebview2.exe",
+            "status": "ESTABLISHED",
+            "laddr": "addr(ip='::1', port=55929)",
+            "raddr": "addr(ip='::1', port=80)",
+            "self_pair": false
+          },
+          {
+            "pid": 2640,
+            "name": "msedgewebview2.exe",
+            "status": "ESTABLISHED",
+            "laddr": "addr(ip='::1', port=50369)",
+            "raddr": "addr(ip='::1', port=80)",
+            "self_pair": false
+          }
+        ],
+        "uninspectable": [],
+        "namespace_new_listeners": []
+      },
+      "lsof_inet": "",
+      "idle_memory": {
+        "app": {
+          "name": "ciphermoth-desktop-spike.exe",
+          "rss_mb": 29.7,
+          "uss_mb": 10.1
+        },
+        "core": {
+          "name": "ciphermoth-core.exe",
+          "rss_mb": 86.8,
+          "uss_mb": 76.8
+        },
+        "webviews": [
+          {
+            "name": "msedgewebview2.exe",
+            "rss_mb": 113.1,
+            "uss_mb": 61.4
+          },
+          {
+            "name": "msedgewebview2.exe",
+            "rss_mb": 9.5,
+            "uss_mb": 1.5
+          },
+          {
+            "name": "msedgewebview2.exe",
+            "rss_mb": 43.4,
+            "uss_mb": 10.6
+          },
+          {
+            "name": "msedgewebview2.exe",
+            "rss_mb": 32.1,
+            "uss_mb": 8.6
+          },
+          {
+            "name": "msedgewebview2.exe",
+            "rss_mb": 17.7,
+            "uss_mb": 3.0
+          },
+          {
+            "name": "msedgewebview2.exe",
+            "rss_mb": 85.7,
+            "uss_mb": 50.9
+          }
+        ]
+      },
+      "processes": [
+        "ciphermoth-core.exe",
+        "ciphermoth-desktop-spike.exe",
+        "conhost.exe",
+        "msedgewebview2.exe"
+      ]
+    },
+    "core_killed_externally": {
+      "ok": true,
+      "old_core": 5416,
+      "new_core": 3584,
+      "respawned_after_s": 0.272,
+      "app_survived": true,
+      "new_core_gone_after_app_kill_s": 0.00012179999998807034
+    },
+    "canary_scan": {
+      "ok": true,
+      "exit_code": 0,
+      "selftest_ok": true,
+      "roots": [
+        "C:\\Users\\runneradmin\\AppData\\Local\\Temp\\cm-spike-e99bkt73\\canary",
+        "C:\\Users\\runneradmin\\AppData\\Local\\com.ciphermoth.desktop-spike",
+        "C:\\Users\\runneradmin\\AppData\\Local\\Temp",
+        "C:\\Users\\RUNNER~1\\AppData\\Local\\Temp"
+      ],
+      "hits": [],
+      "scanned_files": 75,
+      "unreadable_or_large": 1
+    },
+    "startup_failure_core_error": {
+      "ok": true,
+      "reason_shown": "the core failed to start (exited, exit Some(1))",
+      "app_survived": true
+    },
+    "startup_failure_missing_core": {
+      "ok": true,
+      "reason_shown": "could not start the core: The system cannot find the path specified. (os error 3)",
+      "app_survived": true
+    }
+  },
+  "final_leftover_cores": [],
+  "ok": true
+}

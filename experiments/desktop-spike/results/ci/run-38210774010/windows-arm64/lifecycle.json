@@ -1,0 +1,522 @@
+{
+  "host": {
+    "platform": "Windows-11-10.0.26200-SP0",
+    "machine": "ARM64",
+    "cpu_count": 4,
+    "memory_gb": 16.0
+  },
+  "app": "C:\\Users\\runneradmin\\AppData\\Local\\CipherMoth Spike\\ciphermoth-desktop-spike.exe",
+  "preexisting_cores": [],
+  "scenarios": {
+    "repeated_launches": {
+      "ok": true,
+      "first_launch_core_ready_ms": 2670,
+      "warm_core_ready_ms_median": 1495,
+      "warm_core_ready_ms_max": 1557,
+      "first_launch_ui_ready_ms": 1800,
+      "warm_ui_ready_ms_median": 581,
+      "leftover_cores": [],
+      "runs": [
+        {
+          "exit_code": 0,
+          "core_ready_since_launch_ms": 2670,
+          "spawn_to_ready_ms": 2248,
+          "ui_ready_since_launch_ms": 1800,
+          "wall_s": 3.177
+        },
+        {
+          "exit_code": 0,
+          "core_ready_since_launch_ms": 1557,
+          "spawn_to_ready_ms": 1094,
+          "ui_ready_since_launch_ms": 614,
+          "wall_s": 1.936
+        },
+        {
+          "exit_code": 0,
+          "core_ready_since_launch_ms": 1525,
+          "spawn_to_ready_ms": 1069,
+          "ui_ready_since_launch_ms": 595,
+          "wall_s": 1.904
+        },
+        {
+          "exit_code": 0,
+          "core_ready_since_launch_ms": 1495,
+          "spawn_to_ready_ms": 1062,
+          "ui_ready_since_launch_ms": 574,
+          "wall_s": 1.867
+        },
+        {
+          "exit_code": 0,
+          "core_ready_since_launch_ms": 1489,
+          "spawn_to_ready_ms": 1056,
+          "ui_ready_since_launch_ms": 572,
+          "wall_s": 1.864
+        },
+        {
+          "exit_code": 0,
+          "core_ready_since_launch_ms": 1484,
+          "spawn_to_ready_ms": 1045,
+          "ui_ready_since_launch_ms": 579,
+          "wall_s": 1.86
+        },
+        {
+          "exit_code": 0,
+          "core_ready_since_launch_ms": 1494,
+          "spawn_to_ready_ms": 1053,
+          "ui_ready_since_launch_ms": 581,
+          "wall_s": 1.87
+        },
+        {
+          "exit_code": 0,
+          "core_ready_since_launch_ms": 1502,
+          "spawn_to_ready_ms": 1056,
+          "ui_ready_since_launch_ms": 582,
+          "wall_s": 2.24
+        }
+      ]
+    },
+    "ipc_selftest": {
+      "ok": true,
+      "exit_code": 0,
+      "checks": [
+        {
+          "name": "core ready",
+          "ok": true,
+          "ms": 954.1,
+          "error": null
+        },
+        {
+          "name": "real CipherMoth route through axios adapter",
+          "ok": true,
+          "ms": 24.4,
+          "error": null
+        },
+        {
+          "name": "create vault in core, key stays in core",
+          "ok": true,
+          "ms": 287.6,
+          "error": null
+        },
+        {
+          "name": "small request latency (500 x health)",
+          "ok": true,
+          "ms": 1252.6,
+          "error": null
+        },
+        {
+          "name": "binary echo is byte-identical",
+          "ok": true,
+          "ms": 50.2,
+          "error": null
+        },
+        {
+          "name": "5 MiB attachment round trip (FormData -> pipe -> Fernet -> SQLite)",
+          "ok": true,
+          "ms": 638.9,
+          "error": null
+        },
+        {
+          "name": "FormData through the axios adapter",
+          "ok": true,
+          "ms": 60.4,
+          "error": null
+        },
+        {
+          "name": "1000-entry decrypted listing end to end",
+          "ok": true,
+          "ms": 216.4,
+          "error": null
+        },
+        {
+          "name": "listing not blocked behind a 5 MiB upload",
+          "ok": true,
+          "ms": 470.4,
+          "error": null
+        },
+        {
+          "name": "concurrent requests resolve by id",
+          "ok": true,
+          "ms": 330,
+          "error": null
+        },
+        {
+          "name": "timeout cancels the core task",
+          "ok": true,
+          "ms": 472.8,
+          "error": null
+        },
+        {
+          "name": "explicit cancellation",
+          "ok": true,
+          "ms": 162.6,
+          "error": null
+        },
+        {
+          "name": "python exception maps to a generic 500",
+          "ok": true,
+          "ms": 13.5,
+          "error": null
+        },
+        {
+          "name": "renderer cannot reach paths outside the allowlist",
+          "ok": true,
+          "ms": 9.8,
+          "error": null
+        },
+        {
+          "name": "renderer cannot set arbitrary headers",
+          "ok": true,
+          "ms": 4.8,
+          "error": null
+        },
+        {
+          "name": "renderer cannot call Tauri APIs outside its capability",
+          "ok": true,
+          "ms": 30.6,
+          "error": null
+        },
+        {
+          "name": "core environment is scrubbed",
+          "ok": true,
+          "ms": 10.4,
+          "error": null
+        },
+        {
+          "name": "oversized request refused in Rust before the pipe",
+          "ok": true,
+          "ms": 299.2,
+          "error": null
+        },
+        {
+          "name": "core crash fails in-flight requests, restarts locked",
+          "ok": true,
+          "ms": 1538.5,
+          "error": null
+        },
+        {
+          "name": "memory during Argon2id",
+          "ok": true,
+          "ms": 85.1,
+          "error": null
+        }
+      ],
+      "metrics": {
+        "attachment_5mib": {
+          "download_mb_s": 35.79,
+          "download_ms": 139.7,
+          "formdata_encode_ms": 8.5,
+          "upload_mb_s": 10.58,
+          "upload_ms": 472.6
+        },
+        "core_ready": {
+          "generation": 1,
+          "info": {
+            "core_version": "0.1.0-spike",
+            "frozen": true,
+            "hardening": [
+              "seterrormode",
+              "wer_noheap"
+            ],
+            "pid": 1472,
+            "protocol": 1,
+            "python": "3.13.15",
+            "ready": true,
+            "since_launch_ms": 1473,
+            "sqlite": "3.53.1",
+            "startup_ms": 773.3,
+            "test_hooks": true
+          },
+          "ready_ms": 1073,
+          "reason": null,
+          "restarts": 0,
+          "state": "ready"
+        },
+        "kdf": {
+          "argon2id_ms": 74.4,
+          "peak_rss_after": 161927168,
+          "peak_rss_before": 94011392,
+          "rss_after": 94777344
+        },
+        "listing_1000_ms": {
+          "max": 33.4,
+          "min": 30.9
+        },
+        "restart_after_crash_ms": 1325.3,
+        "small_latency_ms": {
+          "mean": 2.49,
+          "p50": 2.5,
+          "p95": 2.8,
+          "p99": 3.1
+        }
+      },
+      "core_stats": {
+        "cancelled": 0,
+        "env_injected": [],
+        "env_names": [
+          "CIPHERMOTH_SPIKE_TEST_HOOKS",
+          "CRYPTOGRAPHY_OPENSSL_NO_LEGACY",
+          "LOCALAPPDATA",
+          "PATH",
+          "POSTGRES_HOST",
+          "PROCESSOR_ARCHITECTURE",
+          "SYSTEMROOT",
+          "TEMP",
+          "TMP",
+          "USERPROFILE",
+          "WINDIR",
+          "_PYI_ARCHIVE_FILE",
+          "_PYI_PARENT_PROCESS_LEVEL"
+        ],
+        "frozen": true,
+        "machine": "ARM64",
+        "peak_rss_bytes": 161927168,
+        "pid": 3536,
+        "platform": "Windows-11-10.0.26200-SP0",
+        "python": "3.13.15",
+        "rss_bytes": 95555584,
+        "sqlite_version": "3.53.1",
+        "unlocked": false,
+        "uptime_s": 0.167
+      },
+      "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36 Edg/154.0.0.0",
+      "core_rss_peak_mb_sampled": 154.4,
+      "leftover_cores": []
+    },
+    "normal_quit": {
+      "ok": true,
+      "exit_code": 0,
+      "core_pid": 2508,
+      "core_gone_after_s": 0.0002686000000267086,
+      "marks": {
+        "core_ready": {
+          "core_pid": 2508,
+          "core_startup_ms": 882.2,
+          "since_launch_ms": 1696,
+          "spawn_to_ready_ms": 1241
+        },
+        "ui_ready": {
+          "js_ms": 179.10000000009313,
+          "since_launch_ms": 624
+        }
+      }
+    },
+    "window_close": {
+      "ok": true,
+      "exit_code": 0,
+      "core_pid": 8484,
+      "core_gone_after_s": 0.0001528000000234897,
+      "marks": {
+        "core_ready": {
+          "core_pid": 8484,
+          "core_startup_ms": 1038.0,
+          "since_launch_ms": 1942,
+          "spawn_to_ready_ms": 1411
+        },
+        "ui_ready": {
+          "js_ms": 176.39999999990687,
+          "since_launch_ms": 701
+        }
+      }
+    },
+    "force_kill_shell": {
+      "ok": true,
+      "how": "TerminateProcess",
+      "exit_code": 15,
+      "core_pid": 5228,
+      "core_gone_after_s": 0.027,
+      "sockets": {
+        "listening": [],
+        "inet": [
+          {
+            "pid": 5228,
+            "name": "ciphermoth-core.exe",
+            "status": "ESTABLISHED",
+            "laddr": "addr(ip='127.0.0.1', port=65434)",
+            "raddr": "addr(ip='127.0.0.1', port=65435)",
+            "self_pair": true
+          },
+          {
+            "pid": 5228,
+            "name": "ciphermoth-core.exe",
+            "status": "ESTABLISHED",
+            "laddr": "addr(ip='127.0.0.1', port=65435)",
+            "raddr": "addr(ip='127.0.0.1', port=65434)",
+            "self_pair": true
+          }
+        ],
+        "core_external": [],
+        "webview_connections": [],
+        "uninspectable": [],
+        "namespace_new_listeners": []
+      },
+      "lsof_inet": "",
+      "idle_memory": {
+        "app": {
+          "name": "ciphermoth-desktop-spike.exe",
+          "rss_mb": 29.5,
+          "uss_mb": 9.6
+        },
+        "core": {
+          "name": "ciphermoth-core.exe",
+          "rss_mb": 88.3,
+          "uss_mb": 76.1
+        },
+        "webviews": [
+          {
+            "name": "msedgewebview2.exe",
+            "rss_mb": 114.6,
+            "uss_mb": 29.7
+          },
+          {
+            "name": "msedgewebview2.exe",
+            "rss_mb": 10.9,
+            "uss_mb": 1.6
+          },
+          {
+            "name": "msedgewebview2.exe",
+            "rss_mb": 37.4,
+            "uss_mb": 6.2
+          },
+          {
+            "name": "msedgewebview2.exe",
+            "rss_mb": 49.4,
+            "uss_mb": 16.5
+          },
+          {
+            "name": "msedgewebview2.exe",
+            "rss_mb": 20.6,
+            "uss_mb": 2.8
+          },
+          {
+            "name": "msedgewebview2.exe",
+            "rss_mb": 89.8,
+            "uss_mb": 32.1
+          }
+        ]
+      },
+      "processes": [
+        "ciphermoth-core.exe",
+        "ciphermoth-desktop-spike.exe",
+        "conhost.exe",
+        "msedgewebview2.exe"
+      ]
+    },
+    "graceful_terminate_shell": {
+      "ok": true,
+      "how": "taskkill (WM_CLOSE)",
+      "exit_code": 0,
+      "core_pid": 10048,
+      "core_gone_after_s": 0.0,
+      "sockets": {
+        "listening": [],
+        "inet": [
+          {
+            "pid": 10048,
+            "name": "ciphermoth-core.exe",
+            "status": "ESTABLISHED",
+            "laddr": "addr(ip='127.0.0.1', port=56175)",
+            "raddr": "addr(ip='127.0.0.1', port=56174)",
+            "self_pair": true
+          },
+          {
+            "pid": 10048,
+            "name": "ciphermoth-core.exe",
+            "status": "ESTABLISHED",
+            "laddr": "addr(ip='127.0.0.1', port=56174)",
+            "raddr": "addr(ip='127.0.0.1', port=56175)",
+            "self_pair": true
+          }
+        ],
+        "core_external": [],
+        "webview_connections": [],
+        "uninspectable": [],
+        "namespace_new_listeners": []
+      },
+      "lsof_inet": "",
+      "idle_memory": {
+        "app": {
+          "name": "ciphermoth-desktop-spike.exe",
+          "rss_mb": 29.4,
+          "uss_mb": 9.5
+        },
+        "core": {
+          "name": "ciphermoth-core.exe",
+          "rss_mb": 89.6,
+          "uss_mb": 77.4
+        },
+        "webviews": [
+          {
+            "name": "msedgewebview2.exe",
+            "rss_mb": 114.1,
+            "uss_mb": 29.2
+          },
+          {
+            "name": "msedgewebview2.exe",
+            "rss_mb": 10.9,
+            "uss_mb": 1.6
+          },
+          {
+            "name": "msedgewebview2.exe",
+            "rss_mb": 49.8,
+            "uss_mb": 16.8
+          },
+          {
+            "name": "msedgewebview2.exe",
+            "rss_mb": 37.6,
+            "uss_mb": 6.3
+          },
+          {
+            "name": "msedgewebview2.exe",
+            "rss_mb": 20.6,
+            "uss_mb": 2.8
+          },
+          {
+            "name": "msedgewebview2.exe",
+            "rss_mb": 89.1,
+            "uss_mb": 31.4
+          }
+        ]
+      },
+      "processes": [
+        "ciphermoth-core.exe",
+        "ciphermoth-desktop-spike.exe",
+        "conhost.exe",
+        "msedgewebview2.exe"
+      ]
+    },
+    "core_killed_externally": {
+      "ok": true,
+      "old_core": 9840,
+      "new_core": 3212,
+      "respawned_after_s": 0.275,
+      "app_survived": true,
+      "new_core_gone_after_app_kill_s": 0.003273400000125548
+    },
+    "canary_scan": {
+      "ok": true,
+      "exit_code": 0,
+      "selftest_ok": true,
+      "roots": [
+        "C:\\Users\\runneradmin\\AppData\\Local\\Temp\\cm-spike-98wx8o2d\\canary",
+        "C:\\Users\\runneradmin\\AppData\\Local\\com.ciphermoth.desktop-spike",
+        "C:\\Users\\runneradmin\\AppData\\Local\\Temp",
+        "C:\\Users\\RUNNER~1\\AppData\\Local\\Temp"
+      ],
+      "hits": [],
+      "scanned_files": 74,
+      "unreadable_or_large": 1
+    },
+    "startup_failure_core_error": {
+      "ok": true,
+      "reason_shown": "the core failed to start (exited, exit Some(1))",
+      "app_survived": true
+    },
+    "startup_failure_missing_core": {
+      "ok": true,
+      "reason_shown": "could not start the core: The system cannot find the path specified. (os error 3)",
+      "app_survived": true
+    }
+  },
+  "final_leftover_cores": [],
+  "ok": true
+}
