@@ -266,6 +266,38 @@ export async function runSuite(onProgress = () => {}) {
     );
   });
 
+  await check("renderer cannot call Tauri APIs outside its capability", async () => {
+    const refused = [];
+    for (const command of [
+      "plugin:window|close",
+      "plugin:window|set_title",
+      "plugin:event|emit",
+      "plugin:path|resolve_directory",
+      "plugin:webview|internal_toggle_devtools",
+      "plugin:shell|execute",
+      "plugin:fs|read_file",
+    ]) {
+      try {
+        await invoke(command, { title: "x", event: "x", directory: 1, path: "/etc/hosts" });
+      } catch (error) {
+        refused.push(command);
+        continue;
+      }
+      throw new Error(`${command} was allowed`);
+    }
+    return refused.length;
+  });
+
+  await check("core environment is scrubbed", async () => {
+    const stats = await coreJson("GET", "/spike/stats");
+    const names = stats.data.env_names;
+    const leaked = names.filter(
+      (n) => /^(PYTHON|LD_|DYLD_)/.test(n) || n === "CIPHERMOTH_CANARY_ENV"
+    );
+    if (leaked.length) throw new Error(`leaked: ${leaked.join(",")}`);
+    return names;
+  });
+
   await check("oversized request refused in Rust before the pipe", async () => {
     await expectError(
       coreRequest({ method: "POST", path: "/spike/echo", body: new Uint8Array(24 * MIB + 1) }),

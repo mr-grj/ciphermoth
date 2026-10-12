@@ -174,12 +174,15 @@ jobs:
           py=experiments/desktop-spike/core/build/venv/Scripts/python.exe
           exe="$($py -c "import json;print(json.load(open('spike-results/summary.json'))['stages']['install']['executable'])")"
           netstat -ano > spike-results/netstat-before.txt 2>&1 || true
-          $py experiments/desktop-spike/harness/port80_probe.py --duration 400 \
-            --out spike-results/port80-probe.json --ready-file spike-results/port80.ready &
-          for i in $(seq 1 100); do [ -f spike-results/port80.ready ] && break; sleep 0.2; done
+          $py experiments/desktop-spike/harness/port80_probe.py --duration 5 --out spike-results/port80-owners.json || true
+          pwsh -NoProfile -File experiments/desktop-spike/harness/http_sys_probe.ps1 \
+            -Out spike-results/http-sys-probe.json -StopFile spike-results/probe.stop \
+            -ReadyFile spike-results/probe.ready -Duration 600 &
+          for i in $(seq 1 150); do [ -f spike-results/probe.ready ] && break; sleep 0.2; done
           $py experiments/desktop-spike/harness/lifecycle.py --app "$exe" \
-            --out spike-results/lifecycle-port80.json --only ipc_selftest canary_scan || true
-          touch spike-results/port80-probe.stop
+            --out spike-results/lifecycle-http-sys.json --only ipc_selftest canary_scan || true
+          netstat -ano > spike-results/netstat-during-probe.txt 2>&1 || true
+          touch spike-results/probe.stop
           wait
 
       - name: Windows Defender scan

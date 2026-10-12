@@ -132,6 +132,17 @@ def main() -> int:
         "timings": timings,
         "core_dir_bytes": directory_size(core_dir),
         "core_file_count": sum(1 for p in core_dir.rglob("*") if p.is_file()),
+        "largest_files": [
+            {"bytes": size, "path": name}
+            for size, name in sorted(
+                (
+                    (p.stat().st_size, str(p.relative_to(core_dir)))
+                    for p in core_dir.rglob("*")
+                    if p.is_file()
+                ),
+                reverse=True,
+            )[:15]
+        ],
         "executable": str(executable),
         "packages": freeze.stdout.split(),
     }

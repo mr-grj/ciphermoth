@@ -262,6 +262,7 @@ def build_spike_app(state: CoreState, test_hooks: bool) -> FastAPI:
             "cancelled": state.cancelled,
             "uptime_s": round(time.monotonic() - state.started, 3),
             "unlocked": state.session.key is not None,
+            "env_names": sorted(os.environ),
         }
 
     @app.post("/spike/kdf")

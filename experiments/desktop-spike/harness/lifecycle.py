@@ -105,6 +105,9 @@ class Launch:
                 "TMPDIR": str(workdir / "tmp"),
                 "TEMP": str(workdir / "tmp"),
                 "TMP": str(workdir / "tmp"),
+                "PYTHONPATH": str(workdir / "injected-pythonpath"),
+                "PYTHONSTARTUP": str(workdir / "injected-startup.py"),
+                "CIPHERMOTH_CANARY_ENV": "1",
             }
         )
         env.update(extra_env or {})
