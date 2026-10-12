@@ -350,9 +350,15 @@ def scenario_kill(app: Path, root: Path, mode: str) -> dict:
             "core": memory(psutil.Process(core_pid)),
             "webviews": [memory(p) for p in launch.webviews()],
         }
+        shell = next(
+            (p for p in launch.tree() if safe_name(p).startswith("ciphermoth-desktop")),
+            launch.ps,
+        )
         if mode == "force":
-            launch.proc.kill()
+            shell.kill()
             how = "SIGKILL" if sys.platform != "win32" else "TerminateProcess"
+            if shell.pid != launch.proc.pid:
+                how += " (real shell under a launcher)"
         elif mode == "graceful":
             how = terminate_gracefully(launch)
         elif mode == "applequit":

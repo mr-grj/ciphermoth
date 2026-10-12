@@ -290,12 +290,9 @@ export async function runSuite(onProgress = () => {}) {
 
   await check("core environment is scrubbed", async () => {
     const stats = await coreJson("GET", "/spike/stats");
-    const names = stats.data.env_names;
-    const leaked = names.filter(
-      (n) => /^(PYTHON|LD_|DYLD_)/.test(n) || n === "CIPHERMOTH_CANARY_ENV"
-    );
+    const leaked = stats.data.env_injected;
     if (leaked.length) throw new Error(`leaked: ${leaked.join(",")}`);
-    return names;
+    return stats.data.env_names;
   });
 
   await check("oversized request refused in Rust before the pipe", async () => {

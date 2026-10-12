@@ -91,6 +91,21 @@ async def open_state(data_dir: Path) -> CoreState:
     return CoreState(engine=engine, data_dir=data_dir)
 
 
+def injected_environment() -> list[str]:
+    bundle = getattr(sys, "_MEIPASS", None)
+    suspicious = []
+    for name, value in os.environ.items():
+        if name == "CIPHERMOTH_CANARY_ENV":
+            suspicious.append(name)
+        elif name.startswith(("PYTHON", "LD_", "DYLD_")):
+            inside = bundle and all(
+                part.startswith(bundle) for part in value.split(os.pathsep) if part
+            )
+            if not inside:
+                suspicious.append(name)
+    return sorted(suspicious)
+
+
 def build_spike_app(state: CoreState, test_hooks: bool) -> FastAPI:
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
     app.add_middleware(UnhandledErrorMiddleware, headers={"Cache-Control": "no-store"})
@@ -263,6 +278,7 @@ def build_spike_app(state: CoreState, test_hooks: bool) -> FastAPI:
             "uptime_s": round(time.monotonic() - state.started, 3),
             "unlocked": state.session.key is not None,
             "env_names": sorted(os.environ),
+            "env_injected": injected_environment(),
         }
 
     @app.post("/spike/kdf")
