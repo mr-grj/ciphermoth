@@ -15,6 +15,7 @@ use tokio::sync::oneshot;
 use crate::protocol::{self, Frame, ReadError};
 
 const READY_TIMEOUT: Duration = Duration::from_secs(30);
+const PROTOCOL_VERSION: u64 = 1;
 const SHUTDOWN_GRACE: Duration = Duration::from_secs(2);
 const RESTART_WINDOW: Duration = Duration::from_secs(60);
 const MAX_RESTARTS: usize = 3;
@@ -221,6 +222,7 @@ impl Supervisor {
         let mut writer: Option<mpsc::Sender<Vec<u8>>> = None;
         let mut pending: Option<Pending> = None;
         let mut became_ready = false;
+        let mut incompatible = false;
         let mut crashes: Vec<Instant> = Vec::new();
         let mut spawned_at = Instant::now();
         let mut shutting_down = false;
@@ -283,6 +285,13 @@ impl Supervisor {
                     generation: g,
                     info,
                 } if g == generation => {
+                    if info.get("protocol").and_then(Value::as_u64) != Some(PROTOCOL_VERSION) {
+                        if let Some(c) = child.as_mut() {
+                            let _ = c.kill();
+                        }
+                        incompatible = true;
+                        continue;
+                    }
                     became_ready = true;
                     *self.running.lock().unwrap() = Some(Running {
                         writer: writer.clone().unwrap(),
@@ -315,6 +324,14 @@ impl Supervisor {
                     pending = None;
                     let code = child.take().map(reap).unwrap_or(None);
                     if shutting_down {
+                        continue;
+                    }
+                    if incompatible {
+                        incompatible = false;
+                        self.set_status(|s| {
+                            s.state = "failed";
+                            s.reason = Some("the core speaks a different protocol version".into());
+                        });
                         continue;
                     }
                     if !became_ready {

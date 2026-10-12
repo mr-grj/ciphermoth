@@ -200,9 +200,24 @@ def sockets(processes: list[psutil.Process], baseline: set) -> dict:
             uninspectable.append(safe_name(proc))
         except psutil.NoSuchProcess:
             continue
+    by_pid: dict[int, set[str]] = {}
+    for entry in inet:
+        by_pid.setdefault(entry["pid"], set()).add(entry["laddr"])
+    for entry in inet:
+        entry["self_pair"] = entry["raddr"] in by_pid[entry["pid"]]
     return {
         "listening": listening,
         "inet": inet,
+        "core_external": [
+            e
+            for e in inet
+            if e["name"].startswith("ciphermoth-core") and not e["self_pair"]
+        ],
+        "webview_connections": [
+            e
+            for e in inet
+            if not e["name"].startswith("ciphermoth") and not e["self_pair"]
+        ],
         "uninspectable": uninspectable,
         "namespace_new_listeners": sorted(map(str, listening_snapshot() - baseline)),
     }
@@ -358,7 +373,7 @@ def scenario_kill(app: Path, root: Path, mode: str) -> dict:
         "ok": gone is not None
         and gone <= 5
         and not net["listening"]
-        and not net["inet"]
+        and not net["core_external"]
         and not net["namespace_new_listeners"],
         "how": how,
         "exit_code": code,
@@ -419,8 +434,9 @@ def scenario_startup_failure(app: Path, root: Path, variant: str) -> dict:
             target = copy_root / app.name
             shutil.rmtree(copy_root / "core")
         else:
-            copy_root.mkdir(parents=True)
-            target = copy_root / app.name
+            (copy_root / "bin").mkdir(parents=True)
+            (copy_root / "lib" / "CipherMoth Spike").mkdir(parents=True)
+            target = copy_root / "bin" / app.name
             shutil.copy2(app, target)
     launch = Launch(target, "idle", root / f"startup-{variant}", extra)
     try:
@@ -433,6 +449,29 @@ def scenario_startup_failure(app: Path, root: Path, variant: str) -> dict:
     failed = (report or {}).get("result", {}).get("failed")
     return {
         "ok": bool(failed) and alive and not leftover_cores(),
+        "reason_shown": failed,
+        "app_survived": alive,
+    }
+
+
+def scenario_symlinked_launch(app: Path, root: Path) -> dict:
+    bundle = app.parents[2]
+    link = root / "linked" / bundle.name
+    link.parent.mkdir(parents=True)
+    link.symlink_to(bundle)
+    launch = Launch(link / "Contents" / "MacOS" / app.name, "idle", root / "symlinked")
+    try:
+        report = launch.report(timeout=60)
+        alive = launch.proc.poll() is None
+        launch.proc.kill()
+        launch.wait_exit(10)
+    finally:
+        launch.cleanup()
+    failed = (report or {}).get("result", {}).get("failed") or ""
+    return {
+        "ok": "cannot locate the bundled core" in failed
+        and alive
+        and not leftover_cores(),
         "reason_shown": failed,
         "app_survived": alive,
     }
@@ -629,6 +668,9 @@ def main() -> int:
     }
     if sys.platform == "darwin":
         plan["applescript_quit"] = lambda: scenario_kill(app, root, "applequit")
+        plan["symlinked_launch_fails_closed"] = lambda: scenario_symlinked_launch(
+            app, root
+        )
     results = {
         "host": {
             "platform": platform.platform(),

@@ -167,6 +167,21 @@ jobs:
             objdump -T experiments/desktop-spike/core/dist/ciphermoth-core/_internal/libpython3*.so* 2>/dev/null | grep -o 'GLIBC_[0-9.]*' | sort -Vu | tail -3
           } > spike-results/linux-inspection.txt 2>&1 || true
 
+      - name: WebView2 loopback probe
+        if: runner.os == 'Windows' && always()
+        continue-on-error: true
+        run: |
+          py=experiments/desktop-spike/core/build/venv/Scripts/python.exe
+          exe="$($py -c "import json;print(json.load(open('spike-results/summary.json'))['stages']['install']['executable'])")"
+          netstat -ano > spike-results/netstat-before.txt 2>&1 || true
+          $py experiments/desktop-spike/harness/port80_probe.py --duration 400 \
+            --out spike-results/port80-probe.json --ready-file spike-results/port80.ready &
+          for i in $(seq 1 100); do [ -f spike-results/port80.ready ] && break; sleep 0.2; done
+          $py experiments/desktop-spike/harness/lifecycle.py --app "$exe" \
+            --out spike-results/lifecycle-port80.json --only ipc_selftest canary_scan || true
+          touch spike-results/port80-probe.stop
+          wait
+
       - name: Windows Defender scan
         if: runner.os == 'Windows' && always()
         shell: pwsh

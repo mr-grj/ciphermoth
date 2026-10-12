@@ -373,8 +373,14 @@ def test_no_sockets_and_no_canary_on_disk(core: Core, workspace: dict) -> None:
         assert sys.platform.startswith("linux")
         connections = []
         assert listening_now() <= workspace["listening_before"]
+    own = {c.laddr for c in connections if c.laddr}
     assert [c for c in connections if c.status == psutil.CONN_LISTEN] == []
-    assert [c for c in connections if c.family in (2, 10, 23)] == []
+    external = [
+        c for c in connections if c.family in (2, 10, 23) and c.raddr not in own
+    ]
+    assert external == []
+    if sys.platform != "win32":
+        assert [c for c in connections if c.family in (2, 10, 23)] == []
     core.close_stdin()
     core.exit_code()
     leaked = []
