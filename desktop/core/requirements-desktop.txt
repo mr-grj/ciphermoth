@@ -2,7 +2,7 @@ fastapi==0.139.0
 cryptography==50.0.0
 aiosqlite==0.22.1
 sqlalchemy==2.0.51
-pydantic-settings==2.14.0
+pydantic-settings==2.14.2
 greenlet==3.5.3
 slowapi==0.1.10
 pyzipper==0.4.0
