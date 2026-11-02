@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Box,
@@ -8,9 +8,11 @@ import {
   MenuItem,
   Stack,
   TextField,
+  Tooltip,
   Typography,
+  useMediaQuery,
 } from "@mui/material";
-import { DataGrid } from "@mui/x-data-grid";
+import { DataGrid, useGridApiRef } from "@mui/x-data-grid";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
 import DownloadIcon from "@mui/icons-material/Download";
@@ -30,6 +32,26 @@ import TrashDialog from "../components/vault/TrashDialog";
 import { createColumns } from "../components/vault/columns";
 import { gridBaseSx } from "../components/vault/gridStyles";
 import useClipboard from "../hooks/useClipboard";
+import { PAGE_SIZES, loadPageSize, savePageSize } from "../lib/gridPreferences";
+
+// Column header + pagination footer + about four rows. A shorter window scrolls the page.
+const MIN_GRID_HEIGHT = 280;
+
+const HeaderAction = ({ label, icon, compact, ...props }) => (
+  <Tooltip title={compact ? label : ""}>
+    <span>
+      <Button
+        variant="outlined"
+        aria-label={label}
+        startIcon={compact ? undefined : icon}
+        sx={compact ? { minWidth: 40, px: 1 } : undefined}
+        {...props}
+      >
+        {compact ? icon : label}
+      </Button>
+    </span>
+  </Tooltip>
+);
 
 const buildSubtitle = (loading, passwords) => {
   if (loading) return "Loading…";
@@ -73,6 +95,15 @@ const PasswordsPage = () => {
   const [removeDamagedOpen, setRemoveDamagedOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [folderFilter, setFolderFilter] = useState("");
+  const [paginationModel, setPaginationModel] = useState(() => ({
+    page: 0,
+    pageSize: loadPageSize(),
+  }));
+  const [columnOverrides, setColumnOverrides] = useState({});
+  const gridApi = useGridApiRef();
+  const compactHeader = useMediaQuery((theme) => theme.breakpoints.down("md"));
+  const wideEnoughForFolders = useMediaQuery((theme) => theme.breakpoints.up("md"));
+  const wideEnoughForTags = useMediaQuery((theme) => theme.breakpoints.up("lg"));
 
   useEffect(() => {
     get();
@@ -236,11 +267,57 @@ const PasswordsPage = () => {
   const subtitle = useMemo(() => buildSubtitle(loading, passwords), [loading, passwords]);
   const isEmpty = !loading && passwords.length === 0;
 
+  // Columns nothing in the vault uses, or that do not fit, stay out of the way until
+  // the user asks for them from the column menu.
+  const columnVisibilityModel = useMemo(
+    () => ({
+      folder: wideEnoughForFolders && folderOptions.length > 0,
+      tags: wideEnoughForTags && passwords.some((p) => p.tags?.length),
+      totp_secret: passwords.some((p) => p.totp_secret),
+      ...columnOverrides,
+    }),
+    [wideEnoughForFolders, wideEnoughForTags, folderOptions, passwords, columnOverrides]
+  );
+
+  const handlePaginationChange = useCallback((model) => {
+    setPaginationModel((previous) => {
+      if (model.pageSize !== previous.pageSize) savePageSize(model.pageSize);
+      return model;
+    });
+  }, []);
+
+  // Results of a new search or folder start from the first page, not wherever the old
+  // list was left.
+  const updateSearch = (next) => {
+    setSearch(next);
+    setPaginationModel((previous) => ({ ...previous, page: 0 }));
+  };
+  const updateFolder = (next) => {
+    setFolderFilter(next);
+    setPaginationModel((previous) => ({ ...previous, page: 0 }));
+  };
+
+  // Every page starts at its first row, not at the scroll offset of the previous page.
+  const shownPage = useRef(paginationModel.page);
+  useEffect(() => {
+    if (shownPage.current === paginationModel.page) return;
+    shownPage.current = paginationModel.page;
+    gridApi.current?.scroll?.({ top: 0 });
+  }, [paginationModel.page, gridApi]);
+
   return (
-    <Box>
+    <Box sx={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
       <Stack
         direction="row"
-        sx={{ justifyContent: "space-between", alignItems: "flex-start", mb: 2.5 }}
+        useFlexGap
+        spacing={1.5}
+        sx={{
+          flexShrink: 0,
+          flexWrap: "wrap",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          mb: { xs: 2, sm: 2.5 },
+        }}
       >
         <Box>
           <Typography variant="h4" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
@@ -251,36 +328,32 @@ const PasswordsPage = () => {
           </Typography>
         </Box>
         <Stack direction="row" spacing={1}>
-          <Button
-            variant="outlined"
-            startIcon={<HealthAndSafetyIcon />}
+          <HeaderAction
+            label="Health"
+            icon={<HealthAndSafetyIcon />}
+            compact={compactHeader}
             onClick={() => setHealthOpen(true)}
             disabled={passwords.length === 0}
-          >
-            Health
-          </Button>
-          <Button
-            variant="outlined"
-            startIcon={<DownloadIcon />}
+          />
+          <HeaderAction
+            label="Backup"
+            icon={<DownloadIcon />}
+            compact={compactHeader}
             onClick={() => setBackupOpen(true)}
             disabled={passwords.length === 0}
-          >
-            Backup
-          </Button>
-          <Button
-            variant="outlined"
-            startIcon={<UploadFileIcon />}
+          />
+          <HeaderAction
+            label="Import"
+            icon={<UploadFileIcon />}
+            compact={compactHeader}
             onClick={() => setImportOpen(true)}
-          >
-            Import
-          </Button>
-          <Button
-            variant="outlined"
-            startIcon={<DeleteOutlineIcon />}
+          />
+          <HeaderAction
+            label={trash.length ? `Trash (${trash.length})` : "Trash"}
+            icon={<DeleteOutlineIcon />}
+            compact={compactHeader}
             onClick={() => setTrashOpen(true)}
-          >
-            {trash.length ? `Trash (${trash.length})` : "Trash"}
-          </Button>
+          />
           <Button variant="contained" startIcon={<AddIcon />} onClick={openAdd}>
             Add
           </Button>
@@ -288,13 +361,18 @@ const PasswordsPage = () => {
       </Stack>
 
       {!isEmpty && (
-        <Stack direction="row" spacing={1.5} sx={{ mb: 2, alignItems: "center" }}>
+        <Stack
+          direction="row"
+          useFlexGap
+          spacing={1.5}
+          sx={{ flexShrink: 0, flexWrap: "wrap", mb: 2, alignItems: "center" }}
+        >
           <TextField
             size="small"
             placeholder="Search name, username, website or tag…"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            sx={{ width: 320 }}
+            onChange={(e) => updateSearch(e.target.value)}
+            sx={{ width: { xs: "100%", sm: 380 } }}
             slotProps={{
               input: {
                 startAdornment: (
@@ -311,8 +389,8 @@ const PasswordsPage = () => {
               size="small"
               label="Folder"
               value={activeFolder}
-              onChange={(e) => setFolderFilter(e.target.value)}
-              sx={{ width: 200 }}
+              onChange={(e) => updateFolder(e.target.value)}
+              sx={{ width: { xs: "100%", sm: 200 } }}
             >
               <MenuItem value="">All folders</MenuItem>
               {folderOptions.map((f) => (
@@ -328,7 +406,7 @@ const PasswordsPage = () => {
       {damageCheckError && (
         <Alert
           severity="warning"
-          sx={{ mb: 2 }}
+          sx={{ mb: 2, flexShrink: 0 }}
           action={
             <Button color="inherit" size="small" onClick={() => getDamaged()}>
               Retry
@@ -342,7 +420,7 @@ const PasswordsPage = () => {
       {damagedCount > 0 && (
         <Alert
           severity="warning"
-          sx={{ mb: 2 }}
+          sx={{ mb: 2, flexShrink: 0 }}
           action={
             <Button color="inherit" size="small" onClick={() => setRemoveDamagedOpen(true)}>
               Remove
@@ -365,57 +443,72 @@ const PasswordsPage = () => {
       {isEmpty && <EmptyVault onAdd={openAdd} />}
 
       {!loading && !isEmpty && (
-        <DataGrid
-          rows={filteredPasswords}
-          columns={columns}
-          getRowId={(row) => row.password_name}
-          disableRowSelectionOnClick
-          density="compact"
-          rowHeight={44}
-          columnHeaderHeight={42}
-          pageSizeOptions={[10, 25, 50]}
-          initialState={{
-            pagination: { paginationModel: { pageSize: 10 } },
-          }}
-          slots={{
-            noRowsOverlay: () => (
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  height: "100%",
-                }}
-              >
-                <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                  No passwords match &ldquo;{search.trim()}&rdquo;.
-                </Typography>
-              </Box>
-            ),
-          }}
-          sx={{
-            ...gridBaseSx,
-            bgcolor: "background.paper",
-            borderRadius: 2.5,
-            "& .MuiDataGrid-columnHeaders": { borderColor: "divider" },
-            "& .MuiDataGrid-columnHeader": { bgcolor: "background.paper" },
-            "& .MuiDataGrid-columnHeaderTitle": {
-              fontWeight: 600,
-              color: "text.secondary",
-            },
-            "& .MuiDataGrid-row:hover": { bgcolor: "action.hover" },
-            "& .rowHoverActions": {
-              opacity: 0,
-              pointerEvents: "none",
-              transition: "opacity 120ms ease",
-            },
-            "& .MuiDataGrid-row:hover .rowHoverActions, & .MuiDataGrid-row:has(:focus-visible) .rowHoverActions":
-              {
-                opacity: 1,
-                pointerEvents: "auto",
+        <Box sx={{ flex: "1 1 0", minHeight: MIN_GRID_HEIGHT, position: "relative" }}>
+          <DataGrid
+            apiRef={gridApi}
+            rows={filteredPasswords}
+            columns={columns}
+            getRowId={(row) => row.password_name}
+            disableRowSelectionOnClick
+            density="compact"
+            rowHeight={44}
+            columnHeaderHeight={42}
+            pageSizeOptions={PAGE_SIZES}
+            paginationModel={paginationModel}
+            onPaginationModelChange={handlePaginationChange}
+            columnVisibilityModel={columnVisibilityModel}
+            onColumnVisibilityModelChange={setColumnOverrides}
+            slots={{
+              noRowsOverlay: () => (
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    height: "100%",
+                  }}
+                >
+                  <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                    No passwords match &ldquo;{search.trim()}&rdquo;.
+                  </Typography>
+                </Box>
+              ),
+            }}
+            sx={{
+              ...gridBaseSx,
+              position: "absolute",
+              inset: 0,
+              bgcolor: "background.paper",
+              borderRadius: 2.5,
+              "& .MuiDataGrid-columnHeaders": { borderColor: "divider" },
+              "& .MuiDataGrid-columnHeader": { bgcolor: "background.paper" },
+              "& .MuiDataGrid-columnHeaderTitle": {
+                fontWeight: 600,
+                color: "text.secondary",
               },
-          }}
-        />
+              "& .MuiDataGrid-row:hover": { bgcolor: "action.hover" },
+              // Keeps the page arrows clear of the floating theme toggle.
+              "& .MuiDataGrid-footerContainer": { pr: { xs: 7, sm: 8 } },
+              "& .MuiTablePagination-selectLabel, & .MuiTablePagination-input": {
+                display: { xs: "none", sm: "inline-flex" },
+              },
+              "& .rowHoverActions": {
+                opacity: 0,
+                pointerEvents: "none",
+                transition: "opacity 120ms ease",
+              },
+              "& .MuiDataGrid-row:hover .rowHoverActions, & .MuiDataGrid-row:has(:focus-visible) .rowHoverActions":
+                {
+                  opacity: 1,
+                  pointerEvents: "auto",
+                },
+              // Touch screens have no hover, so the row actions stay visible there.
+              "@media (hover: none)": {
+                "& .rowHoverActions": { opacity: 1, pointerEvents: "auto" },
+              },
+            }}
+          />
+        </Box>
       )}
 
       <PasswordFormDialog

@@ -33,11 +33,14 @@ const ThemeToggle = ({ zIndex = 1200 }) => {
         className={flying ? "cmFlying" : undefined}
         sx={{
           position: "fixed",
-          bottom: 24,
-          right: 24,
+          // Sits inside the vault grid's footer row, next to the page arrows.
+          bottom: { xs: 20, sm: 24 },
+          right: { xs: 20, sm: 24 },
           zIndex,
-          width: 52,
-          height: 52,
+          width: { xs: 44, sm: 52 },
+          height: { xs: 44, sm: 52 },
+          // A landscape phone has no free corner: it would float over the rows.
+          "@media (max-height: 480px)": { display: "none" },
           color: GLOW,
           bgcolor: dark ? "rgba(20,20,22,0.72)" : "rgba(255,255,255,0.82)",
           border: "1px solid",

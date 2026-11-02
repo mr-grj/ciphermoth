@@ -10,7 +10,9 @@ import {
   Toolbar,
   Tooltip,
   Typography,
+  useMediaQuery,
 } from "@mui/material";
+import LogoutIcon from "@mui/icons-material/Logout";
 import SettingsIcon from "@mui/icons-material/Settings";
 import UpgradeIcon from "@mui/icons-material/Upgrade";
 import { useStoreActions, useStoreState } from "easy-peasy";
@@ -29,6 +31,7 @@ const TopMenu = () => {
   const { pathname } = useLocation();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [updateOpen, setUpdateOpen] = useState(false);
+  const narrow = useMediaQuery((theme) => theme.breakpoints.down("sm"));
 
   const updateCheckEnabled = useStoreState(
     (s) => s.ciphermothModels.settings.settings.update_check_enabled
@@ -86,6 +89,7 @@ const TopMenu = () => {
                     letterSpacing: "0.08em",
                     color: "rgba(255,255,255,0.4)",
                     cursor: "default",
+                    display: { xs: "none", sm: "inline" },
                   }}
                 >
                   v{String(version).replace(/^v/, "")}
@@ -120,9 +124,17 @@ const TopMenu = () => {
                   <SettingsIcon />
                 </IconButton>
               </Tooltip>
-              <Button color="inherit" onClick={handleLogout}>
-                Log out
-              </Button>
+              {narrow ? (
+                <Tooltip title="Log out">
+                  <IconButton color="inherit" aria-label="Log out" onClick={handleLogout}>
+                    <LogoutIcon />
+                  </IconButton>
+                </Tooltip>
+              ) : (
+                <Button color="inherit" onClick={handleLogout} sx={{ whiteSpace: "nowrap" }}>
+                  Log out
+                </Button>
+              )}
               <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
               <UpdateDialog open={updateOpen} onClose={() => setUpdateOpen(false)} />
             </>

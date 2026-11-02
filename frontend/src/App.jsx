@@ -51,12 +51,26 @@ const AppContent = () => {
         sx={{
           bgcolor: "background.default",
           flexGrow: 1,
-          minHeight: "100vh",
+          minWidth: 0,
+          // The vault grid scrolls inside this height. The page itself only scrolls
+          // when the window is too short to fit the grid's minimum height.
+          height: "100dvh",
           overflow: "auto",
+          display: "flex",
+          flexDirection: "column",
         }}
       >
-        <Toolbar />
-        <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        <Toolbar sx={{ flexShrink: 0 }} />
+        <Container
+          maxWidth="lg"
+          sx={{
+            flex: "1 0 auto",
+            display: "flex",
+            flexDirection: "column",
+            pt: { xs: 2, sm: 3 },
+            pb: { xs: 2, sm: 3 },
+          }}
+        >
           {appRoutes}
         </Container>
       </Box>

@@ -123,7 +123,7 @@ export const createColumns = ({
     field: "password_name",
     headerName: "Name",
     flex: 1,
-    minWidth: 130,
+    minWidth: 120,
     renderCell: (params) => {
       const count = params.row.attachment_count ?? 0;
       const clip = count > 0 && (
@@ -182,7 +182,7 @@ export const createColumns = ({
     field: "username",
     headerName: "Username / email",
     flex: 1,
-    minWidth: 150,
+    minWidth: 130,
     renderCell: (params) => {
       const value = params.value;
       return (
@@ -204,7 +204,7 @@ export const createColumns = ({
     field: "password_value",
     headerName: "Password",
     flex: 1,
-    minWidth: 160,
+    minWidth: 130,
     sortable: false,
     renderCell: (params) => {
       const name = params.row.password_name;
@@ -284,7 +284,7 @@ export const createColumns = ({
   {
     field: "actions",
     headerName: "Actions",
-    width: 180,
+    width: 150,
     sortable: false,
     align: "center",
     headerAlign: "center",
