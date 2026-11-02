@@ -15,6 +15,7 @@ from crud.master_password import MasterPasswordCRUD
 from crud.password import PasswordCRUD
 from crud.settings import SettingsCRUD
 from crud.vault_access import SessionToken, VaultAccess
+from device_unlock import DeviceUnlockStore
 from errors import Forbidden, InvalidRequest, SessionRequired
 from helpers import VaultKey
 from vault_sessions import VaultSessions
@@ -40,7 +41,15 @@ VaultSessionsDep = Annotated[VaultSessions, Depends(get_vault_sessions)]
 
 _READ_ONLY_METHODS = frozenset({"GET", "HEAD"})
 _READ_ONLY_ROUTES = frozenset(
-    {"master-password:unlock", "master-password:session-activity", "passwords:backup"}
+    {
+        "master-password:unlock",
+        "master-password:session-activity",
+        "master-password:device-unlock",
+        "master-password:device-enroll",
+        "master-password:device-settings",
+        "master-password:device-forget",
+        "passwords:backup",
+    }
 )
 
 
@@ -91,9 +100,11 @@ async def get_damage_crud(session: SessionDep) -> DamageCRUD:
 
 
 async def get_vault_access(
-    session: SessionDep, vault_sessions: VaultSessionsDep
+    session: SessionDep,
+    vault_sessions: VaultSessionsDep,
+    database: Annotated[Database, Depends(get_database)],
 ) -> VaultAccess:
-    return VaultAccess(session, vault_sessions)
+    return VaultAccess(session, vault_sessions, DeviceUnlockStore(database.data_dir))
 
 
 MasterPasswordCRUDDep = Annotated[MasterPasswordCRUD, Depends(get_master_password_crud)]

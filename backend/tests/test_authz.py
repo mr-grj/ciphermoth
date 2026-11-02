@@ -27,6 +27,8 @@ PUBLIC_ROUTES = {
     ("POST", "/api/master_password/unlock"),
     ("POST", "/api/master_password/lock"),
     ("POST", "/api/master_password/create"),
+    ("GET", "/api/master_password/device-unlock"),
+    ("POST", "/api/master_password/device-unlock/unlock"),
     ("GET", "/api/meta"),
     ("GET", "/api/health"),
 }
@@ -123,6 +125,27 @@ PROTECTED_ROUTES: dict[tuple[str, str], Spec] = {
     ("GET", "/api/vault/damaged"): lambda c, h, x: c.get("/vault/damaged", headers=h),
     ("DELETE", "/api/vault/damaged/{kind}/{row_id}"): lambda c, h, x: c.delete(
         "/vault/damaged/entries/1", headers=h
+    ),
+    ("POST", "/api/master_password/device-unlock/enroll"): lambda c, h, x: c.post(
+        "/master_password/device-unlock/enroll",
+        json={
+            "master_password": MASTER_PASSWORD,
+            "credential_id": "matrix-device",
+            "kind": "passkey",
+            "material": "c2FsdA",
+            "secret": "A" * 43,
+        },
+        headers=h,
+    ),
+    ("PATCH", "/api/master_password/device-unlock"): lambda c, h, x: c.patch(
+        "/master_password/device-unlock",
+        json={"password_interval_days": 30},
+        headers=h,
+    ),
+    ("DELETE", "/api/master_password/device-unlock/{credential_id}"): (
+        lambda c, h, x: c.delete(
+            "/master_password/device-unlock/matrix-device", headers=h
+        )
     ),
     ("PATCH", "/api/master_password/update"): lambda c, h, x: c.patch(
         "/master_password/update",

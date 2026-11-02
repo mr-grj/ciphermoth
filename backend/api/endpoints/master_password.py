@@ -18,6 +18,11 @@ from api.endpoints.deps import (
 from api.rate_limit import limiter, rate
 from api.responses import inject_responses
 from schemas import (
+    DeviceEnrollRequest,
+    DeviceUnlockRequest,
+    DeviceUnlockResult,
+    DeviceUnlockSettings,
+    DeviceUnlockStatus,
     MasterPassword,
     MasterPasswordCreate,
     MasterPasswordCreatePayload,
@@ -148,3 +153,78 @@ async def update_master_password(
         master_password=body.master_password,
         new_master_password=body.new_master_password,
     )
+
+
+@router.get(
+    "/device-unlock",
+    name="master-password:device-status",
+    response_model=DeviceUnlockStatus,
+)
+async def get_device_unlock(access: VaultAccessDep) -> DeviceUnlockStatus:
+    return await access.device_status()
+
+
+@router.post(
+    "/device-unlock/unlock",
+    name="master-password:device-unlock",
+    response_model=DeviceUnlockResult,
+    responses=inject_responses({status.HTTP_429_TOO_MANY_REQUESTS: SimpleDetailSchema}),
+)
+@limiter.limit(rate("30/hour"))
+async def unlock_with_device(
+    request: Request,
+    body: DeviceUnlockRequest,
+    access: VaultAccessDep,
+) -> DeviceUnlockResult:
+    return await access.unlock_with_device(body)
+
+
+@router.post(
+    "/device-unlock/enroll",
+    name="master-password:device-enroll",
+    response_model=DeviceUnlockStatus,
+    dependencies=[Depends(get_vault_key)],
+    responses=inject_responses(
+        {
+            status.HTTP_400_BAD_REQUEST: SimpleDetailSchema,
+            status.HTTP_403_FORBIDDEN: SimpleDetailSchema,
+            status.HTTP_429_TOO_MANY_REQUESTS: SimpleDetailSchema,
+        }
+    ),
+)
+@limiter.limit(rate("10/hour"))
+async def enroll_device(
+    request: Request,
+    body: DeviceEnrollRequest,
+    access: VaultAccessDep,
+) -> DeviceUnlockStatus:
+    await access.enroll_device(body)
+    return await access.device_status()
+
+
+@router.patch(
+    "/device-unlock",
+    name="master-password:device-settings",
+    response_model=DeviceUnlockStatus,
+    dependencies=[Depends(get_vault_key)],
+    responses=inject_responses({status.HTTP_403_FORBIDDEN: SimpleDetailSchema}),
+)
+async def update_device_unlock(
+    body: DeviceUnlockSettings, access: VaultAccessDep
+) -> DeviceUnlockStatus:
+    access.set_password_interval(body.password_interval_days)
+    return await access.device_status()
+
+
+@router.delete(
+    "/device-unlock/{credential_id}",
+    name="master-password:device-forget",
+    response_model=DeviceUnlockStatus,
+    dependencies=[Depends(get_vault_key)],
+    responses=inject_responses({status.HTTP_403_FORBIDDEN: SimpleDetailSchema}),
+)
+async def forget_device(
+    credential_id: str, access: VaultAccessDep
+) -> DeviceUnlockStatus:
+    access.forget_device(credential_id)
+    return await access.device_status()

@@ -1,3 +1,4 @@
+import base64
 from datetime import datetime
 from enum import StrEnum
 from typing import Annotated
@@ -11,6 +12,9 @@ from pydantic import (
     model_validator,
 )
 
+from device_unlock import Kind as DeviceKind
+from device_unlock import PasswordIntervalDays
+from helpers import KEY_BYTES
 from validators import (
     addressable_name,
     normalize_totp_secret,
@@ -60,6 +64,58 @@ class VaultUnlock(BaseModel):
     valid: bool
     session_token: str | None = None
     idle_timeout_ms: int | None = None
+
+
+_CredentialId = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9_-]{1,1400}$")]
+_Base64Url = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9_-]+$")]
+
+
+def _decode_base64url(value: str) -> bytes:
+    return base64.urlsafe_b64decode(value + "=" * (-len(value) % 4))
+
+
+class DeviceUnlockRequest(BaseModel):
+    credential_id: _CredentialId
+    secret: _Base64Url = Field(max_length=64)
+
+    @field_validator("secret")
+    @classmethod
+    def _is_a_key(cls, value: str) -> str:
+        try:
+            decoded = _decode_base64url(value)
+        except ValueError:
+            raise ValueError("must be base64url") from None
+        if len(decoded) != KEY_BYTES:
+            raise ValueError(f"must decode to {KEY_BYTES} bytes")
+        return value
+
+    def secret_bytes(self) -> bytes:
+        return _decode_base64url(self.secret)
+
+
+class DeviceEnrollRequest(DeviceUnlockRequest, MasterPassword):
+    kind: DeviceKind
+    material: _Base64Url = Field(max_length=4096)
+
+
+class DeviceEnrollmentInfo(BaseModel):
+    credential_id: str
+    kind: DeviceKind
+    material: str
+
+
+class DeviceUnlockStatus(BaseModel):
+    enrollments: list[DeviceEnrollmentInfo]
+    password_required: bool
+    password_interval_days: PasswordIntervalDays
+
+
+class DeviceUnlockSettings(BaseModel):
+    password_interval_days: PasswordIntervalDays
+
+
+class DeviceUnlockResult(VaultUnlock):
+    password_required: bool = False
 
 
 class MasterPasswordCreate(BaseModel):

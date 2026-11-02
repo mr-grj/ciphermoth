@@ -24,6 +24,7 @@ from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from sqlalchemy import insert, text
 
 from crud.engine import Database
+from device_unlock import DEVICE_UNLOCK_FILE
 from helpers import VaultKey
 from main import app, get_application
 from models import SETTINGS_DEFAULTS, SettingsModel
@@ -53,6 +54,7 @@ async def reset_vault() -> None:
         await conn.execute(text("DELETE FROM settings"))
         await conn.execute(text("DELETE FROM sqlite_sequence"))
         await conn.execute(insert(SettingsModel).values(**SETTINGS_DEFAULTS))
+    (data_dir() / DEVICE_UNLOCK_FILE).unlink(missing_ok=True)
 
 
 def fresh_vault_sessions(clock: Callable[[], Instant] = system_clock) -> VaultSessions:

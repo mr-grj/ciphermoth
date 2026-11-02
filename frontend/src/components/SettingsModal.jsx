@@ -18,6 +18,8 @@ import HelpOutlineIcon from "@mui/icons-material/HelpOutlined";
 import { useStoreActions, useStoreState } from "easy-peasy";
 import { useSnackbar } from "notistack";
 
+import BiometricUnlockSection from "./BiometricUnlockSection";
+
 const FIELDS = [
   {
     key: "inactivity_ms",
@@ -150,6 +152,8 @@ const SettingsModal = ({ open, onClose }) => {
               }}
             />
           ))}
+          <Divider sx={{ my: 0.5 }} />
+          <BiometricUnlockSection open={open} />
           <Divider sx={{ my: 0.5 }} />
           <FormControlLabel
             sx={{ ml: 0, justifyContent: "space-between" }}

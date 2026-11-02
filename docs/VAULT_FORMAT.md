@@ -71,7 +71,21 @@ vault key VK (32 random bytes, never stored in clear)
 
 **Sessions.** The server keeps VK (with its derived keys) in memory behind an opaque session token, exactly as in format 1 (Phase 2): clients, including the web UI and the future desktop renderer, only ever hold the token. Every vault request compares the session key's `key_check` with the stored one inside its transaction, so a key that another process replaced ends the session at first use.
 
-**Master password change** (always a full re-key): verify the current password as in unlock, generate a new salt and a new random VK, derive and wrap, then in one write transaction confirm the row is unchanged, decrypt every entry document and attachment with the old keys, re-encrypt them with the new keys (new nonces), recompute every name index, and replace the row. Every session ends after the commit. Afterwards the old password unlocks nothing and the old VK decrypts nothing in the live file. Re-wrapping VK without re-encrypting (for a KDF parameter upgrade or, later, an OS keychain or passkey unlock) is supported by the layout but not exposed yet.
+**Master password change** (always a full re-key): verify the current password as in unlock, generate a new salt and a new random VK, derive and wrap, then in one write transaction confirm the row is unchanged, decrypt every entry document and attachment with the old keys, re-encrypt them with the new keys (new nonces), recompute every name index, and replace the row. Every session ends after the commit. Afterwards the old password unlocks nothing and the old VK decrypts nothing in the live file. Re-wrapping VK without re-encrypting for a KDF parameter upgrade is supported by the layout but not exposed yet.
+
+**Biometric unlock** (optional, outside the vault file). `device-unlock.json` in the data folder, mode `0600`, holds one record per enrolled device: `credential_id`, `kind` (`passkey` or `secure-enclave`), `material` (what the authenticator needs to reproduce its secret) and `wrapped_key`, plus `last_password_at` and `password_interval_days`. Binary values are unpadded base64url.
+
+```
+secret S = 32 bytes from the authenticator, never stored
+   passkey:         WebAuthn PRF output for salt = material (random 32 bytes), user verification required
+   secure-enclave:  HKDF-SHA256(ECDH(Secure Enclave P-256 key, peer public key), salt = empty,
+                    info = "ciphermoth/v2/secure-enclave-secret"), material = peer public key (65 bytes) ‖ key blob
+K_device = HKDF(S, "ciphermoth/v2/device-unlock")
+wrapped_key = 0x02 ‖ nonce ‖ AES-256-GCM(K_device, nonce, VK, AD_device)
+AD_device = 0x02 ‖ "ciphermoth/v2" ‖ u32 length ‖ "device-unlock" ‖ u32 length ‖ credential_id
+```
+
+Enrolling verifies the master password as in unlock, since only that yields the raw VK. Unlocking refuses first if the password reminder is due (now − `last_password_at` ≥ the interval, or the clock moved back more than 5 minutes), then decrypts `wrapped_key` and compares the derived `key_check` with the vault's: a mismatch after a successful decryption means the record belongs to a replaced vault key and it is removed. A master password change deletes the file after its commit, and a new vault deletes a stale one. The file is not part of the vault format or schema version: a release without this feature ignores it, and a malformed file is ignored with a log line, leaving the master password as the way in.
 
 **Why a separate commitment and not only GCM?** AES-GCM is not key-committing: one ciphertext can be built to decrypt under many keys. Unlock compares `password_check` first, so whatever is planted in `wrapped_key`, each unlock tests one password. The commitment costs an attacker exactly what testing the wrapped key would: one Argon2id per guess.
 

@@ -20,6 +20,9 @@
     "allow-save-file",
     "allow-open-external",
     "allow-vault-lock",
+    "allow-biometric-available",
+    "allow-biometric-enroll",
+    "allow-biometric-derive",
     "allow-update-check",
     "allow-update-install",
     "allow-update-cancel"

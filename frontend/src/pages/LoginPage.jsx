@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import FingerprintIcon from "@mui/icons-material/Fingerprint";
 import { Box, Button, Checkbox, FormControlLabel, LinearProgress, Typography } from "@mui/material";
 import { useStoreActions, useStoreState } from "easy-peasy";
 import { useSnackbar } from "notistack";
@@ -30,15 +31,26 @@ const LoginPage = () => {
   const { initialized, error, value, confirm, loading } = useStoreState(
     (s) => s.ciphermothModels.masterPassword
   );
+  const loadDeviceUnlock = useStoreActions((a) => a.ciphermothModels.deviceUnlock.load);
+  const unlockWithDevice = useStoreActions((a) => a.ciphermothModels.deviceUnlock.unlock);
+  const {
+    label: deviceLabel,
+    support,
+    enrollment,
+    passwordRequired,
+    unlocking,
+    keyChanged,
+  } = useStoreState((s) => s.ciphermothModels.deviceUnlock);
 
   useEffect(() => {
     fetchStatus();
+    loadDeviceUnlock();
     const notice = sessionStorage.getItem(LOGOUT_NOTICE);
     if (notice) {
       sessionStorage.removeItem(LOGOUT_NOTICE);
       enqueueSnackbar(notice, { variant: "info" });
     }
-  }, [fetchStatus, enqueueSnackbar]);
+  }, [fetchStatus, loadDeviceUnlock, enqueueSnackbar]);
 
   useEffect(() => {
     if (error) enqueueSnackbar(error, { variant: "error" });
@@ -47,6 +59,13 @@ const LoginPage = () => {
   const [acknowledged, setAcknowledged] = useState(false);
 
   const strength = initialized === false ? getMasterPasswordStrength(value) : null;
+  const deviceEnrolled = Boolean(initialized && enrollment && support?.available && !keyChanged);
+  const canUseDevice = deviceEnrolled && !passwordRequired;
+
+  const handleDeviceUnlock = async () => {
+    const problem = await unlockWithDevice();
+    if (problem) enqueueSnackbar(problem, { variant: "error" });
+  };
 
   const handleLogin = () => {
     if (!value.trim()) {
@@ -249,6 +268,28 @@ const LoginPage = () => {
         >
           {initialized ? "Unlock Vault" : "Create Vault"}
         </Button>
+
+        {canUseDevice && (
+          <Button
+            fullWidth
+            size="large"
+            variant="outlined"
+            startIcon={<FingerprintIcon />}
+            loading={unlocking}
+            disabled={loading}
+            onClick={handleDeviceUnlock}
+            sx={{ mt: 1.5, py: 1.4, color: "text.primary", borderColor: "divider" }}
+          >
+            Unlock with {deviceLabel}
+          </Button>
+        )}
+
+        {deviceEnrolled && passwordRequired && (
+          <Typography sx={{ mt: 2, fontSize: 12, color: "text.secondary", lineHeight: 1.5 }}>
+            A little practice: enter your master password so you never forget it. {deviceLabel}{" "}
+            works again right after.
+          </Typography>
+        )}
 
         <Typography sx={{ mt: 2.75, fontSize: 11, color: "text.disabled" }}>
           Closing this tab locks your vault. That is by design.

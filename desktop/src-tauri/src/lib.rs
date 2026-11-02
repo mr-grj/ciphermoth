@@ -1,3 +1,4 @@
+mod biometric;
 mod clipboard;
 mod commands;
 #[cfg(windows)]
@@ -118,6 +119,9 @@ pub fn run() {
         native::backup_import,
         native::save_file,
         native::open_external,
+        biometric::biometric_available,
+        biometric::biometric_enroll,
+        biometric::biometric_derive,
         updates::update_check,
         updates::update_install,
         updates::update_cancel
@@ -136,6 +140,9 @@ pub fn run() {
         native::backup_import,
         native::save_file,
         native::open_external,
+        biometric::biometric_available,
+        biometric::biometric_enroll,
+        biometric::biometric_derive,
         updates::update_check,
         updates::update_install,
         updates::update_cancel,

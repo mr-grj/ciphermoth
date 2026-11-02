@@ -53,6 +53,12 @@ Manual/idle/native lock destroys the core process and all in-flight key derivati
 
 Production capabilities allow only the app's narrow commands and event subscription. No filesystem/shell plugin is exposed. CSP forbids remote scripts/connections; navigation and new windows are restricted. Release devtools are disabled. The webview is incognito and password fields disable autocomplete; these are best-effort webview controls, not guarantees against a compromised OS.
 
+## Touch ID
+
+`native/biometric.swift` keeps a Secure Enclave key as a CryptoKit blob, with access control `biometryCurrentSet`. CryptoKit is what makes this possible without Apple signing: the Keychain's biometric access control needs an entitlement an ad-hoc signed app cannot have. Each use first runs `LAContext.evaluatePolicy`, so a dismissed prompt is told apart from a key that no longer works. The resulting 32-byte secret goes through the renderer to the Python core, like a typed master password; the vault key stays in the core. The format is in [VAULT_FORMAT.md](../docs/VAULT_FORMAT.md#3-key-hierarchy) and the trade-offs in [SECURITY.md](../SECURITY.md#biometric-unlock).
+
+Building on macOS needs `swiftc`, which the Xcode Command Line Tools include. Windows and Linux desktop builds report biometric unlock as unavailable.
+
 ## Files and backups
 
 Attachment/CSV file inputs use the webview's OS picker. Downloads use a native Save dialog and create a new file with restricted permissions. Existing files are refused instead of silently overwritten. External entry links use a protocol allowlist and the system browser.

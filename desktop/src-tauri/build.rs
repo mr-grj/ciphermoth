@@ -23,6 +23,7 @@ fn main() {
             .compile("ciphermoth_native");
         println!("cargo:rustc-link-lib=framework=AppKit");
         println!("cargo:rerun-if-changed=native/macos.m");
+        build_biometric();
     }
     let mut commands = vec![
         "core_request",
@@ -37,6 +38,9 @@ fn main() {
         "backup_import",
         "save_file",
         "open_external",
+        "biometric_available",
+        "biometric_enroll",
+        "biometric_derive",
         "update_check",
         "update_install",
         "update_cancel",
@@ -48,4 +52,46 @@ fn main() {
         tauri_build::AppManifest::new().commands(Box::leak(commands.into_boxed_slice())),
     ))
     .expect("failed to run tauri-build");
+}
+
+// CryptoKit has no Objective-C interface, and it is the only way to a Secure Enclave
+// key without a Keychain entitlement, which an ad-hoc signed app cannot have.
+fn build_biometric() {
+    let source = "native/biometric.swift";
+    println!("cargo:rerun-if-changed={source}");
+    let out = std::path::PathBuf::from(std::env::var("OUT_DIR").unwrap());
+    let architecture = match std::env::var("CARGO_CFG_TARGET_ARCH").as_deref() {
+        Ok("aarch64") => "arm64",
+        Ok("x86_64") => "x86_64",
+        other => panic!("unsupported macOS architecture {other:?}"),
+    };
+    let status = std::process::Command::new("swiftc")
+        .args(["-parse-as-library", "-emit-library", "-static", "-O"])
+        .args(["-module-name", "cm_biometric"])
+        .args(["-target", &format!("{architecture}-apple-macos11.0")])
+        .arg("-o")
+        .arg(out.join("libcm_biometric.a"))
+        .arg(source)
+        .status()
+        .expect("run swiftc (install the Xcode Command Line Tools)");
+    assert!(status.success(), "swiftc failed");
+    let toolchain = std::process::Command::new("xcrun")
+        .args(["--find", "swiftc"])
+        .output()
+        .expect("run xcrun");
+    let swiftc = std::path::PathBuf::from(String::from_utf8(toolchain.stdout).unwrap().trim());
+    let runtime = swiftc
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("lib/swift/macosx");
+    println!("cargo:rustc-link-search=native={}", out.display());
+    println!("cargo:rustc-link-search=native={}", runtime.display());
+    println!("cargo:rustc-link-search=native=/usr/lib/swift");
+    println!("cargo:rustc-link-lib=static=cm_biometric");
+    for framework in ["CryptoKit", "Foundation", "LocalAuthentication", "Security"] {
+        println!("cargo:rustc-link-lib=framework={framework}");
+    }
+    println!("cargo:rustc-link-arg=-Wl,-rpath,/usr/lib/swift");
 }

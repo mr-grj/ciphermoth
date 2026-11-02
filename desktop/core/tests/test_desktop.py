@@ -1,3 +1,4 @@
+import base64
 import json
 import os
 import stat
@@ -86,6 +87,35 @@ def test_fresh_create_unlock_lock(core):
         ]
         is True
     )
+
+
+def test_a_biometric_unlock_gets_the_same_native_deadline_as_a_password(core):
+    token = create(core)
+    secret = base64.urlsafe_b64encode(bytes(range(32))).rstrip(b"=").decode()
+    credential = {"credential_id": "this-mac", "secret": secret}
+    enrolled = api(
+        core,
+        "POST",
+        "/master_password/device-unlock/enroll",
+        {
+            **credential,
+            "master_password": PASSWORD,
+            "kind": "secure-enclave",
+            "material": "b3BhcXVl",
+        },
+        token=token,
+    )
+    assert enrolled[0] == 200, enrolled
+
+    reply = core.call(
+        "POST",
+        "/api/master_password/device-unlock/unlock",
+        headers=[["content-type", "application/json"]],
+        body=json.dumps(credential).encode(),
+    )
+
+    assert json.loads(reply.body)["valid"] is True
+    assert 0 < reply.header["session"]["expires_in_ms"] <= 120_000
 
 
 def test_native_session_deadline_is_authoritative_and_contains_no_token(core):

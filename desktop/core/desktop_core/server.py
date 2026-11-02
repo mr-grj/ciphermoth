@@ -304,6 +304,7 @@ class CoreServer:
             if status == 200 and path in (
                 "/api/master_password/create",
                 "/api/master_password/unlock",
+                "/api/master_password/device-unlock/unlock",
             ):
                 token = json.loads(body).get("session_token")
         if not token:

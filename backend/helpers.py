@@ -45,6 +45,7 @@ _KEY_WRAPPING = "ciphermoth/v2/key-wrapping"
 _RECORD_ENCRYPTION = "ciphermoth/v2/record-encryption"
 _NAME_INDEX = "ciphermoth/v2/name-index"
 _KEY_CHECK = "ciphermoth/v2/key-check"
+_DEVICE_UNLOCK = "ciphermoth/v2/device-unlock"
 _BACKUP_COMMITMENT = "ciphermoth/backup/v2/key-commitment"
 _BACKUP_FRAMES = "ciphermoth/backup/v2/frame-encryption"
 
@@ -288,6 +289,11 @@ def open_key_material(derived: bytes, material: KeyMaterial) -> VaultKey | None:
     key-committing). A matching commitment with a wrapped key or key check
     that does not verify raises DecryptionFailed: the row is damaged.
     """
+    raw = _unwrap_raw_key(derived, material)
+    return None if raw is None else VaultKey(raw)
+
+
+def _unwrap_raw_key(derived: bytes, material: KeyMaterial) -> bytes | None:
     if not hmac.compare_digest(
         _hkdf(derived, _PASSWORD_COMMITMENT), bytes(material.password_check)
     ):
@@ -297,12 +303,9 @@ def open_key_material(derived: bytes, material: KeyMaterial) -> VaultKey | None:
         material.wrapped_key,
         _wrap_associated_data(material.params, material.salt),
     )
-    if len(raw) != KEY_BYTES:
+    if len(raw) != KEY_BYTES or not VaultKey(raw).matches(material.key_check):
         raise DecryptionFailed
-    key = VaultKey(raw)
-    if not key.matches(material.key_check):
-        raise DecryptionFailed
-    return key
+    return raw
 
 
 async def create_key_material(
@@ -318,6 +321,44 @@ async def create_key_material(
 async def unlock_key_material(password: str, material: KeyMaterial) -> VaultKey | None:
     derived = await derive(password, material.salt, material.params)
     return open_key_material(derived, material)
+
+
+def _device_cipher(secret: bytes) -> AESGCM:
+    if len(secret) != KEY_BYTES:
+        raise DecryptionFailed
+    return AESGCM(_hkdf(secret, _DEVICE_UNLOCK))
+
+
+async def wrap_key_for_device(
+    password: str, material: KeyMaterial, secret: bytes, credential_id: str
+) -> bytes | None:
+    """
+    The vault key wrapped under a device's 32-byte secret, or None if ``password``
+    is wrong. Only the master password can create this wrapping: a session does
+    not hold the raw vault key.
+    """
+    derived = await derive(password, material.salt, material.params)
+    raw = _unwrap_raw_key(derived, material)
+    if raw is None:
+        return None
+    return _seal(
+        _device_cipher(secret),
+        raw,
+        _associated_data(b"device-unlock", credential_id.encode()),
+    )
+
+
+def open_device_wrapped_key(
+    secret: bytes, credential_id: str, wrapped: bytes
+) -> VaultKey:
+    raw = _open(
+        _device_cipher(secret),
+        wrapped,
+        _associated_data(b"device-unlock", credential_id.encode()),
+    )
+    if len(raw) != KEY_BYTES:
+        raise DecryptionFailed
+    return VaultKey(raw)
 
 
 BACKUP_MAGIC = b"CMBACKUP"

@@ -71,6 +71,7 @@ Then open **[http://localhost:3000](http://localhost:3000)**. [CONTRIBUTING.md](
 ## What it does
 
 - one master password unlocks the vault, no account, no email, no recovery codes sent to a phone number you changed three years ago
+- optional biometric unlock: Touch ID in the macOS app, a passkey in the browser. It works on that device only, and it asks for your master password every couple of weeks so you never forget it
 - all entry contents encrypted at rest with a random vault key, stored only wrapped under a key derived from your master password
 - store a username, website, tags, folders, a two-factor (TOTP) secret, and your own custom fields alongside each entry, all encrypted, entry names included (see [Security](#security))
 - built-in two-factor: paste a 2FA secret, and CipherMoth shows the live rolling code, computed in the browser
@@ -120,6 +121,9 @@ How it works (the full specification is [docs/VAULT_FORMAT.md](./docs/VAULT_FORM
   its trashed copies) and your timeout settings. This is encryption of each entry, not of the whole file;
 - changing the master password creates a new vault key and re-encrypts everything, so the old password and the old key
   open nothing in the vault afterwards (older snapshots and backups keep the password they were made with);
+- **biometric unlock** is off until you turn it on with your master password. The vault key is then also wrapped under a
+  secret only that device's Secure Enclave or passkey can produce after checking your fingerprint or face. Anyone that
+  device accepts can open the vault ([details](./SECURITY.md#biometric-unlock));
 - Python owns the keys and gives React only an **opaque session token**. Desktop sessions stay in memory, and the bundled Python core talks to Rust through private binary pipes: no backend TCP listener. Locking clears the owned clipboard and stops the process holding the keys. The Docker edition keeps keys in its server process and the browser's session token in `sessionStorage`;
 - a strict Content-Security-Policy restricts the UI. Desktop release checks run in Rust against the fixed GitHub release source; no vault contents, passwords, session tokens or entry metadata are sent;
 - **backups** (`.cmbackup`) are complete and authenticated: every entry including the trash and history, attachments

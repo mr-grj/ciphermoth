@@ -24,6 +24,7 @@ from helpers import (
     VaultKey,
     create_key_material,
     unlock_key_material,
+    wrap_key_for_device,
 )
 from models import AttachmentModel, EntryModel, VaultModel
 from schemas import MasterPasswordUpdate
@@ -176,6 +177,31 @@ class MasterPasswordCRUD(BaseCRUD):
         if opened is None:
             raise Forbidden("Incorrect master password.")
         return opened
+
+    async def wrap_for_device(
+        self, master_password: str, secret: bytes, credential_id: str
+    ) -> bytes:
+        """
+        The vault key wrapped for a biometric enrollment, which only the master
+        password can authorize. Like every slow step this runs outside any
+        transaction; a master password change that committed meanwhile stops it.
+        """
+        observed = key_material(await self._get_model())
+        await self.session.commit()
+        try:
+            wrapped = await wrap_key_for_device(
+                master_password, observed, secret, credential_id
+            )
+        except UnsupportedKdf as error:
+            raise InvalidRequest(str(error)) from None
+        except DecryptionFailed:
+            logger.error("The vault key record failed to verify.")
+            raise InvalidRequest(_DAMAGED) from None
+        if wrapped is None:
+            raise Forbidden("Incorrect master password.")
+        if key_material(await self._get_model()) != observed:
+            raise InvalidKey(_INVALID_KEY)
+        return wrapped
 
     async def confirm_same_key(self, opened: VaultKey, key: VaultKey) -> None:
         """Check, in the request's new transaction, that the session's key is
