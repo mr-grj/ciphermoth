@@ -1,6 +1,17 @@
 # Changelog
 
-## [Unreleased]
+## [3.2.0] - 2026-11-02
+
+Unlock with a touch, and a vault table that fits your window.
+
+### Added
+
+- **Unlock with Touch ID or another biometric**, as an option in Settings, next to the master password. The desktop app on Macs with Touch ID uses a Secure Enclave key tied to the current fingerprints; browsers use a passkey with the PRF extension (HTTPS or localhost, on a device with a fingerprint, face or PIN unlock). Turning it on needs the master password and it works only on that device. The master password is asked for again every 7, 14 or 30 days (14 by default) so it is not forgotten, and changing the master password ends every biometric unlock. The vault format and schema are unchanged. The CLI keeps using the master password.
+
+### Changed
+
+- **The vault table scrolls on its own**: the app bar, search and page controls stay in place at every window size. The page only scrolls when a window is too short to fit the table (landscape phones). Page size choices now go up to 100 (default 25) and are remembered per browser. A new search or folder filter returns to the first page, and each page starts at its first row.
+- Smaller screens: the toolbar buttons become icons, unused or unfitting columns (folder, tags, 2FA) stay hidden until needed, row actions stay visible on touch screens, and the theme toggle no longer covers the page arrows.
 
 ### Security
 
