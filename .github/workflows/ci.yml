@@ -107,6 +107,9 @@ jobs:
       - name: Test the image's runtime configuration
         run: node --test docker/frontend/runtime-config.test.mjs
 
+      - name: Test the dependency audit's accepted advisories
+        run: node --test scripts/npm_audit.test.mjs
+
   frontend-browser:
     name: Frontend image (CSP in Chromium)
     runs-on: ubuntu-latest

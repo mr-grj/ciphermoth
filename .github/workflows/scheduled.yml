@@ -29,12 +29,10 @@ jobs:
           node-version: 20
 
       - name: Audit frontend dependencies
-        working-directory: frontend
-        run: npm audit --audit-level=moderate
+        run: node scripts/npm_audit.mjs frontend
 
       - name: Audit the frontend image's file server
-        working-directory: docker/frontend/serve
-        run: npm audit --audit-level=moderate
+        run: node scripts/npm_audit.mjs docker/frontend/serve
 
   stress:
     name: Stress tests (fuzzing, process kills)

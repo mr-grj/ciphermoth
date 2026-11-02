@@ -84,6 +84,7 @@ test:
 	cd backend && uv run pytest
 	cd frontend && npm test
 	node --test docker/frontend/runtime-config.test.mjs
+	node --test scripts/npm_audit.test.mjs
 
 # Builds the frontend image and checks its Content-Security-Policy in Chromium.
 .PHONY: test-browser

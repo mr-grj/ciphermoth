@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Security
+
+- Update certifi to 2026.10.23, which no longer trusts the emSign root behind compromised eMudhra intermediates (PYSEC-2026-4320). This affects the `ciphermoth` CLI inside the Docker backend image when it connects to a remote HTTPS API; the desktop app does not include certifi.
+- Update the frontend image's file server dependency fast-uri and the frontend's follow-redirects, Vite, Vitest and zod to versions with published fixes.
+
 ## [3.1.0] - 2026-10-17
 
 CipherMoth is now a standalone desktop password manager for macOS, Windows and Linux. Your secrets stay in the dark; Docker remains available.
