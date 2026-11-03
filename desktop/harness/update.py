@@ -188,7 +188,13 @@ class Host:
         while time.monotonic() < deadline:
             path = self.root / "update-request.json"
             if path.exists():
-                report = json.loads(path.read_text())
+                try:
+                    report = json.loads(path.read_text())
+                except (PermissionError, json.JSONDecodeError):
+                    # Windows refuses to open a file while the app renames over
+                    # it; the next poll reads the finished one.
+                    time.sleep(0.05)
+                    continue
                 if report["id"] not in self.seen:
                     self.seen.add(report["id"])
                     self.report = report
@@ -202,7 +208,14 @@ class Host:
         response = self.root / f"update-{self.report['id']}.json"
         partial = response.with_suffix(".partial")
         partial.write_text(json.dumps({"action": action, **fields}))
-        partial.replace(response)
+        for _ in range(100):
+            try:
+                partial.replace(response)
+                break
+            except PermissionError:
+                time.sleep(0.02)
+        else:
+            partial.replace(response)
         return self.receive() if wait else None
 
     def stop(self):

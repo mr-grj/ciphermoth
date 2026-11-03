@@ -70,16 +70,32 @@ pub async fn qa_update_step(
         serde_json::to_vec(&request).unwrap(),
     )
     .map_err(|_| "QA write failed")?;
-    std::fs::rename(
-        root.join("update-request.partial"),
-        root.join("update-request.json"),
-    )
-    .map_err(|_| "QA write failed")?;
+    // Windows refuses to replace or open a file the harness has open at that
+    // moment; both sides poll, so retry briefly instead of failing the run.
+    let mut renamed = false;
+    for _ in 0..100 {
+        if std::fs::rename(
+            root.join("update-request.partial"),
+            root.join("update-request.json"),
+        )
+        .is_ok()
+        {
+            renamed = true;
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    }
+    if !renamed {
+        return Err("QA write failed".into());
+    }
     for _ in 0..2400 {
         if response.exists() {
-            let bytes = std::fs::read(&response).map_err(|_| "QA read failed")?;
-            std::fs::remove_file(response).map_err(|_| "QA cleanup failed")?;
-            return serde_json::from_slice(&bytes).map_err(|_| "Invalid QA response".into());
+            if let Ok(bytes) = std::fs::read(&response) {
+                if std::fs::remove_file(&response).is_ok() {
+                    return serde_json::from_slice(&bytes)
+                        .map_err(|_| "Invalid QA response".into());
+                }
+            }
         }
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
     }
