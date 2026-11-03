@@ -645,3 +645,67 @@ async def test_the_session_binding_is_not_the_token() -> None:
     token = "a" * 43
     assert session_binding(token) != hashlib.sha256(token.encode()).digest()
     assert session_binding(token) == session_binding(token)
+
+
+async def test_a_backup_from_before_a_master_password_change_still_restores(
+    client: httpx.AsyncClient,
+) -> None:
+    """A backup is locked with the master password it was made with. After the
+    password changes (here also with a security key on), it restores with that
+    old password, never with the new one, and needs no security key."""
+    token, key = await _vault_with_key(client)
+    resp = await client.post(
+        "/passwords/backup",
+        json=await confirmation(client, auth(token), key),
+        headers=auth(token),
+    )
+    assert resp.status_code == 200, resp.text
+    backup = resp.content
+
+    answer = await security_key_answer(client, key, auth(token))
+    resp = await client.patch(
+        "/master_password/update",
+        json={
+            "master_password": MASTER_PASSWORD,
+            "new_master_password": NEW_MASTER_PASSWORD,
+            "security_key": answer,
+        },
+        headers=auth(token),
+    )
+    assert resp.status_code == 200, resp.text
+    token = (await unlock_with_key(client, key, NEW_MASTER_PASSWORD)).json()[
+        "session_token"
+    ]
+    resp = await client.delete("/passwords/GitHub", headers=auth(token))
+    assert resp.status_code == 200
+    resp = await client.delete("/passwords/GitHub/purge", headers=auth(token))
+    assert resp.status_code == 200
+
+    def restore(password: str):
+        return client.post(
+            "/passwords/import",
+            data={"master_password": password, "on_conflict": "skip"},
+            files={
+                "file": ("old.cmbackup", io.BytesIO(backup), "application/octet-stream")
+            },
+            headers=auth(token),
+        )
+
+    resp = await restore(NEW_MASTER_PASSWORD)
+    assert resp.status_code in (400, 403), resp.text
+    resp = await restore(MASTER_PASSWORD)
+    assert resp.status_code == 200, resp.text
+    resp = await client.get("/passwords/GitHub", headers=auth(token))
+    assert resp.json()["password_value"] == "gh-Secret-1"
+
+
+async def test_a_new_vault_does_not_require_a_security_key(
+    client: httpx.AsyncClient,
+) -> None:
+    token = await create_vault(client)
+    status = (await client.get("/master_password/status")).json()
+    assert status["security_key_required"] is False
+    security = (await client.get("/security", headers=auth(token))).json()
+    assert security["security_keys"] == []
+    assert security["security_key_required"] is False
+    await unlock(client)
