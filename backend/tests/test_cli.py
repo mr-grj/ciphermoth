@@ -2,6 +2,7 @@ import http.server
 import importlib.util
 import json
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -18,6 +19,7 @@ import typer
 from typer.testing import CliRunner, Result
 
 from cli import app as cli_app
+from tests.authenticator import SoftKey
 from tests.support import (
     MASTER_PASSWORD,
     WRONG_MASTER_PASSWORD,
@@ -1178,3 +1180,102 @@ def test_cli_names_the_entry_on_every_entry_request() -> None:
     assert len(entry_requests) == 5
     for _, _, headers in entry_requests:
         assert headers.get("x-ciphermoth-entry") == "x%2Fpurge"
+
+
+def _register_soft_key(api: str, session: dict[str, str]) -> SoftKey:
+    soft = SoftKey()
+    options = httpx.post(f"{api}/security/keys/options", headers=session).json()
+    resp = httpx.post(
+        f"{api}/security/keys",
+        json={
+            "name": "CLI key",
+            "confirmation": {"master_password": MASTER_PASSWORD},
+            "registration": soft.register(options["challenge"]),
+            "assertion": soft.answer(options["secret_challenge"], options["prf_salt"]),
+        },
+        headers=session,
+    )
+    assert resp.status_code == 200, resp.text
+    return soft
+
+
+@pytest.fixture
+def plugged_in(monkeypatch: pytest.MonkeyPatch):
+    """Stand in for the USB key: the CLI's CTAP client answers with a SoftKey."""
+    import security_key_client
+
+    touches: list[str] = []
+    keys: list = []
+
+    def answer(
+        challenge: dict, on_touch=lambda: None, get_pin=lambda: None, event=None
+    ) -> dict:
+        on_touch()
+        soft = keys[0]
+        descriptor = next(k for k in challenge["keys"] if k["credential_id"] == soft.id)
+        touches.append(challenge["challenge"])
+        return soft.answer(challenge["challenge"], descriptor["prf_salt"])
+
+    monkeypatch.setattr(security_key_client, "answer", answer)
+    return keys, touches
+
+
+async def test_cli_unlocks_and_backs_up_with_a_security_key(
+    api: str, key: dict[str, str], tmp_path: Path, plugged_in
+) -> None:
+    keys, touches = plugged_in
+    _api_create(api, key, {"password_name": "mail", "password_value": "mail-Pass-1"})
+    keys.append(_register_soft_key(api, key))
+
+    output = ok(cli(api, "password", "get", "mail"))
+    assert "mail-Pass-1" in output
+    assert "Touch your security key" in output
+    assert len(touches) == 1
+
+    ok(cli(api, "backup", "--out", str(tmp_path)))
+    assert len(touches) == 3  # unlock, then the backup's own confirmation
+    [archive] = list(tmp_path.glob("ciphermoth_backup_*.cmbackup"))
+    assert archive.read_bytes().startswith(b"CMBACKUP")
+
+
+async def test_cli_recover_resets_the_master_password(
+    api: str, key: dict[str, str], plugged_in
+) -> None:
+    keys, _ = plugged_in
+    _api_create(api, key, {"password_name": "mail", "password_value": "mail-Pass-1"})
+    resp = httpx.post(
+        f"{api}/security/recovery-code",
+        json={"master_password": MASTER_PASSWORD},
+        headers=key,
+    )
+    code = resp.json()["recovery_code"]
+    keys.append(_register_soft_key(api, key))
+
+    new_password = "Cli-Recovered-Vault-2029!"
+    result = runner.invoke(
+        cli_app,
+        ["recover"],
+        input=f"{code}\n{new_password}\n{new_password}\nn\n",
+        env={"CIPHERMOTH_API_URL": api, "COLUMNS": "200"},
+    )
+    output = ok(result)
+    assert code not in output
+    [new_code] = re.findall(r"(?:[0-9A-Z]{4}-){7}[0-9A-Z]{4}", output)
+    assert new_code != code
+
+    # The key still works with the new password.
+    result = runner.invoke(
+        cli_app,
+        ["password", "get", "mail"],
+        input=f"{new_password}\n",
+        env={"CIPHERMOTH_API_URL": api, "COLUMNS": "200"},
+    )
+    assert "mail-Pass-1" in ok(result)
+
+
+async def test_cli_recover_without_a_code_explains(api: str) -> None:
+    result = runner.invoke(
+        cli_app, ["recover"], env={"CIPHERMOTH_API_URL": api, "COLUMNS": "200"}
+    )
+    assert result.exit_code == 1
+    assert "no recovery code" in result.output

@@ -1,11 +1,12 @@
 import base64
+import logging
 from dataclasses import dataclass, field
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from crud.base import BaseCRUD
 from crud.engine import after_commit, after_rollback
-from crud.master_password import MasterPasswordCRUD, fetch_vault
+from crud.master_password import FactorCheck, MasterPasswordCRUD, fetch_vault
 from crud.settings import SettingsCRUD
 from device_unlock import (
     MAX_ENROLLMENTS,
@@ -16,6 +17,7 @@ from device_unlock import (
 from errors import InvalidKey, InvalidRequest, SessionRequired
 from helpers import DecryptionFailed, VaultKey, open_device_wrapped_key
 from schemas import (
+    Confirmation,
     DeviceEnrollmentInfo,
     DeviceEnrollRequest,
     DeviceUnlockRequest,
@@ -23,10 +25,18 @@ from schemas import (
     DeviceUnlockStatus,
     MasterPasswordCreate,
     MasterPasswordUpdate,
+    MasterPasswordUpdatePayload,
+    RecoverPayload,
+    RecoverResult,
+    SecurityKeyChallenge,
+    SecurityKeyDescriptor,
     VaultSessionStatus,
     VaultUnlock,
 )
 from vault_sessions import VaultSessions
+from webauthn import TIMEOUT_MS, Challenges, session_binding
+
+logger = logging.getLogger(__name__)
 
 _SESSION_ENDED = "Your session expired or was locked. Unlock the vault again."
 
@@ -57,11 +67,45 @@ class VaultAccess(BaseCRUD):
         session: AsyncSession,
         vault_sessions: VaultSessions,
         device_unlock: DeviceUnlockStore,
+        challenges: Challenges | None = None,
     ) -> None:
         super().__init__(session)
         self.vault_sessions = vault_sessions
         self.device_unlock = device_unlock
+        self.challenges = challenges or Challenges()
         self.master_password = MasterPasswordCRUD(session)
+
+    def confirm_check(self, credential: SessionToken) -> FactorCheck:
+        """Security key answers for a session's request must answer a challenge
+        issued to that same session."""
+        return FactorCheck(
+            self.challenges, "confirm", session_binding(credential.token)
+        )
+
+    async def _challenge(
+        self, purpose: str, binding: bytes | None
+    ) -> SecurityKeyChallenge:
+        state = await self.master_password.state()
+        if not state.material.second_factor:
+            raise InvalidRequest("This vault does not use a security key.")
+        return SecurityKeyChallenge(
+            challenge=_encode_base64url(self.challenges.issue(purpose, binding)),
+            timeout_ms=TIMEOUT_MS,
+            keys=[
+                SecurityKeyDescriptor(
+                    credential_id=_encode_base64url(key.credential.credential_id),
+                    rp_id=key.credential.rp_id,
+                    prf_salt=_encode_base64url(key.prf_salt),
+                )
+                for key in state.security_keys
+            ],
+        )
+
+    async def unlock_challenge(self) -> SecurityKeyChallenge:
+        return await self._challenge("unlock", None)
+
+    async def confirm_challenge(self, credential: SessionToken) -> SecurityKeyChallenge:
+        return await self._challenge("confirm", session_binding(credential.token))
 
     async def _refresh_idle_timeout(self) -> None:
         inactivity_ms = await SettingsCRUD(
@@ -74,8 +118,12 @@ class VaultAccess(BaseCRUD):
         after_rollback(self.session, lambda: self.vault_sessions.revoke(token))
         return token
 
-    async def unlock(self, master_password: str) -> VaultUnlock:
-        key = await self.master_password.unlock(master_password)
+    async def unlock(self, body: Confirmation) -> VaultUnlock:
+        key = await self.master_password.unlock(
+            body.master_password,
+            body.security_key,
+            FactorCheck(self.challenges, "unlock"),
+        )
         if key is None:
             return VaultUnlock(valid=False)
         self.device_unlock.record_password_unlock()
@@ -114,14 +162,14 @@ class VaultAccess(BaseCRUD):
         )
 
     async def change_master_password(
-        self,
-        credential: SessionToken,
-        master_password: str,
-        new_master_password: str,
+        self, credential: SessionToken, body: MasterPasswordUpdatePayload
     ) -> MasterPasswordUpdate:
         try:
             result = await self.master_password.update_master_password(
-                master_password, new_master_password
+                body.master_password,
+                body.new_master_password,
+                body.security_key,
+                self.confirm_check(credential),
             )
         except InvalidKey:
             self.vault_sessions.revoke(credential.token)
@@ -146,14 +194,20 @@ class VaultAccess(BaseCRUD):
             password_interval_days=state.password_interval_days,
         )
 
-    async def enroll_device(self, request: DeviceEnrollRequest) -> None:
+    async def enroll_device(
+        self, request: DeviceEnrollRequest, credential: SessionToken
+    ) -> None:
         if not self.device_unlock.has_room_for(request.credential_id):
             raise InvalidRequest(
                 f"Biometric unlock can be on at most {MAX_ENROLLMENTS} devices. "
                 "Turn it off on one first."
             )
         wrapped = await self.master_password.wrap_for_device(
-            request.master_password, request.secret_bytes(), request.credential_id
+            request.master_password,
+            request.secret_bytes(),
+            request.credential_id,
+            request.security_key,
+            self.confirm_check(credential),
         )
         self.device_unlock.add(
             Enrollment(
@@ -197,6 +251,28 @@ class VaultAccess(BaseCRUD):
             valid=True,
             session_token=self._open(key),
             idle_timeout_ms=self.vault_sessions.idle_timeout_ms,
+        )
+
+    async def recover(self, body: RecoverPayload) -> RecoverResult:
+        """
+        A new master password from the recovery code. Every session ends and
+        biometric unlock is turned off (it wrapped the old vault key); the new
+        session is the only one.
+        """
+        key, code, security_key_required = await self.master_password.recover(
+            body.recovery_code, body.new_master_password, body.keep_security_keys
+        )
+        logger.warning("The vault was recovered with its recovery code.")
+        await self._refresh_idle_timeout()
+        token = self._open(key)
+        after_commit(self.session, lambda: self.vault_sessions.revoke_all(keep=token))
+        after_commit(self.session, self.device_unlock.clear)
+        return RecoverResult(
+            detail="Master password reset. Save your new recovery code.",
+            session_token=token,
+            idle_timeout_ms=self.vault_sessions.idle_timeout_ms,
+            recovery_code=code,
+            security_key_required=security_key_required,
         )
 
     def forget_device(self, credential_id: str) -> None:

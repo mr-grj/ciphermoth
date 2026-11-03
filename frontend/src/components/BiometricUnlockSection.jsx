@@ -14,6 +14,7 @@ import { useStoreActions, useStoreState } from "easy-peasy";
 import { useSnackbar } from "notistack";
 
 import PasswordField from "./PasswordField";
+import KeyHint from "./security/KeyHint";
 import { BiometricCancelled } from "../platform/biometrics";
 
 const INTERVALS = [7, 14, 30];
@@ -124,7 +125,7 @@ const BiometricUnlockSection = ({ open }) => {
         <Stack spacing={1.25} sx={{ pt: 0.5 }}>
           <Typography variant="caption" sx={{ color: "text.secondary" }}>
             Works on this device only. Anyone whose finger or face this device accepts can open the
-            vault. Your master password still works and is still the only recovery.
+            vault. Your master password still works.
           </Typography>
           <PasswordField
             label="Master Password"
@@ -149,6 +150,7 @@ const BiometricUnlockSection = ({ open }) => {
           >
             Turn on {label}
           </Button>
+          <KeyHint />
         </Stack>
       </Collapse>
       {enabled && !enrolling && (
@@ -158,7 +160,7 @@ const BiometricUnlockSection = ({ open }) => {
           label="Ask for the master password"
           value={passwordIntervalDays}
           onChange={handleInterval}
-          helperText="So you don't forget it. There is no other way to recover the vault."
+          helperText="So you don't forget it."
         >
           {INTERVALS.map((days) => (
             <MenuItem key={days} value={days}>

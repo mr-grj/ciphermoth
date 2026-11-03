@@ -58,6 +58,8 @@ docker compose -f docker-compose.prod.yml up -d
 
 Anything saved after that snapshot is lost by the restore (the vault it replaces is kept, see below).
 
+**Schema upgrades are automatic and keep a copy first.** When a release changes the vault's table layout (3.4 adds the tables for security keys and the recovery code, schema 3), its first start copies the vault to `snapshots/before-schema-<n>-<time>.db`, then upgrades it in one transaction (a failed upgrade changes nothing). That copy is what you restore to go back: the previous release refuses the upgraded file. The desktop app does the same in its own data folder.
+
 ## Snapshots
 
 ```shell

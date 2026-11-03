@@ -859,7 +859,11 @@ async def test_unlocks_waiting_for_the_kdf_hold_no_database_connection(
     finally:
         await engine.dispose()
 
-    assert resp.json() == {"initialized": True}
+    assert resp.json() == {
+        "initialized": True,
+        "security_key_required": False,
+        "recovery_code": False,
+    }
     assert unlocking
     assert waited < 0.15
 
@@ -1002,7 +1006,7 @@ async def test_the_retired_key_route_answers_without_deriving_a_key(
         raise AssertionError("the retired route must not check the password")
 
     monkeypatch.setattr(MasterPasswordCRUD, "unlock", never)
-    monkeypatch.setattr(crud.master_password, "unlock_key_material", never)
+    monkeypatch.setattr(crud.master_password, "open_vault", never)
     monkeypatch.setattr(helpers, "derive", never)
     for body in (
         {"master_password": MASTER_PASSWORD},
@@ -1051,6 +1055,8 @@ async def test_the_server_no_longer_advertises_the_vault_key_protocol(
     assert features == [
         "bulk-entry-actions",
         "entry-names-with-slash",
+        "recovery-code",
+        "security-keys",
         "vault-sessions",
     ]
     paths = app.openapi()["paths"]

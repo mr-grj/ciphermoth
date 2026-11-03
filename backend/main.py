@@ -21,6 +21,7 @@ from models import SETTINGS_DEFAULTS
 from settings import get_api_settings
 from storage import VaultLock
 from vault_sessions import VaultSessions
+from webauthn import Challenges
 
 _SESSION_SWEEP_SECONDS = 30
 
@@ -84,6 +85,7 @@ def get_application(
         else VaultSessions(idle_timeout_ms=SETTINGS_DEFAULTS["inactivity_ms"])
     )
 
+    server.state.security_challenges = Challenges()
     server.state.limiter = limiter
     server.add_exception_handler(RateLimitExceeded, rate_limit_exceeded)
 

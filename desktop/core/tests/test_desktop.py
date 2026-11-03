@@ -67,7 +67,10 @@ def native(core, operation, path, token, **fields):
 
 
 def test_fresh_create_unlock_lock(core):
-    assert api(core, "GET", "/master_password/status") == (200, {"initialized": False})
+    assert api(core, "GET", "/master_password/status") == (
+        200,
+        {"initialized": False, "security_key_required": False, "recovery_code": False},
+    )
     token = create(core)
     assert api(core, "GET", "/passwords", token=token)[0] == 200
     assert (

@@ -41,10 +41,20 @@ async def _get(client: httpx.AsyncClient, key: str, name: str) -> dict:
 
 async def test_vault_lifecycle_and_unlock(client: httpx.AsyncClient) -> None:
     resp = await client.get("/master_password/status")
-    assert resp.json() == {"initialized": False}
+    assert resp.json() == {
+        "initialized": False,
+        "security_key_required": False,
+        "recovery_code": False,
+    }
     assert (await client.get("/meta")).json() == {
         "version": get_api_settings().version,
-        "features": ["bulk-entry-actions", "entry-names-with-slash", "vault-sessions"],
+        "features": [
+            "bulk-entry-actions",
+            "entry-names-with-slash",
+            "recovery-code",
+            "security-keys",
+            "vault-sessions",
+        ],
     }
 
     resp = await client.post(
@@ -53,7 +63,11 @@ async def test_vault_lifecycle_and_unlock(client: httpx.AsyncClient) -> None:
     assert resp.status_code == 422
 
     key = await create_vault(client)
-    assert (await client.get("/master_password/status")).json() == {"initialized": True}
+    assert (await client.get("/master_password/status")).json() == {
+        "initialized": True,
+        "security_key_required": False,
+        "recovery_code": False,
+    }
     resp = await client.post(
         "/master_password/create", json={"master_password": MASTER_PASSWORD}
     )

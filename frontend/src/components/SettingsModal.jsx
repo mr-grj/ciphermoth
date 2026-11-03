@@ -10,6 +10,8 @@ import {
   InputAdornment,
   Stack,
   Switch,
+  Tab,
+  Tabs,
   TextField,
   Tooltip,
   Typography,
@@ -18,7 +20,7 @@ import HelpOutlineIcon from "@mui/icons-material/HelpOutlined";
 import { useStoreActions, useStoreState } from "easy-peasy";
 import { useSnackbar } from "notistack";
 
-import BiometricUnlockSection from "./BiometricUnlockSection";
+import SecuritySettings from "./security/SecuritySettings";
 
 const FIELDS = [
   {
@@ -74,7 +76,7 @@ const isDirty = (form, settings) =>
   FIELDS.some(({ key }) => Number(form[key]) !== toSec(settings[key])) ||
   form.update_check_enabled !== (settings.update_check_enabled ?? true);
 
-const SettingsModal = ({ open, onClose }) => {
+const SettingsModal = ({ open, onClose, initialTab = "general" }) => {
   const { enqueueSnackbar } = useSnackbar();
 
   const { update } = useStoreActions((a) => a.ciphermothModels.settings);
@@ -83,6 +85,7 @@ const SettingsModal = ({ open, onClose }) => {
   const [form, setForm] = useState(() => toForm(settings));
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [tab, setTab] = useState(initialTab);
 
   useEffect(() => {
     if (open) {
@@ -90,6 +93,10 @@ const SettingsModal = ({ open, onClose }) => {
       setFormError("");
     }
   }, [open, settings]);
+
+  useEffect(() => {
+    if (open) setTab(initialTab);
+  }, [open, initialTab]);
 
   const handleChange = (key) => (e) => {
     setForm((prev) => ({ ...prev, [key]: e.target.value }));
@@ -120,9 +127,18 @@ const SettingsModal = ({ open, onClose }) => {
 
   return (
     <Dialog open={open} onClose={saving ? undefined : onClose} maxWidth="xs" fullWidth>
-      <DialogTitle>Settings</DialogTitle>
+      <DialogTitle sx={{ pb: 0 }}>Settings</DialogTitle>
+      <Tabs
+        value={tab}
+        onChange={(_, value) => setTab(value)}
+        sx={{ px: 3, borderBottom: 1, borderColor: "divider" }}
+      >
+        <Tab label="General" value="general" />
+        <Tab label="Security" value="security" />
+      </Tabs>
       <DialogContent>
-        <Stack spacing={1.5} sx={{ mt: 1 }}>
+        {tab === "security" && <SecuritySettings open={open} />}
+        <Stack spacing={1.5} sx={{ mt: 1, display: tab === "general" ? "flex" : "none" }}>
           {FIELDS.map(({ key, label, tooltip, min, max }) => (
             <TextField
               key={key}
@@ -153,8 +169,6 @@ const SettingsModal = ({ open, onClose }) => {
             />
           ))}
           <Divider sx={{ my: 0.5 }} />
-          <BiometricUnlockSection open={open} />
-          <Divider sx={{ my: 0.5 }} />
           <FormControlLabel
             sx={{ ml: 0, justifyContent: "space-between" }}
             labelPlacement="start"
@@ -170,7 +184,7 @@ const SettingsModal = ({ open, onClose }) => {
               />
             }
             label={
-              <Stack direction="row" spacing={0.5} alignItems="center">
+              <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
                 <Typography variant="body2">Check for updates</Typography>
                 <Tooltip
                   title="Asks GitHub whether a newer CipherMoth release exists. No vault data is sent. You choose when to install; turn this off to stop checking."
@@ -193,12 +207,18 @@ const SettingsModal = ({ open, onClose }) => {
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose} disabled={saving}>
-          Cancel
-        </Button>
-        <Button variant="contained" onClick={handleSave} loading={saving} disabled={!dirty}>
-          Save
-        </Button>
+        {tab === "general" ? (
+          <>
+            <Button onClick={onClose} disabled={saving}>
+              Cancel
+            </Button>
+            <Button variant="contained" onClick={handleSave} loading={saving} disabled={!dirty}>
+              Save
+            </Button>
+          </>
+        ) : (
+          <Button onClick={onClose}>Close</Button>
+        )}
       </DialogActions>
     </Dialog>
   );

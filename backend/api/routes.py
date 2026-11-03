@@ -6,6 +6,7 @@ from api.endpoints import (
     master_password,
     meta,
     password,
+    security,
     settings,
     vault,
 )
@@ -23,6 +24,7 @@ def make_api_router() -> APIRouter:
     api_router.include_router(health.router, prefix="/health")
     api_router.include_router(meta.router, prefix="/meta")
     api_router.include_router(password.router, prefix="/passwords")
+    api_router.include_router(security.router, prefix="/security")
     api_router.include_router(settings.router, prefix="/settings")
     api_router.include_router(vault.router, prefix="/vault")
 

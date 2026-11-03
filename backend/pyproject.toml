@@ -17,6 +17,7 @@ dependencies = [
     "python-multipart>=0.0.32",
     "typer>=0.26.0",
     "httpx>=0.28.0",
+    "fido2>=2.2.1",
 ]
 
 [dependency-groups]

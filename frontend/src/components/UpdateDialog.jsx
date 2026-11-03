@@ -47,7 +47,7 @@ const UpdateDialog = ({ open, onClose }) => {
       <DialogTitle>A new moult is ready</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 0.5 }}>
-          <Stack direction="row" spacing={1} alignItems="center">
+          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
             <Chip label={current ? `v${stripV(current)}` : "-"} size="small" />
             <Typography sx={{ color: "text.disabled" }}>→</Typography>
             <Chip

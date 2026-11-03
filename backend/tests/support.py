@@ -37,7 +37,7 @@ MASTER_PASSWORD = "Moth-Test-Vault-2026!"
 NEW_MASTER_PASSWORD = "Moth-Rotated-Vault-2027?"
 WRONG_MASTER_PASSWORD = "Not-The-Vault-Password-1"
 
-TABLES = ("vault", "entries", "attachments", "settings")
+TABLES = ("vault", "entries", "attachments", "settings", "security_keys", "recovery")
 
 engine = app.state.database.engine
 
@@ -49,7 +49,7 @@ def data_dir() -> Path:
 async def reset_vault() -> None:
     """Return the shared test vault to the state of a fresh install."""
     async with engine.begin() as conn:
-        for table in ("attachments", "entries", "vault"):
+        for table in ("attachments", "entries", "security_keys", "recovery", "vault"):
             await conn.execute(text(f"DELETE FROM {table}"))
         await conn.execute(text("DELETE FROM settings"))
         await conn.execute(text("DELETE FROM sqlite_sequence"))
@@ -529,3 +529,87 @@ def backup_file(
         writer.write(content)
     writer.finish()
     return target.getvalue()
+
+
+# Security keys (tests.authenticator.SoftKey) and the recovery code.
+
+
+async def security_key_answer(
+    client: httpx.AsyncClient, key, headers: Headers | None = None, **options
+) -> dict:
+    """An answer from ``key`` to a fresh challenge: the unlock challenge without
+    ``headers``, a session's confirmation challenge with them."""
+    if headers is None:
+        resp = await client.post("/master_password/unlock/challenge")
+    else:
+        resp = await client.post("/security/challenge", headers=headers)
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    # A key the vault does not list answers for some listed key's salt, as a
+    # client trying every connected key would.
+    descriptor = next(
+        (k for k in body["keys"] if k["credential_id"] == key.id), body["keys"][0]
+    )
+    return key.answer(body["challenge"], descriptor["prf_salt"], **options)
+
+
+async def confirmation(
+    client: httpx.AsyncClient,
+    headers: Headers,
+    key=None,
+    master_password: str = MASTER_PASSWORD,
+) -> dict:
+    body: dict = {"master_password": master_password}
+    if key is not None:
+        body["security_key"] = await security_key_answer(client, key, headers)
+    return body
+
+
+async def add_security_key(
+    client: httpx.AsyncClient,
+    headers: Headers,
+    key,
+    *,
+    name: str = "YubiKey",
+    confirm_with=None,
+    master_password: str = MASTER_PASSWORD,
+) -> httpx.Response:
+    resp = await client.post("/security/keys/options", headers=headers)
+    assert resp.status_code == 200, resp.text
+    options = resp.json()
+    return await client.post(
+        "/security/keys",
+        json={
+            "name": name,
+            "confirmation": await confirmation(
+                client, headers, confirm_with, master_password
+            ),
+            "registration": key.register(options["challenge"]),
+            "assertion": key.answer(options["secret_challenge"], options["prf_salt"]),
+        },
+        headers=headers,
+    )
+
+
+async def unlock_with_key(
+    client: httpx.AsyncClient, key, master_password: str = MASTER_PASSWORD
+) -> httpx.Response:
+    return await client.post(
+        "/master_password/unlock",
+        json={
+            "master_password": master_password,
+            "security_key": await security_key_answer(client, key),
+        },
+    )
+
+
+async def create_recovery_code(
+    client: httpx.AsyncClient, headers: Headers, key=None
+) -> str:
+    resp = await client.post(
+        "/security/recovery-code",
+        json=await confirmation(client, headers, key),
+        headers=headers,
+    )
+    assert resp.status_code == 200, resp.text
+    return resp.json()["recovery_code"]

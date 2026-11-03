@@ -18,17 +18,20 @@ from api.endpoints.deps import (
 from api.rate_limit import limiter, rate
 from api.responses import inject_responses
 from schemas import (
+    Confirmation,
     DeviceEnrollRequest,
     DeviceUnlockRequest,
     DeviceUnlockResult,
     DeviceUnlockSettings,
     DeviceUnlockStatus,
-    MasterPassword,
     MasterPasswordCreate,
     MasterPasswordCreatePayload,
     MasterPasswordStatus,
     MasterPasswordUpdate,
     MasterPasswordUpdatePayload,
+    RecoverPayload,
+    RecoverResult,
+    SecurityKeyChallenge,
     SimpleDetailSchema,
     VaultLock,
     VaultSessionStatus,
@@ -46,7 +49,12 @@ router = APIRouter(tags=["master-password"])
 async def get_status(
     crud: MasterPasswordCRUDDep,
 ) -> MasterPasswordStatus:
-    return MasterPasswordStatus(initialized=await crud.is_initialized())
+    security_key_required, recovery_code = await crud.security_key_status()
+    return MasterPasswordStatus(
+        initialized=await crud.is_initialized(),
+        security_key_required=security_key_required,
+        recovery_code=recovery_code,
+    )
 
 
 @router.post(
@@ -63,10 +71,52 @@ async def get_status(
 @limiter.limit(rate("30/hour"))
 async def unlock(
     request: Request,
-    body: MasterPassword,
+    body: Confirmation,
     access: VaultAccessDep,
 ) -> VaultUnlock:
-    return await access.unlock(body.master_password)
+    return await access.unlock(body)
+
+
+@router.post(
+    "/unlock/challenge",
+    name="master-password:unlock-challenge",
+    response_model=SecurityKeyChallenge,
+    responses=inject_responses(
+        {
+            status.HTTP_400_BAD_REQUEST: SimpleDetailSchema,
+            status.HTTP_429_TOO_MANY_REQUESTS: SimpleDetailSchema,
+        }
+    ),
+)
+@limiter.limit(rate("60/hour"))
+async def unlock_challenge(
+    request: Request, access: VaultAccessDep
+) -> SecurityKeyChallenge:
+    """A challenge for a registered security key, when the vault needs one to
+    unlock. Single use, valid for five minutes."""
+    return await access.unlock_challenge()
+
+
+@router.post(
+    "/recover",
+    name="master-password:recover",
+    response_model=RecoverResult,
+    responses=inject_responses(
+        {
+            status.HTTP_400_BAD_REQUEST: SimpleDetailSchema,
+            status.HTTP_403_FORBIDDEN: SimpleDetailSchema,
+            status.HTTP_429_TOO_MANY_REQUESTS: SimpleDetailSchema,
+        }
+    ),
+)
+@limiter.limit(rate("10/hour"))
+async def recover(
+    request: Request, body: RecoverPayload, access: VaultAccessDep
+) -> RecoverResult:
+    """Set a new master password with the recovery code. Re-keys the vault, ends
+    every other session and returns a new recovery code (the old one stops
+    working)."""
+    return await access.recover(body)
 
 
 @router.post(
@@ -148,11 +198,7 @@ async def update_master_password(
     access: VaultAccessDep,
     credential: CredentialDep,
 ) -> MasterPasswordUpdate:
-    return await access.change_master_password(
-        credential,
-        master_password=body.master_password,
-        new_master_password=body.new_master_password,
-    )
+    return await access.change_master_password(credential, body)
 
 
 @router.get(
@@ -197,8 +243,9 @@ async def enroll_device(
     request: Request,
     body: DeviceEnrollRequest,
     access: VaultAccessDep,
+    credential: CredentialDep,
 ) -> DeviceUnlockStatus:
-    await access.enroll_device(body)
+    await access.enroll_device(body, credential)
     return await access.device_status()
 
 

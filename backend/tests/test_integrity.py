@@ -123,7 +123,7 @@ async def test_a_healthy_vault_scans_clean_and_matches_the_api(
 
     assert vault.key_check == "valid"
     assert vault.vault_rows == 1
-    assert vault.revision == 2
+    assert vault.revision == 3
     github = vault.active["GitHub"]
     assert github.value == "third-Value-3"
     assert [h[0] for h in github.history] == ["second-Value-2", "first-Value-1"]

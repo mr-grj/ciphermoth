@@ -53,6 +53,47 @@ class MasterPassword(BaseModel):
         return require_unicode_text(value)
 
 
+def _decode_base64url_field(value: str) -> bytes:
+    return base64.urlsafe_b64decode(value + "=" * (-len(value) % 4))
+
+
+_B64 = r"^[A-Za-z0-9_-]+$"
+
+
+class SecurityKeyAssertion(BaseModel):
+    """One answer from a security key, as WebAuthn defines it (base64url), plus
+    its PRF output for the salt the vault gave."""
+
+    credential_id: Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9_-]{1,1400}$")]
+    client_data_json: Annotated[str, StringConstraints(pattern=_B64, max_length=8192)]
+    authenticator_data: Annotated[str, StringConstraints(pattern=_B64, max_length=8192)]
+    signature: Annotated[str, StringConstraints(pattern=_B64, max_length=2048)]
+    prf_output: Annotated[str, StringConstraints(pattern=_B64, max_length=64)]
+
+    model_config = ConfigDict(extra="forbid")
+
+    @field_validator("prf_output")
+    @classmethod
+    def _is_a_key(cls, value: str) -> str:
+        try:
+            decoded = _decode_base64url_field(value)
+        except ValueError:
+            raise ValueError("must be base64url") from None
+        if len(decoded) != KEY_BYTES:
+            raise ValueError(f"must decode to {KEY_BYTES} bytes")
+        return value
+
+    def raw(self, name: str) -> bytes:
+        return _decode_base64url_field(getattr(self, name))
+
+
+class Confirmation(MasterPassword):
+    """What sensitive changes ask for: the master password, and an answer from a
+    registered security key when the vault requires one."""
+
+    security_key: SecurityKeyAssertion | None = None
+
+
 class MasterPasswordCreatePayload(MasterPassword):
     @field_validator("master_password")
     @classmethod
@@ -93,7 +134,7 @@ class DeviceUnlockRequest(BaseModel):
         return _decode_base64url(self.secret)
 
 
-class DeviceEnrollRequest(DeviceUnlockRequest, MasterPassword):
+class DeviceEnrollRequest(DeviceUnlockRequest, Confirmation):
     kind: DeviceKind
     material: _Base64Url = Field(max_length=4096)
 
@@ -142,6 +183,7 @@ class MasterPasswordUpdate(BaseModel):
 class MasterPasswordUpdatePayload(BaseModel):
     master_password: str = Field(min_length=1, max_length=1024)
     new_master_password: str = Field(min_length=1, max_length=1024)
+    security_key: SecurityKeyAssertion | None = None
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -158,6 +200,120 @@ class MasterPasswordUpdatePayload(BaseModel):
 
 class MasterPasswordStatus(BaseModel):
     initialized: bool
+    security_key_required: bool = False
+    recovery_code: bool = False
+
+
+class SecurityKeyDescriptor(BaseModel):
+    credential_id: str
+    rp_id: str
+    prf_salt: str
+
+
+class SecurityKeyChallenge(BaseModel):
+    """What a client needs to ask a registered security key for its answer."""
+
+    challenge: str
+    timeout_ms: int
+    keys: list[SecurityKeyDescriptor]
+
+
+class SecurityKeyRegistrationOptions(BaseModel):
+    """The two requests that register a security key: create a credential
+    (``challenge``), then ask it once for its PRF output for ``prf_salt``
+    (``secret_challenge``), which is what proves it can protect the vault."""
+
+    challenge: str
+    secret_challenge: str
+    prf_salt: str
+    user_id: str
+    rp_name: str
+    timeout_ms: int
+    algorithms: list[int]
+    exclude_credentials: list[str]
+
+
+class SecurityKeyRegistration(BaseModel):
+    client_data_json: Annotated[str, StringConstraints(pattern=_B64, max_length=8192)]
+    attestation_object: Annotated[
+        str, StringConstraints(pattern=_B64, max_length=16384)
+    ]
+
+    model_config = ConfigDict(extra="forbid")
+
+    def raw(self, name: str) -> bytes:
+        return _decode_base64url_field(getattr(self, name))
+
+
+_MAX_SECURITY_KEY_NAME = 64
+
+
+class SecurityKeyName(BaseModel):
+    name: str = Field(min_length=1, max_length=_MAX_SECURITY_KEY_NAME)
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    @field_validator("name")
+    @classmethod
+    def _text(cls, value: str) -> str:
+        require_unicode_text(value)
+        reject_nul(value)
+        return value
+
+
+class SecurityKeyAdd(SecurityKeyName):
+    confirmation: Confirmation
+    registration: SecurityKeyRegistration
+    assertion: SecurityKeyAssertion
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+
+class SecurityKeyInfo(BaseModel):
+    id: int
+    name: str
+    rp_id: str
+    created: datetime
+    last_used: datetime | None
+
+
+class SecurityStatus(BaseModel):
+    security_keys: list[SecurityKeyInfo]
+    security_key_required: bool
+    recovery_code: bool
+    recovery_code_created: datetime | None
+
+
+class RecoveryCodeResult(BaseModel):
+    recovery_code: str
+    status: SecurityStatus
+
+
+class RecoverPayload(BaseModel):
+    recovery_code: str = Field(min_length=1, max_length=128)
+    new_master_password: str = Field(min_length=1, max_length=1024)
+    keep_security_keys: bool = True
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    @field_validator("recovery_code", "new_master_password")
+    @classmethod
+    def _unicode(cls, value: str) -> str:
+        require_unicode_text(value)
+        return value
+
+    @field_validator("new_master_password")
+    @classmethod
+    def _strong(cls, value: str) -> str:
+        return validate_master_password_strength(value)
+
+
+class RecoverResult(BaseModel):
+    detail: str
+    session_token: str
+    idle_timeout_ms: int
+    recovery_code: str
+    security_key_required: bool
 
 
 class CustomField(BaseModel):

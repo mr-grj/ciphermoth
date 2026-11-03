@@ -29,6 +29,8 @@ PUBLIC_ROUTES = {
     ("POST", "/api/master_password/create"),
     ("GET", "/api/master_password/device-unlock"),
     ("POST", "/api/master_password/device-unlock/unlock"),
+    ("POST", "/api/master_password/unlock/challenge"),
+    ("POST", "/api/master_password/recover"),
     ("GET", "/api/meta"),
     ("GET", "/api/health"),
 }
@@ -162,6 +164,44 @@ PROTECTED_ROUTES: dict[tuple[str, str], Spec] = {
             "/master_password/device-unlock/matrix-device", headers=h
         )
     ),
+    ("GET", "/api/security"): lambda c, h, x: c.get("/security", headers=h),
+    ("POST", "/api/security/challenge"): lambda c, h, x: c.post(
+        "/security/challenge", headers=h
+    ),
+    ("POST", "/api/security/keys/options"): lambda c, h, x: c.post(
+        "/security/keys/options", headers=h
+    ),
+    ("POST", "/api/security/keys"): lambda c, h, x: c.post(
+        "/security/keys",
+        json={
+            "name": "matrix key",
+            "confirmation": {"master_password": MASTER_PASSWORD},
+            "registration": {"client_data_json": "e30", "attestation_object": "oA"},
+            "assertion": {
+                "credential_id": "AA",
+                "client_data_json": "e30",
+                "authenticator_data": "AA",
+                "signature": "AA",
+                "prf_output": "A" * 43,
+            },
+        },
+        headers=h,
+    ),
+    ("POST", "/api/security/keys/{key_id}/remove"): lambda c, h, x: c.post(
+        "/security/keys/1/remove",
+        json={"master_password": MASTER_PASSWORD},
+        headers=h,
+    ),
+    ("POST", "/api/security/recovery-code"): lambda c, h, x: c.post(
+        "/security/recovery-code",
+        json={"master_password": MASTER_PASSWORD},
+        headers=h,
+    ),
+    ("POST", "/api/security/recovery-code/remove"): lambda c, h, x: c.post(
+        "/security/recovery-code/remove",
+        json={"master_password": MASTER_PASSWORD},
+        headers=h,
+    ),
     ("PATCH", "/api/master_password/update"): lambda c, h, x: c.patch(
         "/master_password/update",
         json={
@@ -173,7 +213,14 @@ PROTECTED_ROUTES: dict[tuple[str, str], Spec] = {
 }
 
 ROUTE_IDS = [f"{method} {path}" for method, path in PROTECTED_ROUTES]
-REACHED = {("DELETE", "/api/vault/damaged/{kind}/{row_id}"): 400}
+REACHED = {
+    ("DELETE", "/api/vault/damaged/{kind}/{row_id}"): 400,
+    # Reached the handler: a vault without security keys has none to challenge,
+    # the bogus registration is refused, and there is no key #1 to remove.
+    ("POST", "/api/security/challenge"): 400,
+    ("POST", "/api/security/keys"): 400,
+    ("POST", "/api/security/keys/{key_id}/remove"): 404,
+}
 
 
 async def seed(client: httpx.AsyncClient, headers: Headers) -> dict:

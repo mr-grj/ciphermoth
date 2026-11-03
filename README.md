@@ -64,13 +64,16 @@ curl -fsSL https://raw.githubusercontent.com/mr-grj/ciphermoth/master/install.sh
 
 Then open **[http://localhost:3000](http://localhost:3000)**. [CONTRIBUTING.md](CONTRIBUTING.md) covers manual setup and servers. Coming from 2.0 or PostgreSQL? Read the [upgrade procedure](docs/UPDATING.md) first; those vaults are never converted automatically.
 
-> ⚠️ **There is no password recovery.** Losing your master password means losing your vault, permanently. No reset link,
-> no support email, no backdoor. That's the trade for nobody-but-you holding the key. **Write it down somewhere safe**,
-> and take a backup once you've added a few entries.
+> ⚠️ **Nobody can reset your master password for you.** No reset link, no support email, no backdoor. Create a
+> **recovery code** in Settings → Security right after setup and keep it offline; without one, losing your master
+> password means losing your vault, permanently. That's the trade for nobody-but-you holding the key. Take a backup once
+> you've added a few entries.
 
 ## What it does
 
 - one master password unlocks the vault, no account, no email, no recovery codes sent to a phone number you changed three years ago
+- optional **security key** (YubiKey or any FIDO2 key) as a real second factor: the vault is encrypted with your master password *and* the key, so a stolen vault file or password is useless without it. Works in the browser, the desktop app and the CLI
+- optional **recovery code** you keep offline: it resets a forgotten master password (and gets you in without your security key), then replaces itself
 - optional biometric unlock: Touch ID in the macOS app, a passkey in the browser. It works on that device only, and it asks for your master password every couple of weeks so you never forget it
 - all entry contents encrypted at rest with a random vault key, stored only wrapped under a key derived from your master password
 - store a username, website, tags, folders, a two-factor (TOTP) secret, and your own custom fields alongside each entry, all encrypted, entry names included (see [Security](#security))
@@ -98,8 +101,8 @@ CipherMoth is probably a good fit if you:
 - like small, auditable software and are happy owning your own backups
 
 It's probably not for you (yet) if you need browser autofill, a mobile app, family or team sharing, managed cloud sync,
-or a way to recover your vault if you forget your master password. No hard feelings, those are real needs, just not what
-this is trying to be.
+or someone else who can recover your vault for you. No hard feelings, those are real needs, just not what this is trying
+to be.
 
 ## Security
 
@@ -123,6 +126,13 @@ How it works (the full specification is [docs/VAULT_FORMAT.md](./docs/VAULT_FORM
   its trashed copies) and your timeout settings. This is encryption of each entry, not of the whole file;
 - changing the master password creates a new vault key and re-encrypts everything, so the old password and the old key
   open nothing in the vault afterwards (older snapshots and backups keep the password they were made with);
+- an optional **security key** (FIDO2, e.g. a YubiKey) becomes part of the key itself: a secret only the key can produce
+  (WebAuthn PRF / hmac-secret, after its PIN) joins the master password before the vault key is unwrapped, and every
+  unlock also verifies the key's signature over a fresh challenge. Without the key, the vault file does not even let
+  anyone test password guesses ([details](./SECURITY.md#security-keys));
+- an optional **recovery code** (160 random bits, shown once) opens a copy of the vault key sealed to its public key.
+  It resets a forgotten master password and is replaced after use. Whoever holds it holds the vault, so keep it offline
+  ([details](./SECURITY.md#the-recovery-code));
 - **biometric unlock** is off until you turn it on with your master password. The vault key is then also wrapped under a
   secret only that device's Secure Enclave or passkey can produce after checking your fingerprint or face. Anyone that
   device accepts can open the vault ([details](./SECURITY.md#biometric-unlock));
@@ -145,7 +155,7 @@ inspection of stored data. A session token that leaks works only until that sess
 
 **It does not protect against** malware or a keylogger on the device you unlock from, a weak master password, exposing
 the instance on the public internet without `https`, someone with write access to the vault file rolling it back to an
-older copy or deleting entries, or forgetting your master password (there is no recovery). Run it on a machine and
+older copy or deleting entries, or forgetting your master password without a recovery code. Run it on a machine and
 network you trust, use a strong master password, and keep a backup.
 
 To report a vulnerability, see [SECURITY.md](./SECURITY.md).

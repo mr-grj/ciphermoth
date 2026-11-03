@@ -8,7 +8,8 @@ export const clearClipboard = () =>
   IS_DESKTOP ? invoke("clipboard_clear").catch(() => {}) : Promise.resolve();
 export const openExternal = (url) => invoke("open_external", { url });
 export const chooseBackup = () => invoke("choose_backup");
-export const nativeBackup = (session, password) => invoke("backup_export", { session, password });
+export const nativeBackup = (session, password, securityKey) =>
+  invoke("backup_export", { session, password, securityKey: securityKey ?? null });
 export const nativeRestore = (session, password, ticket, onConflict) =>
   invoke("backup_import", { session, password, ticket, onConflict });
 export const saveFile = async (blob, filename) =>

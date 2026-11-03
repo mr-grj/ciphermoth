@@ -166,10 +166,16 @@ class VaultSessions:
         with self._lock:
             return self._sessions.pop(_digest(token), None) is not None
 
-    def revoke_all(self) -> int:
+    def revoke_all(self, keep: str | None = None) -> int:
+        """End every session, except ``keep`` (a session just opened for the
+        change that ends the others)."""
+        kept = _digest(keep) if keep is not None and _TOKEN.fullmatch(keep) else None
         with self._lock:
-            count = len(self._sessions)
-            self._sessions.clear()
+            count = 0
+            for digest in list(self._sessions):
+                if digest != kept:
+                    del self._sessions[digest]
+                    count += 1
             return count
 
     def drop_expired(self) -> int:

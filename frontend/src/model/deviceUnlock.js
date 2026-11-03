@@ -14,6 +14,7 @@ import {
   rememberCredential,
 } from "../platform/biometrics";
 import { setSessionToken } from "../utils";
+import { asMessage, confirmation } from "./security";
 
 const STATUS = "/master_password/device-unlock";
 
@@ -94,13 +95,13 @@ const DeviceUnlock = {
     try {
       const { data } = await apiClient.post(`${STATUS}/enroll`, {
         ...credential,
-        master_password: masterPassword,
+        ...(await confirmation(masterPassword)),
       });
       rememberCredential(credential.credential_id);
       actions.setStatus(data);
       actions.setKeyChanged(false);
     } catch (err) {
-      throw new Error(await errorDetail(err, "Could not turn on biometric unlock."));
+      throw await asMessage(err, "Could not turn on biometric unlock.");
     }
     if (previous && previous.credential_id !== credential.credential_id) {
       await apiClient.delete(`${STATUS}/${previous.credential_id}`).catch(() => {});

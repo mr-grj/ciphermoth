@@ -16,7 +16,12 @@ let seen;
 const build = (table) => {
   seen = [];
   apiClient.defaults.adapter = routes(
-    { "GET /passwords": [200, []], "GET /passwords/trash": [200, []], ...table },
+    {
+      "GET /passwords": [200, []],
+      "GET /passwords/trash": [200, []],
+      "GET /master_password/status": [200, { initialized: true, security_key_required: false }],
+      ...table,
+    },
     seen
   );
   return createStore({ passwords: Passwords }).getActions().passwords;
@@ -94,7 +99,7 @@ describe("backup", () => {
 
     await actions.backup("Moth-Test-Vault-2026!");
 
-    const [request] = seen;
+    const request = seen.find((config) => config.url === "/passwords/backup");
     expect(request.responseType).toBe("blob");
     expect(JSON.parse(request.data)).toEqual({ master_password: "Moth-Test-Vault-2026!" });
     expect(link.download).toMatch(

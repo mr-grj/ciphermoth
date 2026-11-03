@@ -31,7 +31,7 @@ from crud.attachment import (
     MAX_TOTAL_BYTES,
 )
 from crud.engine import after_rollback
-from crud.master_password import MasterPasswordCRUD
+from crud.master_password import FactorCheck, MasterPasswordCRUD
 from crud.password import (
     SOURCE_KEYS,
     Ignored,
@@ -66,6 +66,7 @@ from helpers import (
 )
 from models import AttachmentModel, EntryModel
 from schemas import (
+    Confirmation,
     OnConflict,
     PasswordImportResult,
     RestoredPassword,
@@ -74,6 +75,7 @@ from schemas import (
 from settings import get_api_settings
 from validators import require_unicode_text
 from vault_sessions import VaultSessions
+from webauthn import Challenges
 
 MAX_LEGACY_FILE_BYTES = 10 * 1024 * 1024
 MAX_LEGACY_JSON_BYTES = 50 * 1024 * 1024
@@ -217,9 +219,15 @@ class BackupManifest(_Strict):
 
 
 class BackupCRUD(PasswordCRUD):
-    def __init__(self, session: AsyncSession, vault_sessions: VaultSessions) -> None:
+    def __init__(
+        self,
+        session: AsyncSession,
+        vault_sessions: VaultSessions,
+        challenges: Challenges | None = None,
+    ) -> None:
         super().__init__(session)
         self.vault_sessions = vault_sessions
+        self.challenges = challenges or Challenges()
         self.master_password = MasterPasswordCRUD(session)
 
     async def _settings(self) -> BackupSettings:
@@ -271,15 +279,23 @@ class BackupCRUD(PasswordCRUD):
         self.session.expunge(attachment)
         return content, metadata, created
 
-    async def create_backup(self, master_password: str, key: VaultKey) -> IO[bytes]:
+    async def create_backup(
+        self, confirmation: Confirmation, key: VaultKey, binding: bytes
+    ) -> IO[bytes]:
         """
         A complete backup of the vault (backup format 2) in a temporary file
         that holds only ciphertext. Both KDFs (checking the master password and
         deriving the backup key from a new salt) run before the read snapshot.
         Generation never writes to the vault or claims the client saved a file.
         """
-        opened = await self.master_password.check_master_password(master_password)
-        salt, backup_key = await new_backup_key(master_password)
+        opened = await self.master_password.check_master_password(
+            confirmation.master_password,
+            confirmation.security_key,
+            FactorCheck(self.challenges, "confirm", binding),
+        )
+        # The backup is protected by the master password alone, so it can be
+        # restored on a new install without the security key.
+        salt, backup_key = await new_backup_key(confirmation.master_password)
         await self.master_password.confirm_same_key(opened, key)
 
         orphan = await self.session.scalar(

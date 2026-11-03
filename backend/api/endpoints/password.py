@@ -19,6 +19,7 @@ from starlette.types import Receive, Scope, Send
 from api.endpoints.deps import (
     AttachmentCRUDDep,
     BackupCRUDDep,
+    CredentialDep,
     EntryName,
     PasswordCRUDDep,
     SessionKeyDep,
@@ -31,6 +32,7 @@ from backup_format import MAX_BACKUP_BYTES
 from errors import InvalidRequest
 from schemas import (
     AttachmentResponse,
+    Confirmation,
     FavoriteUpdatePayload,
     MasterPassword,
     OnConflict,
@@ -43,6 +45,7 @@ from schemas import (
     PasswordUpdatePayload,
     SimpleDetailSchema,
 )
+from webauthn import session_binding
 
 router = APIRouter(tags=["passwords"])
 
@@ -494,11 +497,12 @@ async def import_passwords_csv(
 @limiter.limit(rate("3/hour"))
 async def backup_passwords(
     request: Request,
-    body: MasterPassword,
+    body: Confirmation,
     crud: BackupCRUDDep,
     key: VaultKeyDep,
+    credential: CredentialDep,
 ) -> StreamingResponse:
-    backup = await crud.create_backup(body.master_password, key)
+    backup = await crud.create_backup(body, key, session_binding(credential.token))
     stamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
     filename = f"ciphermoth_backup_{stamp}.cmbackup"
     return BackupResponse(backup, filename)

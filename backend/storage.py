@@ -11,12 +11,20 @@ from typing import Any
 from sqlalchemy import Connection, insert
 
 from helpers import FORMAT_VERSION
-from models import SETTINGS_DEFAULTS, BaseModel, SettingsModel
+from models import (
+    SETTINGS_DEFAULTS,
+    BaseModel,
+    RecoveryModel,
+    SecurityKeyModel,
+    SettingsModel,
+)
 
 MIN_SQLITE_VERSION = (3, 51, 3)
 APPLICATION_ID = 0x434D5448
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 FORMAT_1_SCHEMA = 1
+# Older schemas this release upgrades in place, after a snapshot.
+UPGRADABLE_SCHEMAS = frozenset({2})
 BUSY_TIMEOUT_MS = 15_000
 RESTORE_BUSY_TIMEOUT_MS = 2_000
 JOURNAL_SIZE_LIMIT = 16 * 1024 * 1024
@@ -166,7 +174,7 @@ def identity_problem(application_id: int, user_version: int) -> str | None:
             f"was written by a newer CipherMoth (vault schema {user_version}, this "
             f"release understands {SCHEMA_VERSION}); update CipherMoth"
         )
-    if user_version != SCHEMA_VERSION:
+    if user_version != SCHEMA_VERSION and user_version not in UPGRADABLE_SCHEMAS:
         return f"has an unsupported vault schema ({user_version})"
     return None
 
@@ -211,6 +219,34 @@ def ensure_schema(connection: Connection) -> None:
         problem = format_problem(list(formats))
     if problem:
         raise StorageError(f"The vault file {problem}.")
+    for version in range(user_version, SCHEMA_VERSION):
+        _UPGRADES[version](connection)
+    if user_version != SCHEMA_VERSION:
+        connection.exec_driver_sql(f"PRAGMA user_version={SCHEMA_VERSION}")
+
+
+def _upgrade_2_to_3(connection: Connection) -> None:
+    """Security keys and the recovery code: two new tables and one new column.
+    Nothing existing changes, so a vault without either works exactly as before."""
+    BaseModel.metadata.create_all(
+        connection,
+        tables=[
+            BaseModel.metadata.tables[RecoveryModel.__tablename__],
+            BaseModel.metadata.tables[SecurityKeyModel.__tablename__],
+        ],
+    )
+    connection.exec_driver_sql("ALTER TABLE vault ADD COLUMN factor_key_escrow BLOB")
+
+
+_UPGRADES = {2: _upgrade_2_to_3}
+
+
+def schema_version(path: Path) -> int | None:
+    """The schema version of an existing vault file, read without writing."""
+    if not path.is_file() or path.stat().st_size == 0:
+        return None
+    with contextlib.closing(_connect_existing(path)) as connection:
+        return connection.execute("PRAGMA user_version").fetchone()[0]
 
 
 def refuse_unusable_file(path: Path) -> None:

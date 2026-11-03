@@ -42,6 +42,8 @@ _SESSION_HEADER = "x-ciphermoth-session"
 _SESSIONS = "vault-sessions"
 _SLASH_NAMES = "entry-names-with-slash"
 _BULK = "bulk-entry-actions"
+_SECURITY_KEYS = "security-keys"
+_RECOVERY = "recovery-code"
 _SERVER_TOO_OLD = (
     "This server runs a CipherMoth release older than 1.5.0, which this CLI no "
     "longer supports. Update the server, or use CipherMoth CLI 1.5.x."
@@ -115,6 +117,31 @@ def _features(client: httpx.Client) -> list[str] | None:
     return [feature for feature in features if isinstance(feature, str)]
 
 
+def _touch_prompt() -> None:
+    _err.print("[cyan]›[/cyan]  Touch your security key…")
+
+
+def _security_key_pin() -> str:
+    return typer.prompt("Security key PIN", hide_input=True)
+
+
+def _security_key_answer(challenge: dict) -> dict:
+    """Ask a plugged-in registered security key to answer ``challenge`` over USB.
+    A mistyped PIN is asked again: the key, not this CLI, counts the attempts."""
+    from security_key_client import SecurityKeyError, SecurityKeyPinInvalid, answer
+
+    for attempt in range(3):
+        try:
+            return answer(challenge, on_touch=_touch_prompt, get_pin=_security_key_pin)
+        except SecurityKeyPinInvalid as error:
+            if attempt == 2:
+                _die(str(error))
+            _err.print(f"[red]✗[/red]  {escape(str(error))}")
+        except SecurityKeyError as error:
+            _die(str(error))
+    _die("The security key could not be used.")
+
+
 class _Vault:
     """
     One unlocked vault for the length of a command: a vault session that is
@@ -134,10 +161,32 @@ class _Vault:
         self._authenticate()
 
     def _post_password(self, path: str) -> httpx.Response:
+        body: dict[str, Any] = {"master_password": self.master}
         try:
-            return self.client.post(path, json={"master_password": self.master})
+            if self._security_key_required():
+                resp = self.client.post("/master_password/unlock/challenge")
+                _check(resp)
+                body["security_key"] = _security_key_answer(resp.json())
+            return self.client.post(path, json=body)
         except httpx.ConnectError:
             _die(f"Cannot reach the API at {_api_url()!r}. Is the service running?")
+
+    def _security_key_required(self) -> bool:
+        if _SECURITY_KEYS not in self.features:
+            return False
+        resp = self.client.get("/master_password/status")
+        _check(resp)
+        return bool(resp.json().get("security_key_required"))
+
+    def confirmation(self) -> dict[str, Any]:
+        """The master password again, with the security key's answer when the
+        vault requires one, for a change the server asks to confirm."""
+        body: dict[str, Any] = {"master_password": self.master}
+        if self._security_key_required():
+            resp = self.send("POST", "/security/challenge")
+            _check(resp)
+            body["security_key"] = _security_key_answer(resp.json())
+        return body
 
     def _has_no_unlock_route(self, resp: httpx.Response) -> bool:
         if _SESSIONS in self.features or resp.status_code not in (404, 405):
@@ -615,7 +664,7 @@ def cmd_backup(
     try:
         with _vault(timeout=_TRANSFER_TIMEOUT) as vault:
             with vault.stream(
-                "POST", "/passwords/backup", json={"master_password": vault.master}
+                "POST", "/passwords/backup", json=vault.confirmation()
             ) as resp:
                 _check(resp)
                 out_dir.mkdir(parents=True, exist_ok=True)
@@ -642,6 +691,62 @@ def cmd_backup(
             staged.unlink(missing_ok=True)
 
     _ok(f"Backup saved to [cyan]{escape(str(dest))}[/cyan]")
+
+
+@app.command(
+    "recover",
+    help=(
+        "Forgot the master password? Set a new one with your recovery code. The "
+        "code is used up: a new one is shown, save it."
+    ),
+)
+def cmd_recover() -> None:
+    _warn_plaintext_transport()
+    with httpx.Client(
+        base_url=_api_url(), timeout=60, follow_redirects=False
+    ) as client:
+        features = _features(client) or []
+        if _RECOVERY not in features:
+            _die("This server has no recovery codes. Update CipherMoth.")
+        status = client.get("/master_password/status")
+        _check(status)
+        if not status.json().get("recovery_code"):
+            _die(
+                "This vault has no recovery code, so a forgotten master password "
+                "cannot be reset."
+            )
+        code = typer.prompt("Recovery code", hide_input=True)
+        new_password = typer.prompt(
+            "New master password", hide_input=True, confirmation_prompt=True
+        )
+        keep = True
+        if status.json().get("security_key_required"):
+            keep = not typer.confirm(
+                "Did you lose your security keys? (Yes removes them; the vault then "
+                "opens with the new master password alone)",
+                default=False,
+            )
+        resp = client.post(
+            "/master_password/recover",
+            json={
+                "recovery_code": code,
+                "new_master_password": new_password,
+                "keep_security_keys": keep,
+            },
+        )
+        _check(resp)
+        data = resp.json()
+        with contextlib.suppress(httpx.HTTPError):
+            client.post(
+                "/master_password/lock",
+                headers={_SESSION_HEADER: data["session_token"]},
+            )
+    _ok("Master password reset. Every other session was logged out.")
+    _out.print(
+        "\n  Your new recovery code (the old one no longer works):\n\n"
+        f"    [bold]{escape(data['recovery_code'])}[/bold]\n\n"
+        "  Write it down and keep it offline. Anyone holding it can open the vault."
+    )
 
 
 @app.command(

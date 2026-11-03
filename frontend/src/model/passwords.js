@@ -1,6 +1,8 @@
 import { action, thunk } from "easy-peasy";
 
 import { IS_DESKTOP, nativeBackup, nativeRestore } from "../platform";
+import { SecurityKeyCancelled } from "../platform/securityKeys";
+import { confirmation } from "./security";
 import { getSessionToken } from "../utils";
 import apiClient from "../api/client";
 import { errorDetail, triggerDownload } from "../lib/http";
@@ -293,19 +295,19 @@ const Passwords = {
 
   backup: thunk(async (_actions, masterPassword) => {
     try {
+      const body = await confirmation(masterPassword);
       if (IS_DESKTOP)
-        return await nativeBackup(getSessionToken(), masterPassword).catch((message) => {
-          throw new Error(String(message));
-        });
-      const response = await apiClient.post(
-        "/passwords/backup",
-        { master_password: masterPassword },
-        { responseType: "blob" }
-      );
+        return await nativeBackup(getSessionToken(), body.master_password, body.security_key).catch(
+          (message) => {
+            throw new Error(String(message));
+          }
+        );
+      const response = await apiClient.post("/passwords/backup", body, { responseType: "blob" });
       const stamp = new Date().toISOString().slice(0, 19).replace(/:/g, "-");
       triggerDownload(response.data, `ciphermoth_backup_${stamp}.cmbackup`);
     } catch (err) {
-      throw new Error(await errorDetail(err, IS_DESKTOP ? err.message : "Backup failed."));
+      if (err instanceof SecurityKeyCancelled) throw new Error("Cancelled.");
+      throw new Error(await errorDetail(err, err.message || "Backup failed."));
     }
   }),
 };

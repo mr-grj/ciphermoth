@@ -4,7 +4,7 @@ place so it can be reviewed as a whole. The specification is
 docs/VAULT_FORMAT.md; the known-answer vectors are in testdata/vectors.
 
 Primitives come from ``cryptography`` only: Argon2id, HKDF-SHA256,
-AES-256-GCM and HMAC-SHA256.
+AES-256-GCM, HMAC-SHA256 and X25519 (the recovery code).
 """
 
 import asyncio
@@ -23,6 +23,10 @@ from dataclasses import dataclass, field
 import pyzipper
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric.x25519 import (
+    X25519PrivateKey,
+    X25519PublicKey,
+)
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.argon2 import Argon2id
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
@@ -46,6 +50,14 @@ _RECORD_ENCRYPTION = "ciphermoth/v2/record-encryption"
 _NAME_INDEX = "ciphermoth/v2/name-index"
 _KEY_CHECK = "ciphermoth/v2/key-check"
 _DEVICE_UNLOCK = "ciphermoth/v2/device-unlock"
+_SECOND_FACTOR_WRAP_LABEL = b"ciphermoth/v2/wrapped-vault-key/second-factor"
+_SECOND_FACTOR_COMMITMENT = "ciphermoth/v2/password-and-factor-commitment"
+_SECOND_FACTOR_WRAPPING = "ciphermoth/v2/password-and-factor-key-wrapping"
+_FACTOR_ESCROW = "ciphermoth/v2/factor-key-escrow"
+_SECURITY_KEY_WRAPPING = "ciphermoth/v2/security-key-wrapping"
+_RECOVERY_PRIVATE_KEY = "ciphermoth/v2/recovery-private-key"
+_RECOVERY_SEALING = "ciphermoth/v2/recovery-sealing"
+_RECOVERY_BINDING = "ciphermoth/v2/recovery-binding"
 _BACKUP_COMMITMENT = "ciphermoth/backup/v2/key-commitment"
 _BACKUP_FRAMES = "ciphermoth/backup/v2/frame-encryption"
 
@@ -233,6 +245,20 @@ class VaultKey:
             _associated_data(b"attachment-content", uid, entry_uid),
         )
 
+    def seal_security_key_name(self, uid: bytes, name: str) -> bytes:
+        return _seal(
+            self._records,
+            _padded(name.encode()),
+            _associated_data(b"security-key-name", uid),
+        )
+
+    def open_security_key_name(self, uid: bytes, sealed: bytes) -> str:
+        return (
+            _open(self._records, sealed, _associated_data(b"security-key-name", uid))
+            .decode()
+            .rstrip(" ")
+        )
+
     def open_attachment_content(
         self, uid: bytes, entry_uid: bytes, sealed: bytes
     ) -> bytes:
@@ -245,18 +271,43 @@ class VaultKey:
 
 @dataclass(frozen=True, slots=True)
 class KeyMaterial:
-    """What the vault row stores to turn a master password into the vault key."""
+    """
+    What the vault row stores to turn a master password (and, with a second
+    factor, a security key's secret) into the vault key.
+    """
 
     params: KdfParams
     salt: bytes
     password_check: bytes
     wrapped_key: bytes = field(repr=False)
     key_check: bytes
+    second_factor: bool = False
 
 
-def _wrap_associated_data(params: KdfParams, salt: bytes) -> bytes:
+@dataclass(frozen=True, slots=True)
+class OpenedVault:
+    """
+    The raw vault key, for the few operations that must wrap it again (a second
+    factor, a recovery code, a biometric enrollment), with what opened it. Only
+    the master password, together with the security key when one is required,
+    or the recovery code yields one; a session never does. Never logged, never
+    kept beyond the request.
+    """
+
+    raw: bytes = field(repr=False)
+    derived: bytes = field(repr=False)
+    factor_key: bytes | None = field(default=None, repr=False)
+
+    @property
+    def key(self) -> VaultKey:
+        return VaultKey(self.raw)
+
+
+def _wrap_associated_data(
+    params: KdfParams, salt: bytes, second_factor: bool = False
+) -> bytes:
     return (
-        _WRAP_LABEL
+        (_SECOND_FACTOR_WRAP_LABEL if second_factor else _WRAP_LABEL)
         + struct.pack(
             ">HIII", FORMAT_VERSION, params.memory_kib, params.iterations, params.lanes
         )
@@ -264,24 +315,48 @@ def _wrap_associated_data(params: KdfParams, salt: bytes) -> bytes:
     )
 
 
-def seal_key_material(
-    derived: bytes, raw_key: bytes, params: KdfParams, salt: bytes
-) -> KeyMaterial:
-    wrapped = _seal(
-        AESGCM(_hkdf(derived, _KEY_WRAPPING)),
-        raw_key,
-        _wrap_associated_data(params, salt),
+def _password_keys(derived: bytes, factor_key: bytes | None) -> tuple[bytes, AESGCM]:
+    """
+    The password commitment and the key-wrapping cipher. With a second factor
+    both come from the master password's key and the factor key together, so the
+    vault file alone does not even let anyone test a password guess.
+    """
+    if factor_key is None:
+        return _hkdf(derived, _PASSWORD_COMMITMENT), AESGCM(
+            _hkdf(derived, _KEY_WRAPPING)
+        )
+    if len(factor_key) != KEY_BYTES:
+        raise DecryptionFailed
+    combined = derived + factor_key
+    return _hkdf(combined, _SECOND_FACTOR_COMMITMENT), AESGCM(
+        _hkdf(combined, _SECOND_FACTOR_WRAPPING)
     )
+
+
+def seal_key_material(
+    derived: bytes,
+    raw_key: bytes,
+    params: KdfParams,
+    salt: bytes,
+    factor_key: bytes | None = None,
+) -> KeyMaterial:
+    second_factor = factor_key is not None
+    commitment, cipher = _password_keys(derived, factor_key)
     return KeyMaterial(
         params=params,
         salt=salt,
-        password_check=_hkdf(derived, _PASSWORD_COMMITMENT),
-        wrapped_key=wrapped,
+        password_check=commitment,
+        wrapped_key=_seal(
+            cipher, raw_key, _wrap_associated_data(params, salt, second_factor)
+        ),
         key_check=VaultKey(raw_key).check,
+        second_factor=second_factor,
     )
 
 
-def open_key_material(derived: bytes, material: KeyMaterial) -> VaultKey | None:
+def open_key_material(
+    derived: bytes, material: KeyMaterial, factor_key: bytes | None = None
+) -> VaultKey | None:
     """
     The vault key, or None if ``derived`` comes from a wrong password. The
     password commitment is compared first, so a crafted wrapped key cannot
@@ -289,19 +364,22 @@ def open_key_material(derived: bytes, material: KeyMaterial) -> VaultKey | None:
     key-committing). A matching commitment with a wrapped key or key check
     that does not verify raises DecryptionFailed: the row is damaged.
     """
-    raw = _unwrap_raw_key(derived, material)
+    raw = _unwrap_raw_key(derived, material, factor_key)
     return None if raw is None else VaultKey(raw)
 
 
-def _unwrap_raw_key(derived: bytes, material: KeyMaterial) -> bytes | None:
-    if not hmac.compare_digest(
-        _hkdf(derived, _PASSWORD_COMMITMENT), bytes(material.password_check)
-    ):
+def _unwrap_raw_key(
+    derived: bytes, material: KeyMaterial, factor_key: bytes | None = None
+) -> bytes | None:
+    if material.second_factor != (factor_key is not None):
+        raise ValueError("The second factor does not match the key record.")
+    commitment, cipher = _password_keys(derived, factor_key)
+    if not hmac.compare_digest(commitment, bytes(material.password_check)):
         return None
     raw = _open(
-        AESGCM(_hkdf(derived, _KEY_WRAPPING)),
+        cipher,
         material.wrapped_key,
-        _wrap_associated_data(material.params, material.salt),
+        _wrap_associated_data(material.params, material.salt, material.second_factor),
     )
     if len(raw) != KEY_BYTES or not VaultKey(raw).matches(material.key_check):
         raise DecryptionFailed
@@ -309,18 +387,271 @@ def _unwrap_raw_key(derived: bytes, material: KeyMaterial) -> bytes | None:
 
 
 async def create_key_material(
-    password: str, params: KdfParams = DEFAULT_KDF
-) -> tuple[KeyMaterial, VaultKey]:
-    """A new random vault key and salt, wrapped under ``password``."""
+    password: str, params: KdfParams = DEFAULT_KDF, factor_key: bytes | None = None
+) -> tuple[KeyMaterial, OpenedVault]:
+    """A new random vault key and salt, wrapped under ``password`` (and the factor
+    key, when the vault has a second factor)."""
     salt = os.urandom(SALT_BYTES)
     raw_key = os.urandom(KEY_BYTES)
     derived = await derive(password, salt, params)
-    return seal_key_material(derived, raw_key, params, salt), VaultKey(raw_key)
+    return (
+        seal_key_material(derived, raw_key, params, salt, factor_key),
+        OpenedVault(raw_key, derived, factor_key),
+    )
 
 
-async def unlock_key_material(password: str, material: KeyMaterial) -> VaultKey | None:
+async def open_vault(
+    password: str, material: KeyMaterial, factor_key: bytes | None = None
+) -> OpenedVault | None:
+    """The raw vault key for ``password`` (and the factor key), or None if the
+    password is wrong."""
     derived = await derive(password, material.salt, material.params)
-    return open_key_material(derived, material)
+    raw = _unwrap_raw_key(derived, material, factor_key)
+    return None if raw is None else OpenedVault(raw, derived, factor_key)
+
+
+async def unlock_key_material(
+    password: str, material: KeyMaterial, factor_key: bytes | None = None
+) -> VaultKey | None:
+    opened = await open_vault(password, material, factor_key)
+    return None if opened is None else opened.key
+
+
+def rewrap_key_material(
+    opened: OpenedVault, material: KeyMaterial, factor_key: bytes | None
+) -> KeyMaterial:
+    """The same vault key under the same password, with a second factor added
+    (``factor_key``) or removed (None). Nothing else in the vault changes."""
+    return seal_key_material(
+        opened.derived, opened.raw, material.params, material.salt, factor_key
+    )
+
+
+# Second factor. A random 32-byte factor key joins the master password in the key
+# record above. Each security key holds a copy wrapped under its own PRF secret, and
+# the vault keeps one more under the vault key itself, so the recovery code (which
+# opens the vault key) can keep the security keys working.
+
+
+def new_factor_key() -> bytes:
+    return os.urandom(KEY_BYTES)
+
+
+def escrow_factor_key(raw_key: bytes, factor_key: bytes) -> bytes:
+    return _seal(
+        AESGCM(_hkdf(raw_key, _FACTOR_ESCROW)),
+        factor_key,
+        _associated_data(b"factor-key"),
+    )
+
+
+def open_escrowed_factor_key(raw_key: bytes, sealed: object) -> bytes:
+    factor_key = _open(
+        AESGCM(_hkdf(raw_key, _FACTOR_ESCROW)), sealed, _associated_data(b"factor-key")
+    )
+    if len(factor_key) != KEY_BYTES:
+        raise DecryptionFailed
+    return factor_key
+
+
+@dataclass(frozen=True, slots=True)
+class SecurityKeySlot:
+    """
+    What identifies one registered security key. All of it is associated data of
+    the factor key wrapped for that key, so swapping a public key, credential,
+    relying party or PRF salt in the file makes the slot fail to open.
+    """
+
+    uid: bytes
+    credential_id: bytes
+    public_key: bytes
+    rp_id: str
+    prf_salt: bytes
+
+    def associated_data(self) -> bytes:
+        return _associated_data(
+            b"security-key",
+            self.uid,
+            self.credential_id,
+            self.public_key,
+            self.rp_id.encode(),
+            self.prf_salt,
+        )
+
+
+def _security_key_cipher(prf_output: bytes) -> AESGCM:
+    if len(prf_output) != KEY_BYTES:
+        raise DecryptionFailed
+    return AESGCM(_hkdf(prf_output, _SECURITY_KEY_WRAPPING))
+
+
+def wrap_factor_key(
+    prf_output: bytes, factor_key: bytes, slot: SecurityKeySlot
+) -> bytes:
+    return _seal(_security_key_cipher(prf_output), factor_key, slot.associated_data())
+
+
+def unwrap_factor_key(
+    prf_output: bytes, sealed: object, slot: SecurityKeySlot
+) -> bytes:
+    factor_key = _open(_security_key_cipher(prf_output), sealed, slot.associated_data())
+    if len(factor_key) != KEY_BYTES:
+        raise DecryptionFailed
+    return factor_key
+
+
+# Recovery code. 160 random bits shown once as eight groups of four Crockford
+# base32 characters. Argon2id turns the code into an X25519 key pair; the vault
+# stores only the public key and the vault key sealed to it. Sealing needs only
+# the public key, so a master password change seals the new vault key to the same
+# code without knowing it. The public key is bound to the vault key by a MAC, so
+# someone who can write the file cannot substitute a key pair of their own.
+
+RECOVERY_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+RECOVERY_CODE_CHARACTERS = 32
+_RECOVERY_GROUP = 4
+_RECOVERY_LOOKALIKES = str.maketrans({"O": "0", "I": "1", "L": "1"})
+RECOVERY_SEALED_BYTES = 32 + SEALED_OVERHEAD + KEY_BYTES
+
+
+def new_recovery_code() -> str:
+    # 32 is a power of two, so each byte's low five bits are uniform.
+    code = "".join(
+        RECOVERY_ALPHABET[byte & 31] for byte in os.urandom(RECOVERY_CODE_CHARACTERS)
+    )
+    return "-".join(
+        code[start : start + _RECOVERY_GROUP]
+        for start in range(0, RECOVERY_CODE_CHARACTERS, _RECOVERY_GROUP)
+    )
+
+
+def canonical_recovery_code(text: str) -> str | None:
+    """The code without separators, forgiving case and the look-alike letters
+    O, I and L; None if it cannot be a recovery code."""
+    cleaned = "".join(
+        character for character in text.upper() if character not in " -\t\r\n"
+    ).translate(_RECOVERY_LOOKALIKES)
+    if len(cleaned) != RECOVERY_CODE_CHARACTERS or any(
+        character not in RECOVERY_ALPHABET for character in cleaned
+    ):
+        return None
+    return cleaned
+
+
+@dataclass(frozen=True, slots=True)
+class RecoveryMaterial:
+    params: KdfParams
+    salt: bytes
+    public_key: bytes
+    sealed_key: bytes = field(repr=False)
+    binding: bytes
+
+
+def _recovery_private_key(derived: bytes) -> X25519PrivateKey:
+    return X25519PrivateKey.from_private_bytes(_hkdf(derived, _RECOVERY_PRIVATE_KEY))
+
+
+def _recovery_binding(
+    raw_key: bytes, params: KdfParams, salt: bytes, public_key: bytes
+) -> bytes:
+    return hmac.new(
+        _hkdf(raw_key, _RECOVERY_BINDING),
+        struct.pack(">III", params.memory_kib, params.iterations, params.lanes)
+        + salt
+        + public_key,
+        hashlib.sha256,
+    ).digest()
+
+
+def _recovery_cipher(shared: bytes, ephemeral: bytes, recipient: bytes) -> AESGCM:
+    return AESGCM(_hkdf(shared + ephemeral + recipient, _RECOVERY_SEALING))
+
+
+def _seal_for_recovery(raw_key: bytes, public_key: bytes) -> bytes:
+    ephemeral = X25519PrivateKey.generate()
+    ephemeral_public = ephemeral.public_key().public_bytes_raw()
+    try:
+        shared = ephemeral.exchange(X25519PublicKey.from_public_bytes(public_key))
+    except ValueError:
+        raise DecryptionFailed from None
+    return ephemeral_public + _seal(
+        _recovery_cipher(shared, ephemeral_public, public_key),
+        raw_key,
+        _associated_data(b"recovery", ephemeral_public, public_key),
+    )
+
+
+def _recovery_material(
+    raw_key: bytes, params: KdfParams, salt: bytes, public_key: bytes
+) -> RecoveryMaterial:
+    return RecoveryMaterial(
+        params=params,
+        salt=salt,
+        public_key=public_key,
+        sealed_key=_seal_for_recovery(raw_key, public_key),
+        binding=_recovery_binding(raw_key, params, salt, public_key),
+    )
+
+
+async def create_recovery(
+    raw_key: bytes, params: KdfParams = DEFAULT_KDF
+) -> tuple[str, RecoveryMaterial]:
+    """A new recovery code, and the vault key sealed to it."""
+    code = new_recovery_code()
+    salt = os.urandom(SALT_BYTES)
+    derived = await derive(canonical_recovery_code(code) or "", salt, params)
+    public_key = _recovery_private_key(derived).public_key().public_bytes_raw()
+    return code, _recovery_material(raw_key, params, salt, public_key)
+
+
+def reseal_recovery(
+    old_raw_key: bytes, new_raw_key: bytes, material: RecoveryMaterial
+) -> RecoveryMaterial:
+    """The same recovery code for a new vault key. Refuses (DecryptionFailed) a
+    public key the old vault key did not bind: it was not ours."""
+    expected = _recovery_binding(
+        old_raw_key, material.params, material.salt, material.public_key
+    )
+    if not hmac.compare_digest(expected, bytes(material.binding)):
+        raise DecryptionFailed
+    return _recovery_material(
+        new_raw_key, material.params, material.salt, material.public_key
+    )
+
+
+async def open_recovery(code: str, material: RecoveryMaterial) -> bytes | None:
+    """
+    The raw vault key, or None if ``code`` is not this vault's recovery code.
+    The public key derived from the code is compared first (the commitment); a
+    match whose sealed key or binding does not verify raises DecryptionFailed.
+    """
+    canonical = canonical_recovery_code(code)
+    if canonical is None:
+        return None
+    derived = await derive(canonical, material.salt, material.params)
+    private_key = _recovery_private_key(derived)
+    public_key = private_key.public_key().public_bytes_raw()
+    if not hmac.compare_digest(public_key, bytes(material.public_key)):
+        return None
+    sealed = bytes(material.sealed_key)
+    ephemeral_public = sealed[:32]
+    try:
+        shared = private_key.exchange(
+            X25519PublicKey.from_public_bytes(ephemeral_public)
+        )
+    except ValueError:
+        raise DecryptionFailed from None
+    raw = _open(
+        _recovery_cipher(shared, ephemeral_public, public_key),
+        sealed[32:],
+        _associated_data(b"recovery", ephemeral_public, public_key),
+    )
+    if len(raw) != KEY_BYTES or not hmac.compare_digest(
+        _recovery_binding(raw, material.params, material.salt, public_key),
+        bytes(material.binding),
+    ):
+        raise DecryptionFailed
+    return raw
 
 
 def _device_cipher(secret: bytes) -> AESGCM:
@@ -329,21 +660,17 @@ def _device_cipher(secret: bytes) -> AESGCM:
     return AESGCM(_hkdf(secret, _DEVICE_UNLOCK))
 
 
-async def wrap_key_for_device(
-    password: str, material: KeyMaterial, secret: bytes, credential_id: str
-) -> bytes | None:
+def wrap_key_for_device(
+    opened: OpenedVault, secret: bytes, credential_id: str
+) -> bytes:
     """
-    The vault key wrapped under a device's 32-byte secret, or None if ``password``
-    is wrong. Only the master password can create this wrapping: a session does
-    not hold the raw vault key.
+    The vault key wrapped under a device's 32-byte secret. Only an opened vault
+    (the master password, with the security key when one is required) can create
+    this wrapping: a session does not hold the raw vault key.
     """
-    derived = await derive(password, material.salt, material.params)
-    raw = _unwrap_raw_key(derived, material)
-    if raw is None:
-        return None
     return _seal(
         _device_cipher(secret),
-        raw,
+        opened.raw,
         _associated_data(b"device-unlock", credential_id.encode()),
     )
 

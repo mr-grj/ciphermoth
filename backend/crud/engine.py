@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -18,13 +19,21 @@ from backup_format import MAX_BACKUP_BYTES, MAX_FRAMES
 from errors import InvalidRequest, VaultBusy
 from settings import get_storage_settings
 from storage import (
+    SCHEMA_VERSION,
+    UPGRADABLE_SCHEMAS,
     StorageError,
     configure_connection,
     ensure_schema,
     prepare_data_dir,
     require_supported_sqlite,
+    schema_version,
+    snapshot,
+    snapshot_dir,
+    timestamped,
     vault_file,
 )
+
+logger = logging.getLogger(__name__)
 
 _AFTER_COMMIT = "ciphermoth_after_commit"
 _AFTER_ROLLBACK = "ciphermoth_after_rollback"
@@ -211,6 +220,7 @@ class Database:
         """Create or open the vault file: folder and file modes, a read-only
         identity and integrity check of an existing file, then the schema."""
         await asyncio.to_thread(prepare_data_dir, self.data_dir)
+        await asyncio.to_thread(self._snapshot_before_upgrade)
         try:
             async with self.writer().begin() as connection:
                 await connection.run_sync(ensure_schema)
@@ -219,6 +229,18 @@ class Database:
                 f"SQLite cannot open the vault file {self.path}: {error.orig}. "
                 "Restore a snapshot (docs/UPDATING.md)."
             ) from error
+
+    def _snapshot_before_upgrade(self) -> None:
+        """An older schema is upgraded in place by ``ensure_schema``; keep a copy of
+        the vault exactly as the previous release left it first."""
+        if schema_version(self.path) not in UPGRADABLE_SCHEMAS:
+            return
+        kept = snapshot(
+            self.data_dir,
+            snapshot_dir(self.data_dir)
+            / timestamped(f"before-schema-{SCHEMA_VERSION}"),
+        )
+        logger.info("Upgrading the vault schema; the previous file is in %s.", kept)
 
     async def dispose(self) -> None:
         if self._engine is not None:

@@ -13,6 +13,7 @@ mod native;
 mod protocol;
 #[cfg(feature = "gui-test")]
 mod qa;
+mod security_key;
 mod sidecar;
 mod updates;
 
@@ -123,6 +124,9 @@ pub fn run() {
         biometric::biometric_available,
         biometric::biometric_enroll,
         biometric::biometric_derive,
+        security_key::security_key_register,
+        security_key::security_key_answer,
+        security_key::security_key_cancel,
         menu::menu_state,
         updates::update_check,
         updates::update_install,
@@ -145,6 +149,9 @@ pub fn run() {
         biometric::biometric_available,
         biometric::biometric_enroll,
         biometric::biometric_derive,
+        security_key::security_key_register,
+        security_key::security_key_answer,
+        security_key::security_key_cancel,
         menu::menu_state,
         updates::update_check,
         updates::update_install,
@@ -178,6 +185,7 @@ pub fn run() {
                 let _ = emitter.emit("core-status", status);
             });
             app.manage(supervisor);
+            app.manage(security_key::SecurityKeys::new(core_config(&handle)?));
             app.manage(native::Files::default());
             app.manage(clipboard::Clipboard::start());
             #[cfg(target_os = "macos")]

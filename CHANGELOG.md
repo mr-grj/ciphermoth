@@ -1,5 +1,22 @@
 # Changelog
 
+## [Unreleased]
+
+A security key that takes part in the encryption itself, and a way back if you forget your master password.
+
+### Added
+
+- **Require a security key** (Settings → Security). Register a FIDO2 key such as a YubiKey and the vault is encrypted with your master password **and** the key together: a secret only that key can produce (its WebAuthn PRF / CTAP2 hmac-secret output) joins the master password in the key record. A copied vault file, snapshot or a stolen master password opens nothing without the key, and the file alone no longer even lets anyone test password guesses. Every unlock also checks the key's signature over a fresh, single-use challenge, its user verification (its PIN) and its signature counter (clone detection). Register a backup key too; any registered key unlocks. Works in Chrome, Edge and Firefox (HTTPS or localhost), in the desktop app (which talks to the key over USB) and in the CLI. Biometric unlock keeps working and needs the key to turn on.
+- **Recovery code** (Settings → Security). A one-time code (160 random bits, eight groups of four) that sets a new master password if you forget yours, and gets you in if you lose your security keys: **Forgot master password?** on the unlock screen, or `ciphermoth recover`. Using it re-keys the vault, logs every other session out and shows a new code; your keys keep working unless you say you lost them. The vault stores only a public key and the vault key sealed to it (X25519), bound to the vault key, so a master password change keeps the code working without knowing it.
+- **Change the master password from the app** (Settings → Security), with the strength meter. It re-encrypts everything under a new vault key and logs you out everywhere.
+- Every security change (keys, recovery code, master password, biometric unlock, backups) asks for the master password again, and for the security key once one is required, so an unattended unlocked screen cannot make it.
+- API: `POST /api/master_password/unlock/challenge`, `POST /api/master_password/recover`, `GET /api/security`, `POST /api/security/challenge`, `POST /api/security/keys/options`, `POST /api/security/keys`, `POST /api/security/keys/{id}/remove`, `POST /api/security/recovery-code` and `.../remove`; unlock, backup, master password change and biometric enrollment accept a `security_key` answer; `/api/meta` lists `security-keys` and `recovery-code`; `/api/master_password/status` says whether a key is required and whether a recovery code exists. CLI: unlock and `backup` ask the key (and its PIN) over USB; new `ciphermoth recover`.
+
+### Changed
+
+- **Vault schema 3.** The first start of this release upgrades a 3.3.0 vault in place, in one transaction, after keeping a copy of it in `snapshots/before-schema-3-<time>.db`. Nothing existing changes: a vault without keys or a recovery code works exactly as before. Older releases refuse a schema 3 vault (restore that snapshot to go back).
+- The settings dialog has General and Security tabs.
+
 ## [3.3.0] - 2026-11-03
 
 Tidy many secrets at once, and reach the everyday actions with a right-click.

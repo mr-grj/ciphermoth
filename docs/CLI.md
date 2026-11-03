@@ -61,9 +61,14 @@ ciphermoth backup [--out <dir>]              Save a complete encrypted backup (.
 ciphermoth import <file> [--on-conflict]     Restore a .cmbackup, or a backup ZIP from 2.0 or earlier (skip|overwrite)
 ciphermoth import-csv <file> [--on-conflict] Import a CSV from another manager (skip|overwrite)
 ciphermoth damaged [--remove] [--yes]        List (or remove) entries and attachments the vault cannot read
+ciphermoth recover                           Forgot the master password? Set a new one with your recovery code
 ```
 
 Every command that touches encrypted data prompts for the master password. Use `--help` on any command for details.
+
+**Security keys.** When the vault requires a security key, the CLI asks for the key's PIN and then for a touch, talking to the key over USB (`backup` asks once more, to confirm). Run the CLI on the computer the key is plugged into: `cip` inside the Docker container cannot reach it. Registering and removing keys happens in the web UI or the desktop app.
+
+**Recovery.** `recover` asks for the recovery code (hidden), a new master password twice, and, if the vault requires a security key, whether you lost your keys (answering yes removes them). The vault is re-keyed, every other session ends, and a new recovery code is printed: the old one no longer works.
 
 `delete` with several names moves them together: if one of them is missing, none is moved (servers before 3.3.0 accept only one name per command).
 

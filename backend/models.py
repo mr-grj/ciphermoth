@@ -92,6 +92,66 @@ class VaultModel(BaseModel):
     password_check: Mapped[bytes] = mapped_column(LargeBinary)
     wrapped_key: Mapped[bytes] = mapped_column(LargeBinary)
     key_check: Mapped[bytes] = mapped_column(LargeBinary)
+    # Schema 3. Set while a security key is required: the factor key sealed under
+    # the vault key, so the recovery code can keep the security keys working.
+    factor_key_escrow: Mapped[bytes | None] = mapped_column(LargeBinary, default=None)
+
+
+class RecoveryModel(BaseModel):
+    """Schema 3. The recovery code's public key and the vault key sealed to it."""
+
+    __tablename__ = "recovery"
+    __table_args__ = (
+        CheckConstraint("id = 1", name="ck_recovery_singleton"),
+        CheckConstraint("length(salt) = 16", name="ck_recovery_salt"),
+        CheckConstraint("length(public_key) = 32", name="ck_recovery_public_key"),
+        CheckConstraint("length(binding) = 32", name="ck_recovery_binding"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    created: Mapped[datetime] = mapped_column(
+        TIMESTAMP, default=utc_now, server_default=func.current_timestamp()
+    )
+    kdf_memory_kib: Mapped[int] = mapped_column(Integer)
+    kdf_iterations: Mapped[int] = mapped_column(Integer)
+    kdf_lanes: Mapped[int] = mapped_column(Integer)
+    salt: Mapped[bytes] = mapped_column(LargeBinary)
+    public_key: Mapped[bytes] = mapped_column(LargeBinary)
+    sealed_key: Mapped[bytes] = mapped_column(LargeBinary)
+    binding: Mapped[bytes] = mapped_column(LargeBinary)
+
+
+class SecurityKeyModel(BaseModel):
+    """
+    Schema 3. One registered FIDO2 security key: its WebAuthn credential, the
+    PRF salt that makes it produce its secret, and the factor key wrapped under
+    that secret. The name the user gave it is sealed under the vault key.
+    """
+
+    __tablename__ = "security_keys"
+    __table_args__ = (
+        CheckConstraint("length(uid) = 16", name="ck_security_keys_uid"),
+        CheckConstraint("length(prf_salt) = 32", name="ck_security_keys_prf_salt"),
+        {"sqlite_autoincrement": True},
+    )
+
+    def __init__(self, **fields: object) -> None:
+        fields.setdefault("uid", new_uid())
+        super().__init__(**fields)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    uid: Mapped[bytes] = mapped_column(LargeBinary, unique=True)
+    created: Mapped[datetime] = mapped_column(
+        TIMESTAMP, default=utc_now, server_default=func.current_timestamp()
+    )
+    last_used: Mapped[datetime | None] = mapped_column(TIMESTAMP, default=None)
+    credential_id: Mapped[bytes] = mapped_column(LargeBinary, unique=True)
+    public_key: Mapped[bytes] = mapped_column(LargeBinary)
+    rp_id: Mapped[str] = mapped_column(String)
+    prf_salt: Mapped[bytes] = mapped_column(LargeBinary)
+    sign_count: Mapped[int] = mapped_column(Integer, default=0)
+    wrapped_factor_key: Mapped[bytes] = mapped_column(LargeBinary)
+    name: Mapped[bytes] = mapped_column(LargeBinary)
 
 
 class EntryModel(BaseModel):

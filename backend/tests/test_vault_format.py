@@ -108,7 +108,7 @@ async def test_a_new_vault_is_format_2_with_a_wrapped_key_and_no_verifier(
     assert tables >= {"vault", "entries", "attachments", "settings"}
     assert not tables & {"master_password", "passwords", "password_attachments"}
     [(user_version,)] = await db_execute("PRAGMA user_version")
-    assert user_version == SCHEMA_VERSION == 2
+    assert user_version == SCHEMA_VERSION == 3
 
 
 async def test_the_schema_has_no_plaintext_entry_columns_or_indexes() -> None:
@@ -126,6 +126,7 @@ async def test_the_schema_has_no_plaintext_entry_columns_or_indexes() -> None:
             "password_check",
             "wrapped_key",
             "key_check",
+            "factor_key_escrow",
         },
         "entries": {
             "id",
@@ -145,6 +146,31 @@ async def test_the_schema_has_no_plaintext_entry_columns_or_indexes() -> None:
             "size_bytes",
             "meta",
             "content",
+        },
+        # A security key's name is sealed; the rest identifies the credential.
+        "security_keys": {
+            "id",
+            "uid",
+            "created",
+            "last_used",
+            "credential_id",
+            "public_key",
+            "rp_id",
+            "prf_salt",
+            "sign_count",
+            "wrapped_factor_key",
+            "name",
+        },
+        "recovery": {
+            "id",
+            "created",
+            "kdf_memory_kib",
+            "kdf_iterations",
+            "kdf_lanes",
+            "salt",
+            "public_key",
+            "sealed_key",
+            "binding",
         },
     }
     for table, columns in allowed.items():
@@ -529,7 +555,11 @@ async def test_a_format_1_vault_is_refused_untouched_and_can_be_set_aside(
 
     async with client_for_data_dir(folder) as client:
         resp = await client.get("/master_password/status")
-        assert resp.json() == {"initialized": False}
+        assert resp.json() == {
+            "initialized": False,
+            "security_key_required": False,
+            "recovery_code": False,
+        }
         await create_vault(client)
     assert check_file(folder / VAULT_FILE) == []
 
@@ -587,7 +617,9 @@ async def test_an_interrupted_vault_creation_leaves_a_vault_that_is_not_set_up(
         monkeypatch.undo()
         assert resp.status_code == 500
         assert (await client.get("/master_password/status")).json() == {
-            "initialized": False
+            "initialized": False,
+            "security_key_required": False,
+            "recovery_code": False,
         }
         token = await create_vault(client)
         assert (await client.get("/passwords", headers=auth(token))).status_code == 200
@@ -727,7 +759,9 @@ async def test_a_journal_without_its_vault_is_never_discarded(
     assert kept is not None and (kept / f"{VAULT_FILE}-wal").read_bytes() == wal
     async with client_for_data_dir(folder) as client:
         assert (await client.get("/master_password/status")).json() == {
-            "initialized": False
+            "initialized": False,
+            "security_key_required": False,
+            "recovery_code": False,
         }
     assert original
 

@@ -7,3 +7,4 @@ greenlet==3.5.3
 slowapi==0.1.10
 pyzipper==0.4.0
 python-multipart==0.0.32
+fido2==2.2.1

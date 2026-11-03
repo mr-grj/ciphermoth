@@ -1,6 +1,6 @@
 # CipherMoth vault format 2 and backup format 2
 
-This is the specification of how CipherMoth stores a vault on disk (vault format 2, SQLite schema 2) and how it writes a complete encrypted backup (backup format 2, `.cmbackup`). It is written for reviewers and for anyone implementing a second reader (the planned desktop core runs this same Python code; a future JavaScript, Rust or mobile core would implement this document against `testdata/vectors/vault-v2.json` and `backup-v2.json`).
+This is the specification of how CipherMoth stores a vault on disk (vault format 2, SQLite schema 3) and how it writes a complete encrypted backup (backup format 2, `.cmbackup`). It is written for reviewers and for anyone implementing a second reader (the planned desktop core runs this same Python code; a future JavaScript, Rust or mobile core would implement this document against `testdata/vectors/vault-v2.json` and `backup-v2.json`).
 
 The reference implementation is `backend/helpers.py` (every primitive and every associated-data construction), `backend/crud/master_password.py` (unlock and rotation), `backend/crud/password.py` and `backend/crud/attachment.py` (records), `backend/crud/backup.py` (backups) and `backend/storage.py` (file identity).
 
@@ -21,6 +21,9 @@ Format 2 replaced format 1 (CipherMoth 2.0.x and earlier, Fernet columns, plaint
 - Changing an entry's name index so that a lookup lands on another entry: every read recomputes the index from the decrypted name and refuses a mismatch.
 - Changing the stored KDF parameters, salt or format version: they are associated data of the wrapped vault key, and the password commitment depends on them.
 - Planting a crafted wrapped key that decrypts under many candidate passwords (an AES-GCM "partitioning oracle"): unlock checks a password commitment before decrypting anything, so each unlock tests exactly one password.
+- With a security key required: swapping a registered key's credential id, public key, relying party or PRF salt (all associated data of its wrapped factor key), and planting a recovery public key of one's own (it is bound to the vault key by an HMAC, checked before anything is sealed to it).
+
+**Protected with a security key required (section 3a):** the vault file together with the master password, and the file alone against offline password guessing (the commitment needs the factor key).
 
 **Not detected (documented limits):**
 
@@ -87,11 +90,52 @@ AD_device = 0x02 ‖ "ciphermoth/v2" ‖ u32 length ‖ "device-unlock" ‖ u32 
 
 Enrolling verifies the master password as in unlock, since only that yields the raw VK. Unlocking refuses first if the password reminder is due (now − `last_password_at` ≥ the interval, or the clock moved back more than 5 minutes), then decrypts `wrapped_key` and compares the derived `key_check` with the vault's: a mismatch after a successful decryption means the record belongs to a replaced vault key and it is removed. A master password change deletes the file after its commit, and a new vault deletes a stale one. The file is not part of the vault format or schema version: a release without this feature ignores it, and a malformed file is ignored with a log line, leaving the master password as the way in.
 
+### 3a. Second factor: security keys (schema 3)
+
+Optional. While at least one security key is registered, the key record above is made from the master password **and** a random 32-byte factor key `F`:
+
+```
+D = Argon2id(master password, salt, params)            (as above)
+password_check = HKDF(D ‖ F, "ciphermoth/v2/password-and-factor-commitment")
+KEK            = HKDF(D ‖ F, "ciphermoth/v2/password-and-factor-key-wrapping")
+wrapped_key    = 0x02 ‖ nonce ‖ AES-256-GCM(KEK, nonce, VK, AD_wrap2)
+AD_wrap2       = "ciphermoth/v2/wrapped-vault-key/second-factor" ‖ the rest of AD_wrap
+factor_key_escrow = sealed(HKDF(VK, "ciphermoth/v2/factor-key-escrow"), F, AD = parts("factor-key"))
+```
+
+`vault.factor_key_escrow` is non-null exactly while a second factor is required; it lets the recovery code (which opens VK) keep the keys working. Each row of `security_keys` holds one FIDO2 credential:
+
+```
+S = PRF output of the key for prf_salt (WebAuthn PRF = CTAP2 hmac-secret of
+    SHA-256("WebAuthn PRF" ‖ 0x00 ‖ prf_salt)), with user verification
+wrapped_factor_key = sealed(HKDF(S, "ciphermoth/v2/security-key-wrapping"), F,
+                            AD = parts("security-key", uid, credential_id, public_key, rp_id, prf_salt))
+name = sealed under K_rec with AD = parts("security-key-name", uid), padded like a document
+```
+
+**Unlock** (and every confirmation): the client asks the server for a challenge (32 random bytes, single use, five minutes, bound to its purpose and, inside a session, to a hash of the session token), the key signs it and returns its PRF output. The server verifies the WebAuthn assertion with python-fido2 (client data type, challenge, origin = a host of `rp_id` over HTTPS or localhost, RP ID hash, user present **and** user verified, signature with the stored COSE key), requires the signature counter to grow unless both old and new are 0 (stored with a compare-and-set in its own short write transaction), unwraps `F` with `S`, then runs Argon2id and compares the combined commitment. A mismatch there is a wrong password. The CLI and the desktop app build the same client data with the origin `https://<rp_id>` (the desktop app registers with `rp_id = "localhost"`) and talk CTAP2 over USB.
+
+**Turning it on** (the first key) needs the master password: it rewraps VK under `D ‖ F` (same salt) and stores the escrow. **Adding a key** needs the master password and an existing key (which yields `F`). **Removing the last key** needs both and rewraps VK under `D` alone. A master password change keeps `F` (the keys keep working), re-seals the names and the escrow under the new VK.
+
+### 3b. Recovery code (schema 3)
+
+Optional. A code of 32 Crockford base32 characters (160 bits from `os.urandom`), shown once in groups of four. Readers upper-case it, drop spaces and dashes and read O, I, L as 0, 1, 1.
+
+```
+D_r  = Argon2id(code, recovery.salt, recovery params)     (code: the 32 characters)
+x    = X25519 private key HKDF(D_r, "ciphermoth/v2/recovery-private-key"), public key P (stored)
+sealed_key = E ‖ AES-256-GCM(HKDF(ECDH(e, P) ‖ E ‖ P, "ciphermoth/v2/recovery-sealing"), VK,
+                             AD = parts("recovery", E, P))      (e fresh per sealing, E its public key)
+binding = HMAC-SHA256(HKDF(VK, "ciphermoth/v2/recovery-binding"), u32 memory ‖ u32 iterations ‖ u32 lanes ‖ salt ‖ P)
+```
+
+Recovering derives `P` from the code and compares it with the stored one in constant time (a mismatch is a wrong code), opens `sealed_key`, checks `binding` under the opened VK and the vault's `key_check` (either failing is damage). It then re-keys like a master password change with a new code. Because sealing needs only `P`, a master password change seals the new VK to the same code; it first checks `binding` under the old VK, so a planted `P` is refused instead of receiving the new key.
+
 **Why a separate commitment and not only GCM?** AES-GCM is not key-committing: one ciphertext can be built to decrypt under many keys. Unlock compares `password_check` first, so whatever is planted in `wrapped_key`, each unlock tests one password. The commitment costs an attacker exactly what testing the wrapped key would: one Argon2id per guess.
 
-## 4. SQLite layout (schema 2)
+## 4. SQLite layout (schema 3)
 
-`PRAGMA application_id` = `0x434D5448` ("CMTH"), `PRAGMA user_version` = 2. The SQLite settings (WAL, `synchronous=FULL`, `secure_delete=ON`, `foreign_keys=ON`, ...) are unchanged from schema 1 and listed in `CLAUDE.md`.
+`PRAGMA application_id` = `0x434D5448` ("CMTH"), `PRAGMA user_version` = 3 (schema 2 vaults are upgraded at startup after a snapshot: the two tables below are created and `vault.factor_key_escrow` is added). The SQLite settings (WAL, `synchronous=FULL`, `secure_delete=ON`, `foreign_keys=ON`, ...) are unchanged from schema 1 and listed in `CLAUDE.md`.
 
 **`vault`** (at most one row, `id = 1`): `format_version` (2), `kdf` (`argon2id`), `kdf_memory_kib`, `kdf_iterations`, `kdf_lanes`, `kdf_salt` (16 bytes), `password_check` (32), `wrapped_key` (61), `key_check` (32), `created`, `updated`.
 
@@ -100,6 +144,10 @@ Enrolling verifies the master password as in unlock, since only that yields the 
 **`attachments`**: `id` (integer, autoincrement), `uid` (16 random bytes, unique), `entry_id` (foreign key, `ON DELETE CASCADE`), `size_bytes`, `meta` (sealed name and type), `content` (sealed bytes), `created`.
 
 **`settings`**: the timing settings and the update-check switch, in clear.
+
+**`security_keys`** (schema 3): `id` (autoincrement), `uid` (16 random bytes), `credential_id`, `public_key` (CBOR COSE key), `rp_id`, `prf_salt` (32), `sign_count`, `wrapped_factor_key` (61), `name` (sealed), `created`, `last_used`.
+
+**`recovery`** (schema 3, at most one row, `id = 1`): `kdf_memory_kib`, `kdf_iterations`, `kdf_lanes`, `salt` (16), `public_key` (32), `sealed_key` (93), `binding` (32), `created`.
 
 **Sealed value** = `0x02` ‖ nonce (12) ‖ AES-256-GCM(K_rec, nonce, plaintext, AD) (ciphertext ‖ 16-byte tag).
 
@@ -133,6 +181,7 @@ A note keeps its body in `value`. Readers refuse unknown or missing keys and wro
 - Which entries share a name (equal `name_index`), in practice an entry and its trashed copies; nothing else about names. Values change completely after a master password change.
 - Each entry document's length rounded up to 64 bytes, each attachment's exact size.
 - The settings row (timeouts in milliseconds, update check on or off).
+- Whether a security key is required, how many keys are registered, their credential ids, public keys, relying party (the host name they were registered on), PRF salts, signature counters and when each was added and last used; whether a recovery code exists and when it was made. Key names are encrypted.
 - When the master password last changed (the `vault` row's `updated` time) and how many entries and attachments were ever created, purged ones included (SQLite's id counter).
 - Across two copies of the file (two snapshots, or a snapshot and the live vault): which entries changed, were renamed (their name index changed) or were trashed in between.
 
@@ -195,7 +244,7 @@ Wrong password, tampering, truncation, reordering, a frame from another backup a
 
 Three independent numbers, each refused when newer than the code understands:
 
-- SQLite `user_version`: the table layout (schema). 2 since this format.
+- SQLite `user_version`: the table layout (schema). 2 since this format, 3 since security keys and the recovery code (upgraded in place).
 - `vault.format_version`: the cryptographic layout. 2.
 - The backup header `version`: 2. (Version 1 was the WinZip-AES ZIP of CipherMoth up to 2.0.x; it can still be imported, see below.)
 

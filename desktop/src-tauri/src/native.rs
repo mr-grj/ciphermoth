@@ -83,10 +83,18 @@ pub(super) async fn file_request(
 pub async fn backup_export(
     session: String,
     password: String,
+    security_key: Option<Value>,
     core: State<'_, Arc<Supervisor>>,
 ) -> Result<Value, String> {
     if password.len() > 4096 {
         return Err("Password is too long.".into());
+    }
+    // The core validates the answer; this only bounds it.
+    if security_key
+        .as_ref()
+        .is_some_and(|key| key.to_string().len() > 32 * 1024)
+    {
+        return Err("Invalid security key answer.".into());
     }
     let picked = rfd::AsyncFileDialog::new()
         .set_file_name("ciphermoth-backup.cmbackup")
@@ -101,7 +109,7 @@ pub async fn backup_export(
         "backup_export",
         file.path().into(),
         session,
-        json!({"master_password":password}),
+        json!({"master_password":password,"security_key":security_key}),
     )
     .await
 }

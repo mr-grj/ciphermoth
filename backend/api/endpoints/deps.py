@@ -13,12 +13,14 @@ from crud.damage import DamageCRUD
 from crud.engine import Database
 from crud.master_password import MasterPasswordCRUD
 from crud.password import PasswordCRUD
+from crud.security import SecurityCRUD
 from crud.settings import SettingsCRUD
 from crud.vault_access import SessionToken, VaultAccess
 from device_unlock import DeviceUnlockStore
 from errors import Forbidden, InvalidRequest, SessionRequired
 from helpers import VaultKey
 from vault_sessions import VaultSessions
+from webauthn import Challenges, session_binding
 
 SESSION_HEADER = "x-ciphermoth-session"
 _session_header = APIKeyHeader(
@@ -36,6 +38,13 @@ async def get_vault_sessions(request: Request) -> VaultSessions:
     return request.app.state.vault_sessions
 
 
+async def get_challenges(request: Request) -> Challenges:
+    return request.app.state.security_challenges
+
+
+ChallengesDep = Annotated[Challenges, Depends(get_challenges)]
+
+
 VaultSessionsDep = Annotated[VaultSessions, Depends(get_vault_sessions)]
 
 
@@ -48,6 +57,9 @@ _READ_ONLY_ROUTES = frozenset(
         "master-password:device-enroll",
         "master-password:device-settings",
         "master-password:device-forget",
+        "master-password:unlock-challenge",
+        "security:challenge",
+        "security:key-options",
         "passwords:backup",
     }
 )
@@ -90,9 +102,9 @@ async def get_attachment_crud(session: SessionDep) -> AttachmentCRUD:
 
 
 async def get_backup_crud(
-    session: SessionDep, vault_sessions: VaultSessionsDep
+    session: SessionDep, vault_sessions: VaultSessionsDep, challenges: ChallengesDep
 ) -> BackupCRUD:
-    return BackupCRUD(session, vault_sessions)
+    return BackupCRUD(session, vault_sessions, challenges)
 
 
 async def get_damage_crud(session: SessionDep) -> DamageCRUD:
@@ -103,8 +115,11 @@ async def get_vault_access(
     session: SessionDep,
     vault_sessions: VaultSessionsDep,
     database: Annotated[Database, Depends(get_database)],
+    challenges: ChallengesDep,
 ) -> VaultAccess:
-    return VaultAccess(session, vault_sessions, DeviceUnlockStore(database.data_dir))
+    return VaultAccess(
+        session, vault_sessions, DeviceUnlockStore(database.data_dir), challenges
+    )
 
 
 MasterPasswordCRUDDep = Annotated[MasterPasswordCRUD, Depends(get_master_password_crud)]
@@ -134,6 +149,15 @@ async def get_credential(
 
 
 CredentialDep = Annotated[SessionToken, Depends(get_credential)]
+
+
+async def get_security_crud(
+    session: SessionDep, challenges: ChallengesDep, credential: CredentialDep
+) -> SecurityCRUD:
+    return SecurityCRUD(session, challenges, session_binding(credential.token))
+
+
+SecurityCRUDDep = Annotated[SecurityCRUD, Depends(get_security_crud)]
 
 
 async def get_vault_key(access: VaultAccessDep, credential: CredentialDep) -> VaultKey:

@@ -26,8 +26,14 @@ const ENROLLED = {
 };
 const originalAdapter = apiClient.defaults.adapter;
 
+const PASSWORD_ONLY = [200, { initialized: true, security_key_required: false }];
+
 const build = async (table) => {
-  apiClient.defaults.adapter = routes({ [`GET ${STATUS}`]: [200, ENROLLED], ...table });
+  apiClient.defaults.adapter = routes({
+    [`GET ${STATUS}`]: [200, ENROLLED],
+    "GET /master_password/status": PASSWORD_ONLY,
+    ...table,
+  });
   const store = createStore({ deviceUnlock: DeviceUnlock });
   await store.getActions().deviceUnlock.load();
   return store;
@@ -107,6 +113,7 @@ describe("enroll", () => {
     const store = await build({});
     apiClient.defaults.adapter = routes(
       {
+        "GET /master_password/status": PASSWORD_ONLY,
         [`POST ${STATUS}/enroll`]: [200, ENROLLED],
         [`DELETE ${STATUS}/device`]: [200, ENROLLED],
       },
@@ -114,7 +121,8 @@ describe("enroll", () => {
     );
     await store.getActions().deviceUnlock.enroll({ credential, masterPassword: "x" });
     expect(biometrics.rememberCredential).toHaveBeenCalledWith("new");
-    expect(seen.map((c) => c.method)).toEqual(["post", "delete"]);
-    expect(JSON.parse(seen[0].data).master_password).toBe("x");
+    expect(seen.map((c) => c.method)).toEqual(["get", "post", "delete"]);
+    expect(JSON.parse(seen[1].data).master_password).toBe("x");
+    expect(JSON.parse(seen[1].data).security_key).toBeUndefined();
   });
 });

@@ -55,10 +55,15 @@ def main(started):
     parser.add_argument("--data-dir", type=Path)
     parser.add_argument("--check-vectors", type=Path)
     parser.add_argument("--version", action="store_true")
+    parser.add_argument("--security-key", action="store_true")
     args = parser.parse_args()
     if args.version:
         print(CORE_VERSION)
         return 0
+    if args.security_key:
+        from .security_key import run
+
+        return run()
     if args.check_vectors:
         from .vectors import run_all
 

@@ -47,6 +47,7 @@ async def clean_state() -> AsyncIterator[None]:
     await reset_vault()
     limiter.reset()
     app.state.vault_sessions = fresh_vault_sessions()
+    app.state.security_challenges.clear()
     yield
 
 
