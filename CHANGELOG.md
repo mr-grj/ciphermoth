@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [3.4.0] - 2026-11-03
 
 A security key that takes part in the encryption itself, and a way back if you forget your master password.
 
