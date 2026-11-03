@@ -1048,7 +1048,11 @@ async def test_the_server_no_longer_advertises_the_vault_key_protocol(
     client: httpx.AsyncClient,
 ) -> None:
     features = (await client.get("/meta")).json()["features"]
-    assert features == ["entry-names-with-slash", "vault-sessions"]
+    assert features == [
+        "bulk-entry-actions",
+        "entry-names-with-slash",
+        "vault-sessions",
+    ]
     paths = app.openapi()["paths"]
     assert "/api/master_password/check" not in paths
     assert "key-derivation" not in str(app.openapi()).lower()

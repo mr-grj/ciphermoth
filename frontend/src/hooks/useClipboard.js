@@ -25,9 +25,11 @@ const useClipboard = () => {
   }, []);
 
   return useCallback(
-    (value) => {
+    // `what` names the copied value in the toast ("Password copied."), if given.
+    (value, what) => {
       (IS_DESKTOP ? copySecret(value, clearMs) : navigator.clipboard.writeText(value)).then(() => {
-        enqueueSnackbar(`Copied! Clipboard clears in ${formatDuration(clearMs)}.`, {
+        const copied = what ? `${what} copied.` : "Copied!";
+        enqueueSnackbar(`${copied} Clipboard clears in ${formatDuration(clearMs)}.`, {
           variant: "success",
         });
         if (IS_DESKTOP) return;

@@ -223,3 +223,57 @@ describe("damaged rows", () => {
     expect(store.getState().passwords.damageCheckError).toContain("may be missing");
   });
 });
+
+describe("bulk entry actions", () => {
+  const calls = () => seen.map((request) => `${request.method.toUpperCase()} ${request.url}`);
+  const body = (request) => JSON.parse(request.data);
+  const rows = [
+    { id: 4, password_name: "a/b" },
+    { id: 9, password_name: "c" },
+  ];
+
+  it("moves entries to the trash by name, then reloads both lists", async () => {
+    const result = { count: 2, detail: "2 entries moved to trash." };
+    const actions = build({ "POST /vault/entries/trash": [200, result] });
+    await expect(actions.trashMany(["a/b", "c"])).resolves.toEqual(result);
+    expect(body(seen[0])).toEqual({ entries: [{ password_name: "a/b" }, { password_name: "c" }] });
+    expect(calls()).toEqual([
+      "POST /vault/entries/trash",
+      "GET /passwords",
+      "GET /passwords/trash",
+    ]);
+  });
+
+  it("restores and purges trashed entries by name and id", async () => {
+    const actions = build({
+      "POST /vault/trash/restore": [200, { count: 2, detail: "x" }],
+      "POST /vault/trash/purge": [200, { count: 2, detail: "x" }],
+    });
+    await actions.restoreMany(rows);
+    await actions.purgeMany(rows);
+    const expected = {
+      entries: [
+        { password_name: "a/b", entry_id: 4 },
+        { password_name: "c", entry_id: 9 },
+      ],
+    };
+    expect(body(seen[0])).toEqual(expected);
+    expect(body(seen[3])).toEqual(expected);
+    expect(calls().slice(3)).toEqual(["POST /vault/trash/purge", "GET /passwords/trash"]);
+  });
+
+  it("surfaces the server's reason and still reloads after a refusal", async () => {
+    const detail =
+      "An active password named 'c' already exists. Rename or delete it before restoring.";
+    const actions = build({
+      "POST /vault/trash/restore": [400, { detail }],
+      "GET /passwords/trash": [500, {}],
+    });
+    await expect(actions.restoreMany(rows)).rejects.toThrow(detail);
+    expect(calls()).toEqual([
+      "POST /vault/trash/restore",
+      "GET /passwords",
+      "GET /passwords/trash",
+    ]);
+  });
+});

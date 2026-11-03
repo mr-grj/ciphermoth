@@ -241,6 +241,38 @@ async def test_cli_reports_and_removes_damaged_rows_without_a_traceback(
     assert "No password found" in missing.output
 
 
+async def test_cli_deletes_several_entries_together(api: str) -> None:
+    for name in ("one", "two/x", "three [3]", "kept"):
+        ok(cli(api, "password", "create", name, answers=["Value-12345"] * 2 + [""] * 5))
+
+    refused = cli(api, "password", "delete", "one", "missing", "--yes")
+    assert refused.exit_code == 1
+    assert "No password found for 'missing'" in refused.output
+    assert "one" in ok(cli(api, "password", "list"))
+
+    asked = cli(api, "password", "delete", "one", "two/x", "three [3]", answers=["n"])
+    assert asked.exit_code == 1
+    assert "three [3]" in asked.output and "Move these 3 entries" in asked.output
+
+    out = ok(cli(api, "password", "delete", "one", "two/x", "one", "three [3]", "-y"))
+    assert "Moved 3 entries to trash" in out
+    listing = ok(cli(api, "password", "list"))
+    assert "kept" in listing and "one" not in listing and "two/x" not in listing
+    assert "three [3]" in ok(cli(api, "password", "trash"))
+
+
+def test_cli_refuses_several_names_on_an_older_server() -> None:
+    def respond(handler: _Recorder) -> None:
+        if not _answer_unlock(handler, "sessions"):
+            handler.send(500, {"detail": "unexpected"})
+
+    with _fake_server(respond) as (api, requests):
+        result = cli(api, "password", "delete", "a", "b", "--yes")
+    assert result.exit_code == 1
+    assert "needs CipherMoth 3.3.0 or newer" in result.output
+    assert not any("/vault/entries/trash" in line for line in map(str, requests))
+
+
 FULL_ENTRY = {
     "password_name": "full",
     "kind": "login",

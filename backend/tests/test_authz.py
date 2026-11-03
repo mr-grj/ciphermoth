@@ -123,6 +123,21 @@ PROTECTED_ROUTES: dict[tuple[str, str], Spec] = {
         "/settings", json=SETTINGS_BODY, headers=h
     ),
     ("GET", "/api/vault/damaged"): lambda c, h, x: c.get("/vault/damaged", headers=h),
+    ("POST", "/api/vault/entries/trash"): lambda c, h, x: c.post(
+        "/vault/entries/trash",
+        json={"entries": [{"password_name": "alpha"}]},
+        headers=h,
+    ),
+    ("POST", "/api/vault/trash/restore"): lambda c, h, x: c.post(
+        "/vault/trash/restore",
+        json={"entries": [{"password_name": "beta", "entry_id": x["beta_id"]}]},
+        headers=h,
+    ),
+    ("POST", "/api/vault/trash/purge"): lambda c, h, x: c.post(
+        "/vault/trash/purge",
+        json={"entries": [{"password_name": "beta", "entry_id": x["beta_id"]}]},
+        headers=h,
+    ),
     ("DELETE", "/api/vault/damaged/{kind}/{row_id}"): lambda c, h, x: c.delete(
         "/vault/damaged/entries/1", headers=h
     ),
@@ -182,7 +197,12 @@ async def seed(client: httpx.AsyncClient, headers: Headers) -> dict:
     backup_zip = legacy_backup_zip(
         [{"name": "from-backup", "value": "restored-Value-1"}], MASTER_PASSWORD
     )
-    return {"attachment_id": attachment_id, "backup_zip": backup_zip}
+    trash = await client.get("/passwords/trash", headers=headers)
+    return {
+        "attachment_id": attachment_id,
+        "backup_zip": backup_zip,
+        "beta_id": trash.json()[0]["id"],
+    }
 
 
 def _expected_rejection(headers: Headers) -> tuple[int, str]:
@@ -307,7 +327,7 @@ async def test_sessions_and_keys_from_before_a_rotation_are_rejected(
 async def test_uninitialized_vault_rejects_everything(
     client: httpx.AsyncClient, route: tuple[str, str]
 ) -> None:
-    ctx = {"attachment_id": 1, "backup_zip": b"PK"}
+    ctx = {"attachment_id": 1, "backup_zip": b"PK", "beta_id": 1}
     credentials = {
         **_as_key_headers(forged_keys("A" * 43 + "=")),
         "random token": auth("A" * 43),

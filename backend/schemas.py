@@ -369,6 +369,42 @@ class PasswordUpdatePayload(BaseModel):
     new_password: Password
 
 
+MAX_BULK_ENTRIES = 10_000
+
+
+class TrashedEntryRef(PasswordRef):
+    entry_id: int = Field(gt=0)
+
+
+class BulkTrashPayload(BaseModel):
+    """Active entries to move to the trash together, by name."""
+
+    entries: list[PasswordRef] = Field(min_length=1, max_length=MAX_BULK_ENTRIES)
+
+    @model_validator(mode="after")
+    def _distinct(self) -> "BulkTrashPayload":
+        if len({e.password_name for e in self.entries}) != len(self.entries):
+            raise ValueError("Each entry may be listed only once.")
+        return self
+
+
+class BulkTrashedPayload(BaseModel):
+    """Trashed entries to restore or delete together, by name and id."""
+
+    entries: list[TrashedEntryRef] = Field(min_length=1, max_length=MAX_BULK_ENTRIES)
+
+    @model_validator(mode="after")
+    def _distinct(self) -> "BulkTrashedPayload":
+        if len({e.entry_id for e in self.entries}) != len(self.entries):
+            raise ValueError("Each entry may be listed only once.")
+        return self
+
+
+class BulkResult(BaseModel):
+    count: int
+    detail: str
+
+
 class SettingsResponse(BaseModel):
     inactivity_ms: int
     warn_before_ms: int

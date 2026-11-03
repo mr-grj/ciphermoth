@@ -78,7 +78,9 @@ Then open **[http://localhost:3000](http://localhost:3000)**. [CONTRIBUTING.md](
 - secure notes for free-form secrets (recovery codes, Wi-Fi, passport details), encrypted just like passwords
 - attach files to any entry (recovery-code PDFs, license keys, key files), up to 5 MB each, encrypted with your vault key
 - search, favorites, folders, tags, and password history to keep a growing vault tidy
-- trash for deletions you can restore from or empty for good when you're sure
+- trash for deletions you can restore from or empty for good when you're sure, one entry or a whole selection at a time (with Undo)
+- quick actions: double-click to edit, right-click for copy username/password/2FA code, open website, duplicate, favorite and trash, plus keyboard shortcuts
+- a native macOS menu bar in the desktop app: new login or note, find, import, backup, trash, health, settings and lock, each with its usual shortcut
 - light and dark themes that flip across the whole app, toggled by a moth that flutters off as the colours fade (and remembers your pick)
 - vault health check that flags weak, reused, and old passwords, entirely on your device
 - cryptographically secure password generator (not the `Math.random()` kind) with a strength indicator on every entry

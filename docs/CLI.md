@@ -53,7 +53,7 @@ ciphermoth password list                     List all entries
 ciphermoth password get <name>               Reveal an entry (and its live 2FA code)
 ciphermoth password create <name> [--kind]   Add a login or a secure note (interactive)
 ciphermoth password update <name>            Edit an entry (interactive)
-ciphermoth password delete <name> [--yes]    Move an entry to the trash
+ciphermoth password delete <name>... [--yes] Move one or more entries to the trash
 ciphermoth password trash                    List entries currently in the trash
 ciphermoth password restore <name> [--id]    Restore a trashed entry back to the vault
 ciphermoth password purge <name> [--id] [--yes] Permanently delete a trashed entry
@@ -64,6 +64,8 @@ ciphermoth damaged [--remove] [--yes]        List (or remove) entries and attach
 ```
 
 Every command that touches encrypted data prompts for the master password. Use `--help` on any command for details.
+
+`delete` with several names moves them together: if one of them is missing, none is moved (servers before 3.3.0 accept only one name per command).
 
 Trash may contain several entries with the same name, especially after overwriting an import. `password trash` shows their row IDs. Pass `--id <row-id>` to restore or purge that exact row; without it these commands select the most recently trashed entry of that name. The name must still match the selected row.
 

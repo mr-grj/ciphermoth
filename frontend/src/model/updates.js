@@ -39,12 +39,16 @@ const Updates = {
     }
   }),
 
+  // Resolves to the status, or null when the check failed.
   checkForUpdates: thunk(async (actions) => {
     actions.setChecking(true);
     try {
-      actions.setStatus(IS_DESKTOP ? await invoke("update_check") : await getUpdateStatus());
+      const status = IS_DESKTOP ? await invoke("update_check") : await getUpdateStatus();
+      actions.setStatus(status);
+      return status ?? null;
     } catch {
       // Offline GitHub must never interfere with the vault.
+      return null;
     } finally {
       actions.setChecking(false);
     }

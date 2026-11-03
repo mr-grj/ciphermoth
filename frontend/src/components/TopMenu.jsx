@@ -16,9 +16,11 @@ import LogoutIcon from "@mui/icons-material/Logout";
 import SettingsIcon from "@mui/icons-material/Settings";
 import UpgradeIcon from "@mui/icons-material/Upgrade";
 import { useStoreActions, useStoreState } from "easy-peasy";
+import { useSnackbar } from "notistack";
 
 import { endSession } from "../api/session";
 import { isAuth } from "../utils";
+import useMenuAction from "../hooks/useMenuAction";
 import { DEV_ACCENT, IS_DEV } from "../lib/appEnv";
 import { GLOW } from "../lib/brand";
 import EnvBadge from "./EnvBadge";
@@ -51,6 +53,32 @@ const TopMenu = () => {
   }, [userIsAuth, settingsLoaded, updateCheckEnabled, checkForUpdates]);
 
   const handleLogout = () => endSession();
+
+  const { enqueueSnackbar, closeSnackbar } = useSnackbar();
+  useMenuAction("settings", () => setSettingsOpen(true));
+  useMenuAction("lock", handleLogout);
+  // Asked for from the menu, the check runs even with automatic checks off, and
+  // always answers.
+  useMenuAction("check-updates", async () => {
+    const checking = enqueueSnackbar("Checking for updates…", {
+      variant: "info",
+      persist: true,
+    });
+    const status = await checkForUpdates();
+    closeSnackbar(checking);
+    if (!status) {
+      enqueueSnackbar("Could not check for updates. Check your connection and try again.", {
+        variant: "warning",
+      });
+    } else if (status.updateAvailable) {
+      setUpdateOpen(true);
+    } else {
+      const running = String(status.current ?? version ?? "").replace(/^v/, "");
+      enqueueSnackbar(`You're up to date${running ? ` (v${running})` : ""}.`, {
+        variant: "success",
+      });
+    }
+  });
 
   return (
     <AppBar

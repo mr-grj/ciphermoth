@@ -3,6 +3,7 @@ import { Box, Button, Typography } from "@mui/material";
 import { listen } from "@tauri-apps/api/event";
 import { IS_DESKTOP, openExternal, clearClipboard } from "./index";
 import { coreStatus, coreRestart, onCoreStatus } from "./core";
+import { listenForMenuActions } from "./menu";
 import { clearSession, isAuth } from "../utils";
 import LoadingScreen from "../components/LoadingScreen";
 
@@ -28,7 +29,11 @@ export default function DesktopGate({ children }) {
       generation = next.generation;
       setStatus(next);
     };
-    Promise.all([onCoreStatus(update), listen("vault-locked", locked)]).then((stops) => {
+    Promise.all([
+      onCoreStatus(update),
+      listen("vault-locked", locked),
+      listenForMenuActions(),
+    ]).then((stops) => {
       if (disposed) stops.forEach((stop) => stop());
       else unlisten.push(...stops);
     });

@@ -44,7 +44,7 @@ async def test_vault_lifecycle_and_unlock(client: httpx.AsyncClient) -> None:
     assert resp.json() == {"initialized": False}
     assert (await client.get("/meta")).json() == {
         "version": get_api_settings().version,
-        "features": ["entry-names-with-slash", "vault-sessions"],
+        "features": ["bulk-entry-actions", "entry-names-with-slash", "vault-sessions"],
     }
 
     resp = await client.post(

@@ -10,6 +10,7 @@ import { ColorModeProvider } from "./hooks/useColorMode";
 import useAutoLogout from "./hooks/useAutoLogout";
 import routes from "./routes";
 import { isAuth } from "./utils";
+import { setMenuUnlocked } from "./platform/menu";
 import { GLOW, INFO, PAPER_DARK, TEXT_ON_DARK, WARN, WEAK } from "./lib/brand";
 
 const SANS = "'Space Grotesk Variable', system-ui, sans-serif";
@@ -23,6 +24,9 @@ const AppContent = () => {
   useEffect(() => {
     if (authed) getSettings();
   }, [authed, getSettings]);
+  useEffect(() => {
+    setMenuUnlocked(authed);
+  }, [authed]);
 
   const appRoutes = (
     <Routes>

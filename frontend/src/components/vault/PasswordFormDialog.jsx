@@ -208,6 +208,7 @@ const HistoryRow = ({ entry, onCopy }) => {
 const PasswordFormDialog = ({
   open,
   editTarget,
+  template = null,
   onClose,
   onSubmit,
   onCopy,
@@ -225,14 +226,16 @@ const PasswordFormDialog = ({
 
   useEffect(() => {
     if (!open) return;
-    setForm(toForm(editTarget));
-    setSections(sectionsForTarget(editTarget));
+    // A new entry may start as a copy of another (Duplicate).
+    const source = editTarget ?? template;
+    setForm(toForm(source));
+    setSections(sectionsForTarget(source));
     setFormError("");
     setShowValue(false);
     setShowTotp(false);
     setShowGenerator(false);
     setAttachmentsDirty(false);
-  }, [open, editTarget]);
+  }, [open, editTarget, template]);
 
   const isNote = form.kind === "note";
 

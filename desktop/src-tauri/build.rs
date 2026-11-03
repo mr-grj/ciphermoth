@@ -41,6 +41,7 @@ fn main() {
         "biometric_available",
         "biometric_enroll",
         "biometric_derive",
+        "menu_state",
         "update_check",
         "update_install",
         "update_cancel",

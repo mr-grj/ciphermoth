@@ -41,6 +41,7 @@ _LOCAL_HOSTS = ("localhost", "127.0.0.1", "::1")
 _SESSION_HEADER = "x-ciphermoth-session"
 _SESSIONS = "vault-sessions"
 _SLASH_NAMES = "entry-names-with-slash"
+_BULK = "bulk-entry-actions"
 _SERVER_TOO_OLD = (
     "This server runs a CipherMoth release older than 1.5.0, which this CLI no "
     "longer supports. Update the server, or use CipherMoth CLI 1.5.x."
@@ -448,13 +449,42 @@ def pw_update(name: Annotated[str, typer.Argument(help="Entry name.")]) -> None:
     _ok(f"Updated [cyan]{escape(name)}[/cyan]")
 
 
-@pw_app.command("delete", help="Move an entry to the trash. It can be restored later.")
+@pw_app.command(
+    "delete",
+    help=(
+        "Move one or more entries to the trash. They can be restored later. "
+        "Several names move together or, if one is missing, not at all."
+    ),
+)
 def pw_delete(
-    name: Annotated[str, typer.Argument(help="Entry name.")],
+    names: Annotated[list[str], typer.Argument(help="Entry names.")],
     yes: Annotated[
         bool, typer.Option("--yes", "-y", help="Skip confirmation.")
     ] = False,
 ) -> None:
+    names = list(dict.fromkeys(names))
+    if len(names) == 1:
+        _delete_one(names[0], yes)
+        return
+
+    with _vault() as vault:
+        if _BULK not in vault.features:
+            _die("Deleting several entries at once needs CipherMoth 3.3.0 or newer.")
+        if not yes:
+            _out.print("\n".join(f"  {escape(name)}" for name in names))
+            typer.confirm(f"Move these {len(names)} entries to trash?", abort=True)
+        resp = vault.send(
+            "POST",
+            "/vault/entries/trash",
+            json={"entries": [{"password_name": name} for name in names]},
+        )
+
+    _check(resp)
+
+    _ok(f"Moved {len(names)} entries to trash")
+
+
+def _delete_one(name: str, yes: bool) -> None:
     with _vault() as vault:
         exists = vault.send("GET", vault.entry_path(name), name=name)
         if exists.status_code == 404:

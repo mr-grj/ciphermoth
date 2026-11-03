@@ -32,7 +32,7 @@ describe("desktop update checks", () => {
   it("keeps the vault usable when GitHub is unreachable", async () => {
     invoke.mockRejectedValue(new Error("Offline"));
     const store = createStore(Updates);
-    await expect(store.getActions().checkForUpdates()).resolves.toBeUndefined();
+    await expect(store.getActions().checkForUpdates()).resolves.toBeNull();
     expect(store.getState()).toMatchObject({ checking: false, updateAvailable: false });
   });
   it("retains the Debian manual-update distinction", async () => {

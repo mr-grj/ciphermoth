@@ -54,7 +54,7 @@ const CellActionButton = ({ title, onClick, children }) => (
   </Tooltip>
 );
 
-const openUrl = (url) => {
+export const openUrl = (url) => {
   const safe = /^https?:\/\//i.test(url) ? url : `https://${url}`;
   if (IS_DESKTOP) openExternal(safe).catch(() => {});
   else window.open(safe, "_blank", "noopener,noreferrer");

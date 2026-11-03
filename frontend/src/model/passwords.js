@@ -116,6 +116,46 @@ const Passwords = {
     }
   }),
 
+  // The bulk routes are all-or-nothing: one missing entry or name conflict changes
+  // nothing. The lists are reloaded either way, so the view matches the vault.
+  trashMany: thunk(async (actions, names) => {
+    try {
+      const entries = names.map((password_name) => ({ password_name }));
+      const { data } = await apiClient.post("/vault/entries/trash", { entries });
+      return data;
+    } catch (err) {
+      throw new Error(await errorDetail(err, "Failed to move the entries to trash."));
+    } finally {
+      await actions.get();
+      await actions.getTrash().catch(() => {});
+    }
+  }),
+
+  restoreMany: thunk(async (actions, rows) => {
+    try {
+      const entries = rows.map((row) => ({ password_name: row.password_name, entry_id: row.id }));
+      const { data } = await apiClient.post("/vault/trash/restore", { entries });
+      return data;
+    } catch (err) {
+      throw new Error(await errorDetail(err, "Failed to restore the entries."));
+    } finally {
+      await actions.get();
+      await actions.getTrash().catch(() => {});
+    }
+  }),
+
+  purgeMany: thunk(async (actions, rows) => {
+    try {
+      const entries = rows.map((row) => ({ password_name: row.password_name, entry_id: row.id }));
+      const { data } = await apiClient.post("/vault/trash/purge", { entries });
+      return data;
+    } catch (err) {
+      throw new Error(await errorDetail(err, "Failed to delete the entries."));
+    } finally {
+      await actions.getTrash().catch(() => {});
+    }
+  }),
+
   getTrash: thunk(async (actions) => {
     try {
       const { data } = await apiClient.get("/passwords/trash");

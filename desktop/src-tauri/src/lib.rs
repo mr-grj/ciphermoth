@@ -8,6 +8,7 @@ mod lock;
 mod lock_linux;
 #[cfg(windows)]
 mod lock_windows;
+mod menu;
 mod native;
 mod protocol;
 #[cfg(feature = "gui-test")]
@@ -122,6 +123,7 @@ pub fn run() {
         biometric::biometric_available,
         biometric::biometric_enroll,
         biometric::biometric_derive,
+        menu::menu_state,
         updates::update_check,
         updates::update_install,
         updates::update_cancel
@@ -143,6 +145,7 @@ pub fn run() {
         biometric::biometric_available,
         biometric::biometric_enroll,
         biometric::biometric_derive,
+        menu::menu_state,
         updates::update_check,
         updates::update_install,
         updates::update_cancel,
@@ -160,6 +163,12 @@ pub fn run() {
             let handle = app.handle().clone();
             let emitter = handle.clone();
             let supervisor = Supervisor::start(core_config(&handle)?, launched, move |status| {
+                // "stopped" only follows a shutdown, while the main thread waits for
+                // the core in RunEvent::Exit. Resetting the window then needs that
+                // same thread, which stalled every quit until the shutdown timed out.
+                if status.state == "stopped" {
+                    return;
+                }
                 if status.state != "ready" {
                     lock::reset_renderer(&emitter);
                     if let Some(clipboard) = emitter.try_state::<Arc<clipboard::Clipboard>>() {
@@ -171,6 +180,8 @@ pub fn run() {
             app.manage(supervisor);
             app.manage(native::Files::default());
             app.manage(clipboard::Clipboard::start());
+            #[cfg(target_os = "macos")]
+            menu::install(&handle)?;
             lock::install(handle);
             let window =
                 tauri::WebviewWindowBuilder::from_config(app, &app.config().app.windows[0])?
@@ -198,7 +209,16 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("CipherMoth could not initialize its window");
     app.run(|handle, event| {
+        // Hide at once, so quitting looks immediate while the core shuts down.
+        if let RunEvent::ExitRequested { .. } = event {
+            for window in handle.webview_windows().values() {
+                let _ = window.hide();
+            }
+        }
         if let RunEvent::Exit = event {
+            for window in handle.webview_windows().values() {
+                let _ = window.hide();
+            }
             handle.state::<Arc<clipboard::Clipboard>>().clear();
             if let Some(core) = handle.try_state::<Arc<Supervisor>>() {
                 core.shutdown();

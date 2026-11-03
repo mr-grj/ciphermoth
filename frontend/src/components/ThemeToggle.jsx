@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { IconButton, Tooltip } from "@mui/material";
 
 import { useColorMode } from "../hooks/useColorMode";
+import useMenuAction from "../hooks/useMenuAction";
 import MothIcon from "./MothIcon";
 import { GLOW } from "../lib/brand";
 
@@ -21,6 +22,7 @@ const ThemeToggle = ({ zIndex = 1200 }) => {
     clearTimeout(timer.current);
     timer.current = setTimeout(() => setFlying(false), FLIGHT_MS);
   };
+  useMenuAction("toggle-theme", handleClick);
 
   return (
     <Tooltip

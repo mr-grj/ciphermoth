@@ -4,6 +4,7 @@ import {
   Box,
   Button,
   CircularProgress,
+  IconButton,
   InputAdornment,
   MenuItem,
   Stack,
@@ -14,6 +15,7 @@ import {
 } from "@mui/material";
 import { DataGrid, useGridApiRef } from "@mui/x-data-grid";
 import AddIcon from "@mui/icons-material/Add";
+import CloseIcon from "@mui/icons-material/Close";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
 import DownloadIcon from "@mui/icons-material/Download";
 import HealthAndSafetyIcon from "@mui/icons-material/HealthAndSafety";
@@ -25,14 +27,21 @@ import { useSnackbar } from "notistack";
 import BackupDialog from "../components/vault/BackupDialog";
 import ConfirmDialog from "../components/ConfirmDialog";
 import EmptyVault from "../components/vault/EmptyVault";
+import NameList from "../components/vault/NameList";
+import SelectionBar from "../components/vault/SelectionBar";
 import HealthDialog from "../components/vault/HealthDialog";
 import ImportDialog from "../components/vault/ImportDialog";
 import PasswordFormDialog from "../components/vault/PasswordFormDialog";
+import EntryContextMenu from "../components/vault/EntryContextMenu";
 import TrashDialog from "../components/vault/TrashDialog";
-import { createColumns } from "../components/vault/columns";
+import { createColumns, openUrl } from "../components/vault/columns";
 import { gridBaseSx } from "../components/vault/gridStyles";
 import useClipboard from "../hooks/useClipboard";
+import useMenuAction from "../hooks/useMenuAction";
+import { generateTotp } from "../lib/totp";
+import { duplicateName, fromControl, isDeleteKey } from "../lib/shortcuts";
 import { PAGE_SIZES, loadPageSize, savePageSize } from "../lib/gridPreferences";
+import { entriesWord, gridSelectionModel, mergeSelection, pruneSelection } from "../lib/selection";
 
 // Column header + pagination footer + about four rows. A shorter window scrolls the page.
 const MIN_GRID_HEIGHT = 280;
@@ -62,21 +71,21 @@ const buildSubtitle = (loading, passwords) => {
 };
 
 const PasswordsPage = () => {
-  const { enqueueSnackbar } = useSnackbar();
+  const { enqueueSnackbar, closeSnackbar } = useSnackbar();
   const copy = useClipboard();
 
   const {
     get,
     create,
     update,
-    remove,
+    trashMany,
+    restoreMany,
     backup,
     importPasswords,
     importCsv,
     toggleFavorite,
     getTrash,
-    restore,
-    purge,
+    purgeMany,
     getDamaged,
     removeDamaged,
   } = useStoreActions((actions) => actions.ciphermothModels.passwords);
@@ -87,7 +96,12 @@ const PasswordsPage = () => {
   const [visibleRows, setVisibleRows] = useState(new Set());
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
-  const [deleteTarget, setDeleteTarget] = useState(null);
+  // An entry to copy into a new one (Duplicate); only read while editTarget is null.
+  const [template, setTemplate] = useState(null);
+  const [contextMenu, setContextMenu] = useState(null);
+  // Names waiting for the Move to Trash confirmation: one row, or the selection.
+  const [trashTargets, setTrashTargets] = useState(null);
+  const [selected, setSelected] = useState(() => new Set());
   const [backupOpen, setBackupOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [healthOpen, setHealthOpen] = useState(false);
@@ -128,6 +142,7 @@ const PasswordsPage = () => {
 
   const openAdd = () => {
     setEditTarget(null);
+    setTemplate(null);
     setDialogOpen(true);
   };
 
@@ -135,6 +150,44 @@ const PasswordsPage = () => {
     setEditTarget(row);
     setDialogOpen(true);
   }, []);
+
+  const openNewNote = () => {
+    setEditTarget(null);
+    setTemplate({ password_name: "", password_value: "", kind: "note" });
+    setDialogOpen(true);
+  };
+
+  // The desktop menu bar. Actions that need entries say so instead of doing nothing.
+  const needsEntries = (open) => () => {
+    if (passwords.length) open();
+    else enqueueSnackbar("Your vault is empty. Add an entry first.", { variant: "info" });
+  };
+  useMenuAction("new-login", openAdd);
+  useMenuAction("new-note", openNewNote);
+  useMenuAction("import", () => setImportOpen(true));
+  useMenuAction(
+    "backup",
+    needsEntries(() => setBackupOpen(true))
+  );
+  useMenuAction(
+    "health",
+    needsEntries(() => setHealthOpen(true))
+  );
+  useMenuAction("trash", () => setTrashOpen(true));
+  useMenuAction("find", () => {
+    searchInput.current?.focus();
+    searchInput.current?.select();
+  });
+
+  const openDuplicate = (row) => {
+    const name = duplicateName(
+      row.password_name,
+      passwords.map((p) => p.password_name)
+    );
+    setEditTarget(null);
+    setTemplate({ ...row, password_name: name, favorite: false, attachment_count: 0 });
+    setDialogOpen(true);
+  };
 
   const handleToggleFavorite = useCallback(
     async (row) => {
@@ -170,23 +223,76 @@ const PasswordsPage = () => {
     setDialogOpen(false);
   };
 
-  const handleDelete = async () => {
+  // Entries that disappear (trashed, renamed, deleted elsewhere) leave the selection.
+  useEffect(() => {
+    setSelected((prev) =>
+      pruneSelection(
+        prev,
+        passwords.map((p) => p.password_name)
+      )
+    );
+  }, [passwords]);
+
+  const askToTrash = useCallback((name) => setTrashTargets([name]), []);
+
+  const undoTrash = async (rows) => {
     try {
-      await remove(deleteTarget);
-      enqueueSnackbar("Moved to trash.", { variant: "success" });
+      await restoreMany(rows);
+      enqueueSnackbar(`${entriesWord(rows.length)} restored.`, { variant: "success" });
     } catch (err) {
       enqueueSnackbar(err.message, { variant: "error" });
-    } finally {
-      setDeleteTarget(null);
     }
   };
 
-  const handleRestore = async (name) => {
+  const handleTrash = async () => {
+    const names = trashTargets;
+    const byName = new Map(passwords.map((p) => [p.password_name, p]));
+    const rows = names.map((name) => byName.get(name)).filter(Boolean);
     try {
-      await restore(name);
-      enqueueSnackbar("Restored from trash.", { variant: "success" });
+      await trashMany(names);
+      setSelected((prev) => new Set([...prev].filter((name) => !names.includes(name))));
+      const message =
+        names.length === 1
+          ? `Moved ${names[0]} to trash.`
+          : `${entriesWord(names.length)} moved to trash.`;
+      enqueueSnackbar(message, {
+        variant: "success",
+        preventDuplicate: false,
+        action: (key) => (
+          <Button
+            color="inherit"
+            size="small"
+            sx={{ fontWeight: 700 }}
+            onClick={() => {
+              closeSnackbar(key);
+              undoTrash(rows);
+            }}
+          >
+            Undo
+          </Button>
+        ),
+      });
     } catch (err) {
       enqueueSnackbar(err.message, { variant: "error" });
+    } finally {
+      setTrashTargets(null);
+    }
+  };
+
+  // Trash actions report success, so the dialog knows whether to clear its selection.
+  const handleRestore = async (rows) => {
+    try {
+      await restoreMany(rows);
+      enqueueSnackbar(
+        rows.length === 1
+          ? `Restored ${rows[0].password_name} from trash.`
+          : `${entriesWord(rows.length)} restored from trash.`,
+        { variant: "success" }
+      );
+      return true;
+    } catch (err) {
+      enqueueSnackbar(err.message, { variant: "error" });
+      return false;
     }
   };
 
@@ -200,12 +306,19 @@ const PasswordsPage = () => {
     }
   };
 
-  const handlePurge = async (name) => {
+  const handlePurge = async (rows) => {
     try {
-      await purge(name);
-      enqueueSnackbar("Permanently deleted.", { variant: "success" });
+      await purgeMany(rows);
+      enqueueSnackbar(
+        rows.length === 1
+          ? `Permanently deleted ${rows[0].password_name}.`
+          : `${entriesWord(rows.length)} permanently deleted.`,
+        { variant: "success" }
+      );
+      return true;
     } catch (err) {
       enqueueSnackbar(err.message, { variant: "error" });
+      return false;
     }
   };
 
@@ -224,9 +337,9 @@ const PasswordsPage = () => {
         onToggleFavorite: handleToggleFavorite,
         onCopy: copy,
         onEdit: openEdit,
-        onDelete: setDeleteTarget,
+        onDelete: askToTrash,
       }),
-    [visibleRows, toggleVisibility, handleToggleFavorite, copy, openEdit]
+    [visibleRows, toggleVisibility, handleToggleFavorite, copy, openEdit, askToTrash]
   );
 
   const folderOptions = useMemo(
@@ -264,6 +377,94 @@ const PasswordsPage = () => {
     );
   }, [passwords, search, activeFolder]);
 
+  const visibleIds = useMemo(
+    () => filteredPasswords.map((p) => p.password_name),
+    [filteredPasswords]
+  );
+  const rowSelectionModel = useMemo(
+    () => gridSelectionModel(selected, visibleIds),
+    [selected, visibleIds]
+  );
+  const hiddenSelected = selected.size - rowSelectionModel.ids.size;
+  const trashHidden = (trashTargets ?? []).filter((name) => !visibleIds.includes(name)).length;
+  const handleSelectionChange = useCallback(
+    (model) => {
+      console.log("SEL", model.type, JSON.stringify([...model.ids]));
+      setSelected((prev) => mergeSelection(prev, visibleIds, model));
+    },
+    [visibleIds]
+  );
+  const clearSelection = useCallback(() => setSelected(new Set()), []);
+  const trashSelected = () => {
+    const visibleFirst = [
+      ...visibleIds.filter((name) => selected.has(name)),
+      ...[...selected].filter((name) => !rowSelectionModel.ids.has(name)),
+    ];
+    setTrashTargets(visibleFirst);
+  };
+
+  // Delete moves the selection (or else the focused row) to the trash; Escape
+  // clears the selection. Keys typed into anything editable are left alone.
+  // Delete or Backspace moves the selection (or else the focused row) to the trash,
+  // Enter edits the focused row, Escape clears the selection. Keys typed into
+  // anything editable are left alone.
+  const handleCellKeyDown = (params, event) => {
+    if (contextMenu || event.target.closest("input:not([type=checkbox]), textarea")) return;
+    if (event.key === "Escape" && selected.size > 0) {
+      clearSelection();
+    } else if (isDeleteKey(event)) {
+      event.preventDefault();
+      if (selected.size > 0) trashSelected();
+      else askToTrash(params.row.password_name);
+    } else if (event.key === "Enter" && !fromControl(event)) {
+      event.preventDefault();
+      openEdit(params.row);
+    }
+  };
+
+  // Double-clicking a row edits it, unless the clicks were on a control in it.
+  const handleRowDoubleClick = (params, event) => {
+    if (!fromControl(event)) openEdit(params.row);
+  };
+
+  const handleRowContextMenu = (event) => {
+    if (event.shiftKey) return; // Shift+right-click keeps the browser's own menu.
+    const row = filteredPasswords.find((p) => p.password_name === event.currentTarget.dataset.id);
+    if (!row) return;
+    event.preventDefault();
+    // A menu opened from the keyboard (Shift+F10, the menu key) has no pointer
+    // position inside the row, so it opens under the row instead.
+    const box = event.currentTarget.getBoundingClientRect();
+    const { clientX: x, clientY: y } = event;
+    const pointer = x >= box.left && x <= box.right && y >= box.top && y <= box.bottom;
+    setContextMenu({
+      row,
+      selection: selected.has(row.password_name) ? selected.size : 0,
+      top: pointer ? y : box.bottom,
+      left: pointer ? x : box.left + 56,
+    });
+  };
+
+  const copyTotp = async (secret) => {
+    try {
+      copy(await generateTotp(secret), "2FA code");
+    } catch {
+      enqueueSnackbar("This entry's 2FA secret is invalid.", { variant: "error" });
+    }
+  };
+
+  const contextActions = {
+    copy,
+    copyTotp,
+    openUrl,
+    edit: openEdit,
+    duplicate: openDuplicate,
+    toggleFavorite: handleToggleFavorite,
+    trash: askToTrash,
+    trashSelection: trashSelected,
+    clearSelection,
+  };
+
   const subtitle = useMemo(() => buildSubtitle(loading, passwords), [loading, passwords]);
   const isEmpty = !loading && passwords.length === 0;
 
@@ -291,6 +492,11 @@ const PasswordsPage = () => {
   const updateSearch = (next) => {
     setSearch(next);
     setPaginationModel((previous) => ({ ...previous, page: 0 }));
+  };
+  const searchInput = useRef(null);
+  const clearSearch = () => {
+    updateSearch("");
+    searchInput.current?.focus();
   };
   const updateFolder = (next) => {
     setFolderFilter(next);
@@ -365,19 +571,48 @@ const PasswordsPage = () => {
           direction="row"
           useFlexGap
           spacing={1.5}
-          sx={{ flexShrink: 0, flexWrap: "wrap", mb: 2, alignItems: "center" }}
+          sx={{
+            flexShrink: 0,
+            flexWrap: "wrap",
+            mb: 2,
+            alignItems: "center",
+            position: "relative",
+          }}
         >
           <TextField
             size="small"
             placeholder="Search name, username, website or tag…"
             value={search}
             onChange={(e) => updateSearch(e.target.value)}
+            // Escape clears a search the way the clear button does.
+            onKeyDown={(e) => {
+              if (e.key === "Escape" && search) {
+                e.stopPropagation();
+                updateSearch("");
+              }
+            }}
+            inputRef={searchInput}
             sx={{ width: { xs: "100%", sm: 380 } }}
             slotProps={{
               input: {
                 startAdornment: (
                   <InputAdornment position="start">
                     <SearchIcon fontSize="small" sx={{ color: "text.disabled" }} />
+                  </InputAdornment>
+                ),
+                endAdornment: search && (
+                  <InputAdornment position="end">
+                    <Tooltip title="Clear search">
+                      <IconButton
+                        size="small"
+                        edge="end"
+                        aria-label="Clear search"
+                        onClick={clearSearch}
+                        sx={{ color: "text.secondary" }}
+                      >
+                        <CloseIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
                   </InputAdornment>
                 ),
               },
@@ -399,6 +634,36 @@ const PasswordsPage = () => {
                 </MenuItem>
               ))}
             </TextField>
+          )}
+          {selected.size > 0 && (
+            <SelectionBar
+              count={selected.size}
+              hidden={hiddenSelected}
+              onClear={clearSelection}
+              // Wide screens have room beside the filters; narrower ones cover the
+              // first filter line, so ticking a row never moves the grid under the pointer.
+              sx={{
+                ml: { md: "auto" },
+                position: { xs: "absolute", md: "static" },
+                // A pixel past the field, so its focus ring never shows around the bar.
+                top: -1,
+                left: -1,
+                right: -1,
+                minHeight: 42,
+                zIndex: 2,
+              }}
+            >
+              <Button
+                size="small"
+                color="error"
+                variant="contained"
+                disableElevation
+                startIcon={<DeleteOutlineIcon />}
+                onClick={trashSelected}
+              >
+                Move to Trash
+              </Button>
+            </SelectionBar>
           )}
         </Stack>
       )}
@@ -449,7 +714,16 @@ const PasswordsPage = () => {
             rows={filteredPasswords}
             columns={columns}
             getRowId={(row) => row.password_name}
+            checkboxSelection
             disableRowSelectionOnClick
+            rowSelectionModel={rowSelectionModel}
+            onRowSelectionModelChange={handleSelectionChange}
+            hideFooterSelectedRowCount
+            onCellKeyDown={handleCellKeyDown}
+            onRowDoubleClick={handleRowDoubleClick}
+            getRowClassName={(params) =>
+              params.id === contextMenu?.row.password_name ? "contextMenuRow" : ""
+            }
             density="compact"
             rowHeight={44}
             columnHeaderHeight={42}
@@ -458,6 +732,16 @@ const PasswordsPage = () => {
             onPaginationModelChange={handlePaginationChange}
             columnVisibilityModel={columnVisibilityModel}
             onColumnVisibilityModelChange={setColumnOverrides}
+            slotProps={{
+              row: {
+                onContextMenu: handleRowContextMenu,
+                // The grid re-focuses a cell on the mouseup after a mousedown in it,
+                // which would pull focus out of the menu a right-click just opened.
+                onMouseDownCapture: (event) => event.button === 2 && event.stopPropagation(),
+                // A double-click edits; it should not also select the text under it.
+                onMouseDown: (event) => event.detail > 1 && event.preventDefault(),
+              },
+            }}
             slots={{
               noRowsOverlay: () => (
                 <Box
@@ -465,12 +749,23 @@ const PasswordsPage = () => {
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
+                    flexDirection: "column",
+                    gap: 1,
                     height: "100%",
                   }}
                 >
                   <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                    No passwords match &ldquo;{search.trim()}&rdquo;.
+                    {search.trim() ? (
+                      <>No passwords match &ldquo;{search.trim()}&rdquo;.</>
+                    ) : (
+                      "No passwords in this folder."
+                    )}
                   </Typography>
+                  {search && (
+                    <Button size="small" onClick={clearSearch}>
+                      Clear search
+                    </Button>
+                  )}
                 </Box>
               ),
             }}
@@ -487,6 +782,10 @@ const PasswordsPage = () => {
                 color: "text.secondary",
               },
               "& .MuiDataGrid-row:hover": { bgcolor: "action.hover" },
+              "& .MuiDataGrid-row.contextMenuRow": {
+                bgcolor: "action.focus",
+                boxShadow: (theme) => `inset 3px 0 0 ${theme.palette.secondary.main}`,
+              },
               // Keeps the page arrows clear of the floating theme toggle.
               "& .MuiDataGrid-footerContainer": { pr: { xs: 7, sm: 8 } },
               "& .MuiTablePagination-selectLabel, & .MuiTablePagination-input": {
@@ -514,6 +813,7 @@ const PasswordsPage = () => {
       <PasswordFormDialog
         open={dialogOpen}
         editTarget={editTarget}
+        template={template}
         folderOptions={folderOptions}
         onClose={() => setDialogOpen(false)}
         onSubmit={handleSubmit}
@@ -540,14 +840,28 @@ const PasswordsPage = () => {
         }}
       />
       <ConfirmDialog
-        open={!!deleteTarget}
+        open={!!trashTargets}
         title="Move to Trash"
         confirmText="Move to Trash"
         confirmColor="error"
-        onClose={() => setDeleteTarget(null)}
-        onConfirm={handleDelete}
+        focusConfirm
+        onClose={() => setTrashTargets(null)}
+        onConfirm={handleTrash}
+        details={trashTargets?.length > 1 && <NameList names={trashTargets} />}
       >
-        Move <strong>{deleteTarget}</strong> to Trash? You can restore it later from the Trash.
+        {trashTargets?.length > 1 ? (
+          <>
+            Move <strong>{entriesWord(trashTargets.length)}</strong> to Trash? You can restore them
+            later from the Trash.
+            {trashHidden > 0 &&
+              ` ${trashHidden} of them ${trashHidden === 1 ? "is" : "are"} hidden by the current filter.`}
+          </>
+        ) : (
+          <>
+            Move <strong>{trashTargets?.[0]}</strong> to Trash? You can restore it later from the
+            Trash.
+          </>
+        )}
       </ConfirmDialog>
       <ConfirmDialog
         open={removeDamagedOpen}
@@ -561,6 +875,11 @@ const PasswordsPage = () => {
         removed entry takes its attachments with it. If you have a snapshot from before the damage,
         restoring it keeps them instead.
       </ConfirmDialog>
+      <EntryContextMenu
+        menu={contextMenu}
+        onClose={() => setContextMenu(null)}
+        actions={contextActions}
+      />
       <TrashDialog
         open={trashOpen}
         trash={trash}

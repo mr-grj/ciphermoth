@@ -1,5 +1,27 @@
 # Changelog
 
+## [3.3.0] - 2026-11-03
+
+Tidy many secrets at once, and reach the everyday actions with a right-click.
+
+### Added
+
+- **Select several entries and move them to the trash together.** Tick rows (the header box selects every entry the current search or folder shows); the selection stays across pages and searches, a bar shows how many are selected and how many the current filter hides, and the confirmation lists every name. The move is all or nothing, and the toast offers **Undo**. Delete or Backspace moves the selection (or the focused row) to the trash, Escape clears it.
+- **The Trash has the same selection**, with Restore and Delete forever for many entries at once. Deleting forever lists what goes and never confirms on Enter by itself; a restore that would clash with an active name changes nothing and says which name.
+- **Quick actions**: double-click a row (or press Enter) to edit it, and right-click it for Copy username, Copy password (or note), Copy 2FA code, Copy website, Open website, Edit, Duplicate, favorite and Move to Trash. Right-clicking a selected row acts on the whole selection. Shift+right-click keeps the browser's own menu.
+- API: `POST /api/vault/entries/trash`, `POST /api/vault/trash/restore` and `POST /api/vault/trash/purge` act on up to 10,000 entries in one transaction; `/api/meta` lists the `bulk-entry-actions` feature. CLI: `ciphermoth password delete` takes several names and moves them together.
+
+- **Clear the search with one click**: an × appears in the search box once you type (Escape works too), and an empty result offers "Clear search".
+- **A real menu bar in the macOS app**: New Login (⌘N), New Secure Note (⇧⌘N), Import, Back Up Vault, Find (⌘F), Trash, Vault Health, Settings (⌘,), Lock Vault (⇧⌘L), Check for Updates, a light/dark switch, and Help links to the project, its release notes and its issue tracker. Vault items are greyed out while the vault is locked, and a menu action never replaces a dialog you are working in.
+
+### Changed
+
+- Copy toasts say what was copied ("Password copied.").
+
+### Fixed
+
+- Quitting the desktop app (⌘Q) froze the window for about three seconds: the shutdown waited on the window it was trying to reset. It now closes at once (about 0.2 s) and still shuts the vault core down cleanly.
+
 ## [3.2.0] - 2026-11-02
 
 Unlock with a touch, and a vault table that fits your window.

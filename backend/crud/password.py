@@ -23,6 +23,7 @@ from errors import InvalidRequest, VaultDamaged
 from helpers import VaultKey
 from models import AttachmentModel, EntryModel, utc_now
 from schemas import (
+    BulkResult,
     ImportRowReport,
     OnConflict,
     Password,
@@ -32,6 +33,7 @@ from schemas import (
     PasswordResponse,
     PasswordUpdate,
     RestoredPassword,
+    TrashedEntryRef,
 )
 from validators import normalize_totp_secret, normalize_totp_secret_leniently
 
@@ -57,6 +59,11 @@ _CSV_UNSUPPORTED_TYPES = (
 )
 _MAX_NAME_LENGTH = 255
 _NAME_TAKEN = "A password with that name already exists."
+
+
+def _entries_word(count: int) -> str:
+    return f"{count} {'entry' if count == 1 else 'entries'}"
+
 
 csv.field_size_limit(_CSV_FIELD_SIZE_LIMIT)
 
@@ -282,6 +289,70 @@ class PasswordCRUD(BaseCRUD):
         await self.session.delete(model)
         await self.session.flush()
         return PasswordDelete(deleted=True, detail="Password permanently deleted.")
+
+    async def trash_passwords(self, names: Sequence[str], key: VaultKey) -> BulkResult:
+        """
+        Move every named active entry to the trash in one transaction: one
+        missing or unreadable entry refuses them all.
+        """
+        now = utc_now()
+        for name in names:
+            model, _ = await find_entry(self.session, key, name)
+            model.deleted = now
+        await self.session.flush()
+        return BulkResult(
+            count=len(names),
+            detail=_entries_word(len(names)) + " moved to trash.",
+        )
+
+    async def restore_passwords(
+        self, targets: Sequence[TrashedEntryRef], key: VaultKey
+    ) -> BulkResult:
+        """
+        Restore every listed trashed entry, or none: a name that is active, or
+        listed twice, would leave two active entries with one name.
+        """
+        restoring: set[bytes] = set()
+        for target in targets:
+            name = target.password_name
+            model, _ = await find_entry(
+                self.session, key, name, deleted=True, entry_id=target.entry_id
+            )
+            if model.name_index in restoring:
+                raise InvalidRequest(
+                    f"More than one selected entry is named '{name}'. "
+                    "Restore one of them at a time."
+                )
+            if await active_entry_exists(self.session, key, name):
+                raise InvalidRequest(
+                    f"An active password named '{name}' already exists. "
+                    "Rename or delete it before restoring."
+                )
+            restoring.add(model.name_index)
+            model.deleted = None
+        await self.flush_or_conflict(_NAME_TAKEN)
+        return BulkResult(
+            count=len(targets), detail=_entries_word(len(targets)) + " restored."
+        )
+
+    async def purge_passwords(
+        self, targets: Sequence[TrashedEntryRef], key: VaultKey
+    ) -> BulkResult:
+        """Permanently delete every listed trashed entry and its attachments."""
+        for target in targets:
+            model, _ = await find_entry(
+                self.session,
+                key,
+                target.password_name,
+                deleted=True,
+                entry_id=target.entry_id,
+            )
+            await self.session.delete(model)
+        await self.session.flush()
+        return BulkResult(
+            count=len(targets),
+            detail=_entries_word(len(targets)) + " permanently deleted.",
+        )
 
     async def _upsert_entry(
         self,
