@@ -66,6 +66,8 @@ ENV/
 
 # Database
 *.db
+# Frozen vaults written by released versions, for upgrade tests.
+!testdata/vaults/*.db
 
 # OS
 .DS_Store
