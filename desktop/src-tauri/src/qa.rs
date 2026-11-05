@@ -150,8 +150,19 @@ pub async fn qa_report(mut result: serde_json::Value) -> Result<(), String> {
         serde_json::to_vec_pretty(&result).unwrap(),
     )
     .map_err(|_| "Could not write QA report")?;
-    std::fs::rename(root.join("webview.partial"), root.join("webview.json"))
-        .map_err(|_| "Could not publish QA report")?;
+    // Windows refuses to replace a file the harness has open at that moment;
+    // the harness polls, so retry briefly instead of failing the run.
+    let mut renamed = false;
+    for _ in 0..100 {
+        if std::fs::rename(root.join("webview.partial"), root.join("webview.json")).is_ok() {
+            renamed = true;
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    }
+    if !renamed {
+        return Err("Could not publish QA report".into());
+    }
     if let Some(ack) = ack {
         for _ in 0..600 {
             if ack.exists() {
