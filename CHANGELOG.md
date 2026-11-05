@@ -1,5 +1,27 @@
 # Changelog
 
+## [Unreleased]
+
+Put many secrets in their place at once, and get an old password back when you need it.
+
+### Added
+
+- **Password history.** Right-click a login and choose **Password history**, press **H** on a selected row, or use the history button that appears next to the password when you hover a row. The dialog shows the current password and every earlier one (the last 10), newest first, each with when it was replaced and how long it was in use (hover for the exact time). Reveal a single value or all of them, copy one (the clipboard still clears itself), or **Use again** to make an earlier password current once more, for example when a website never accepted the new one. The password it replaces moves to the history, and the confirmation says when that would drop the oldest saved one. A value you went back to is marked "same as current". The edit form's history section uses the same rows. CLI: `ciphermoth password history <name>`.
+- **Move entries to a folder together.** Select rows and choose **Move to folder** in the selection bar, or right-click an entry (or a selection) and pick **Move to folder…**. The picker lists your folders with how many entries each holds; type to filter them or to create a new one, pick **No folder** to take entries out of their folder, and press Enter (arrows change the pick, a double-click moves at once). A typed name that matches an existing folder in another case ("work") goes to that folder instead of starting a near-duplicate. Folder names are trimmed, never empty and at most 200 characters, with a counter near the limit; long names end in an ellipsis everywhere instead of stretching the layout. The move is all or nothing, and the toast offers **Undo**, which puts every entry back in the folder it came from.
+- **Find entries with attachments or notes at a glance.** The Name column marks entries with attachments (a paperclip and how many) and logins with notes (a notes icon), each with a tooltip. A new **Filters** button next to the folder filter narrows the list to Favorites, Secure notes, Logins with notes, With attachments or With 2FA, each with how many entries it matches in the current folder and search. Several filters combine (an entry must match all of them), the button shows how many are on, and an empty result offers Clear filters.
+- API: `POST /api/vault/entries/move` (`{"entries": [{"password_name": ...}], "folder": "Work"}`, `null` for no folder) moves up to 10,000 entries in one transaction and reports how many moved and how many were already there; `/api/meta` lists the `bulk-entry-move` feature. CLI: `ciphermoth password move <name>... --folder <folder>` (or `--no-folder`).
+
+### Changed
+
+- A moved entry counts as edited, so it is no longer marked as backed up (as when its folder is changed in the edit form). Entries already in the target folder are left untouched.
+- The folder filter shows how many entries each folder holds (in its menu, and in its label once a folder is chosen: "Folder (10 entries)"), and long folder names end in an ellipsis instead of widening its menu.
+- The entry form refuses a folder name over 200 characters with a clear message (and a counter near the limit) instead of the server's generic validation error.
+
+### Fixed
+
+- The sort arrow in the vault and Trash column headers is smaller, takes the header text's colour and no longer sits in a filled circle of a slightly different shade.
+- The vault page no longer logs the names of selected entries to the browser console (a debugging line left in 3.3.0).
+
 ## [3.4.0] - 2026-11-03
 
 A security key that takes part in the encryption itself, and a way back if you forget your master password.

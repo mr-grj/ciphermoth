@@ -50,6 +50,7 @@ async def test_vault_lifecycle_and_unlock(client: httpx.AsyncClient) -> None:
         "version": get_api_settings().version,
         "features": [
             "bulk-entry-actions",
+            "bulk-entry-move",
             "entry-names-with-slash",
             "recovery-code",
             "security-keys",
@@ -147,6 +148,59 @@ async def test_entries_notes_totp_history_and_favorites(
     login = await _get(client, key, "GitHub")
     assert login["favorite"] is False
     assert login["backed_up"] is False
+
+
+async def test_using_an_earlier_password_again_keeps_the_rest_of_the_entry(
+    client: httpx.AsyncClient,
+) -> None:
+    """The body the web UI's password history sends to make an old value current
+    again: only the name identifies the entry, every other field is resent."""
+    key = await create_vault(client)
+    headers = auth(key)
+    resp = await client.post("/passwords/create", json=FULL_LOGIN, headers=headers)
+    assert resp.status_code == 200, resp.text
+    name = FULL_LOGIN["password_name"]
+    for value in ("second-Value-2", "third-Value-3"):
+        before = await _get(client, key, name)
+        payload = {
+            "password": {"password_name": name},
+            "new_password": {
+                field: before[field]
+                for field in (
+                    "password_name",
+                    "kind",
+                    "username",
+                    "url",
+                    "totp_secret",
+                    "description",
+                    "tags",
+                    "custom_fields",
+                    "folder",
+                    "favorite",
+                )
+            }
+            | {"password_value": value},
+        }
+        resp = await client.patch("/passwords/update", json=payload, headers=headers)
+        assert resp.status_code == 200, resp.text
+    before = await _get(client, key, name)
+    old = before["password_history"][1]["value"]
+    assert old == FULL_LOGIN["password_value"]
+
+    payload["new_password"]["password_value"] = old
+    resp = await client.patch("/passwords/update", json=payload, headers=headers)
+    assert resp.status_code == 200, resp.text
+
+    after = await _get(client, key, name)
+    assert after["password_value"] == old
+    assert [h["value"] for h in after["password_history"]] == [
+        "third-Value-3",
+        "second-Value-2",
+        old,
+    ]
+    unchanged = ("username", "url", "totp_secret", "description", "tags")
+    for field in (*unchanged, "custom_fields", "folder", "favorite", "kind"):
+        assert after[field] == before[field], field
 
 
 async def test_trash_restore_and_purge(client: httpx.AsyncClient) -> None:

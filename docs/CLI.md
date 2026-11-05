@@ -54,6 +54,8 @@ ciphermoth password get <name>               Reveal an entry (and its live 2FA c
 ciphermoth password create <name> [--kind]   Add a login or a secure note (interactive)
 ciphermoth password update <name>            Edit an entry (interactive)
 ciphermoth password delete <name>... [--yes] Move one or more entries to the trash
+ciphermoth password move <name>... --folder <folder> | --no-folder  Move entries into a folder, or out of theirs
+ciphermoth password history <name>          Reveal an entry's earlier passwords (last 10), newest first
 ciphermoth password trash                    List entries currently in the trash
 ciphermoth password restore <name> [--id]    Restore a trashed entry back to the vault
 ciphermoth password purge <name> [--id] [--yes] Permanently delete a trashed entry
@@ -71,6 +73,8 @@ Every command that touches encrypted data prompts for the master password. Use `
 **Recovery.** `recover` asks for the recovery code (hidden), a new master password twice, and, if the vault requires a security key, whether you lost your keys (answering yes removes them). The vault is re-keyed, every other session ends, and a new recovery code is printed: the old one no longer works.
 
 `delete` with several names moves them together: if one of them is missing, none is moved (servers before 3.3.0 accept only one name per command).
+
+`move` works the same way: every name moves into the folder, or none does if one is missing. The folder name is trimmed and may not be empty (use `--no-folder` to take entries out of their folder) or longer than 200 characters; entries already in it are left as they are. It needs a 3.5.0 server.
 
 Trash may contain several entries with the same name, especially after overwriting an import. `password trash` shows their row IDs. Pass `--id <row-id>` to restore or purge that exact row; without it these commands select the most recently trashed entry of that name. The name must still match the selected row.
 

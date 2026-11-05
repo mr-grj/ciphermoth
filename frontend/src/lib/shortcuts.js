@@ -14,6 +14,14 @@ export const isDeleteKey = (event) =>
 
 export const DELETE_KEY_LABEL = IS_MAC ? "⌫" : "Del";
 
+// H opens the focused row's password history; with a modifier it is left alone.
+export const isHistoryKey = (event) =>
+  (event.key === "h" || event.key === "H") &&
+  !event.altKey &&
+  !event.ctrlKey &&
+  !event.metaKey &&
+  !event.shiftKey;
+
 // Keys pressed on a control inside a cell (a copy button, the checkbox, a link)
 // belong to that control, not to the row.
 export const fromControl = (event) =>

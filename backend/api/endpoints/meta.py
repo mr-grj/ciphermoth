@@ -12,6 +12,7 @@ def get_meta() -> MetaResponse:
         version=get_api_settings().version,
         features=[
             "bulk-entry-actions",
+            "bulk-entry-move",
             "entry-names-with-slash",
             "recovery-code",
             "security-keys",

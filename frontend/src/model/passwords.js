@@ -133,6 +133,19 @@ const Passwords = {
     }
   }),
 
+  // `folder` null takes the entries out of their folder.
+  moveMany: thunk(async (actions, { names, folder }) => {
+    try {
+      const entries = names.map((password_name) => ({ password_name }));
+      const { data } = await apiClient.post("/vault/entries/move", { entries, folder });
+      return data;
+    } catch (err) {
+      throw new Error(await errorDetail(err, "Failed to move the entries."));
+    } finally {
+      await actions.get();
+    }
+  }),
+
   restoreMany: thunk(async (actions, rows) => {
     try {
       const entries = rows.map((row) => ({ password_name: row.password_name, entry_id: row.id }));

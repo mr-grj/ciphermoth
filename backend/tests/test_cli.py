@@ -275,6 +275,108 @@ def test_cli_refuses_several_names_on_an_older_server() -> None:
     assert not any("/vault/entries/trash" in line for line in map(str, requests))
 
 
+async def test_cli_moves_several_entries_to_a_folder(api: str) -> None:
+    for name in ("one", "two/x", "three [3]", "kept"):
+        ok(cli(api, "password", "create", name, answers=["Value-12345"] * 2 + [""] * 5))
+
+    def folder_of(name: str) -> str | None:
+        resp = httpx.post(
+            f"{api}/master_password/unlock", json={"master_password": MASTER_PASSWORD}
+        )
+        headers = {"x-ciphermoth-session": resp.json()["session_token"]}
+        rows = httpx.get(f"{api}/passwords", headers=headers).json()
+        return next(r["folder"] for r in rows if r["password_name"] == name)
+
+    for args, message in (
+        ((), "Give either --folder NAME or --no-folder."),
+        (("--folder", "W", "--no-folder"), "Give either --folder NAME or --no-folder."),
+        (("--folder", "   "), "Folder name can't be empty."),
+    ):
+        refused = cli(api, "password", "move", "one", *args)
+        assert refused.exit_code == 1
+        assert message in refused.output
+
+    refused = cli(api, "password", "move", "one", "missing", "-f", "Work")
+    assert refused.exit_code == 1
+    assert "No password found for 'missing'" in refused.output
+    assert folder_of("one") is None
+
+    out = ok(
+        cli(
+            api,
+            "password",
+            "move",
+            "one",
+            "two/x",
+            "one",
+            "three [3]",
+            "-f",
+            " [Work] ",
+        )
+    )
+    assert "Moved 3 entries to [Work]" in out
+    assert [folder_of(n) for n in ("one", "two/x", "three [3]", "kept")] == [
+        "[Work]",
+        "[Work]",
+        "[Work]",
+        None,
+    ]
+    assert "Folder" in ok(cli(api, "password", "get", "one"))
+
+    out = ok(cli(api, "password", "move", "one", "kept", "--folder", "[Work]"))
+    assert "Moved 1 entry to [Work] (1 entry already there)" in out
+
+    out = ok(cli(api, "password", "move", "one", "two/x", "--no-folder"))
+    assert "Took 2 entries out of their folder" in out
+    assert folder_of("one") is None and folder_of("three [3]") == "[Work]"
+
+    too_long = cli(api, "password", "move", "one", "-f", "F" * 201)
+    assert too_long.exit_code == 1
+    assert folder_of("one") is None
+
+
+async def test_cli_shows_password_history(api: str) -> None:
+    ok(
+        cli(
+            api,
+            "password",
+            "create",
+            "site [x]",
+            answers=["First-[b]-1"] * 2 + [""] * 5,
+        )
+    )
+    assert "No earlier passwords for site [x]." in ok(
+        cli(api, "password", "history", "site [x]")
+    )
+    for value in ("Second-Value-2", "Third-Value-3"):
+        ok(
+            cli(
+                api, "password", "update", "site [x]", answers=[value, value] + [""] * 5
+            )
+        )
+
+    out = ok(cli(api, "password", "history", "site [x]"))
+    assert out.index("Second-Value-2") < out.index("First-[b]-1")
+    assert "Third-Value-3" not in out
+    assert re.search(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}", out)
+
+    missing = cli(api, "password", "history", "missing")
+    assert missing.exit_code == 1
+    assert "No password found" in missing.output
+
+
+def test_cli_refuses_to_move_on_an_older_server() -> None:
+    def respond(handler: _Recorder) -> None:
+        if not _answer_unlock(handler, "sessions"):
+            handler.send(500, {"detail": "unexpected"})
+
+    with _fake_server(respond) as (api, requests):
+        result = cli(api, "password", "move", "a", "--folder", "Work")
+    assert result.exit_code == 1
+    assert "needs CipherMoth 3.5.0 or newer" in result.output
+    assert not any("/vault/entries/move" in line for line in map(str, requests))
+
+
 FULL_ENTRY = {
     "password_name": "full",
     "kind": "login",

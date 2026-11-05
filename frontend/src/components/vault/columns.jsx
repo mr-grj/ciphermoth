@@ -7,6 +7,8 @@ import AttachFileIcon from "@mui/icons-material/AttachFile";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
+import HistoryIcon from "@mui/icons-material/History";
+import NotesIcon from "@mui/icons-material/Notes";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import StarIcon from "@mui/icons-material/Star";
 import StarBorderIcon from "@mui/icons-material/StarBorder";
@@ -17,6 +19,8 @@ import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import TotpCell from "./TotpCell";
 import { getPasswordStrength } from "../../lib/passwordStrength";
 import { GLOW } from "../../lib/brand";
+import { hasHistory } from "../../lib/passwordHistory";
+import { attachmentCount, hasNotes } from "../../lib/entryFilters";
 
 const ValueCell = ({ text, mono = false, masked = false, color = "text.primary", actions }) => (
   <Box sx={{ display: "flex", alignItems: "center", width: "100%", minWidth: 0 }}>
@@ -99,6 +103,7 @@ export const createColumns = ({
   onCopy,
   onEdit,
   onDelete,
+  onHistory,
 }) => [
   {
     field: "favorite",
@@ -125,15 +130,28 @@ export const createColumns = ({
     flex: 1,
     minWidth: 120,
     renderCell: (params) => {
-      const count = params.row.attachment_count ?? 0;
+      const count = attachmentCount(params.row);
       const clip = count > 0 && (
         <Tooltip title={`${count} attachment${count === 1 ? "" : "s"}`}>
-          <Stack direction="row" spacing={0.25} sx={{ alignItems: "center", flexShrink: 0 }}>
-            <AttachFileIcon sx={{ fontSize: 15, color: "text.disabled" }} />
-            <Typography variant="caption" sx={{ color: "text.disabled" }}>
+          <Stack
+            direction="row"
+            spacing={0.25}
+            aria-label={`${count} attachment${count === 1 ? "" : "s"}`}
+            sx={{ alignItems: "center", flexShrink: 0, color: "text.secondary" }}
+          >
+            <AttachFileIcon sx={{ fontSize: 16, transform: "rotate(45deg)" }} />
+            <Typography variant="caption" sx={{ color: "inherit", fontWeight: 600 }}>
               {count}
             </Typography>
           </Stack>
+        </Tooltip>
+      );
+      const notes = hasNotes(params.row) && (
+        <Tooltip title="Has notes">
+          <NotesIcon
+            aria-label="Has notes"
+            sx={{ fontSize: 16, color: "text.secondary", flexShrink: 0 }}
+          />
         </Tooltip>
       );
       return (
@@ -150,6 +168,7 @@ export const createColumns = ({
             {params.value}
           </Typography>
           {clip}
+          {notes}
         </Stack>
       );
     },
@@ -230,6 +249,14 @@ export const createColumns = ({
               <CellActionButton title="Copy password" onClick={() => onCopy(params.value)}>
                 <ContentCopyIcon fontSize="small" />
               </CellActionButton>
+              {onHistory && hasHistory(params.row) && (
+                <CellActionButton
+                  title={`Password history (${params.row.password_history.length})`}
+                  onClick={() => onHistory(params.row)}
+                >
+                  <HistoryIcon fontSize="small" />
+                </CellActionButton>
+              )}
             </>
           }
         />

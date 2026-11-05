@@ -1054,6 +1054,7 @@ async def test_the_server_no_longer_advertises_the_vault_key_protocol(
     features = (await client.get("/meta")).json()["features"]
     assert features == [
         "bulk-entry-actions",
+        "bulk-entry-move",
         "entry-names-with-slash",
         "recovery-code",
         "security-keys",

@@ -130,6 +130,11 @@ PROTECTED_ROUTES: dict[tuple[str, str], Spec] = {
         json={"entries": [{"password_name": "alpha"}]},
         headers=h,
     ),
+    ("POST", "/api/vault/entries/move"): lambda c, h, x: c.post(
+        "/vault/entries/move",
+        json={"entries": [{"password_name": "alpha"}], "folder": "Work"},
+        headers=h,
+    ),
     ("POST", "/api/vault/trash/restore"): lambda c, h, x: c.post(
         "/vault/trash/restore",
         json={"entries": [{"password_name": "beta", "entry_id": x["beta_id"]}]},

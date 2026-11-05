@@ -19,7 +19,6 @@ import {
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import AutoFixHighIcon from "@mui/icons-material/AutoFixHigh";
-import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutlined";
@@ -29,15 +28,15 @@ import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import StarIcon from "@mui/icons-material/Star";
 import StarBorderIcon from "@mui/icons-material/StarBorder";
 import StickyNote2OutlinedIcon from "@mui/icons-material/StickyNote2Outlined";
-import VisibilityIcon from "@mui/icons-material/Visibility";
-import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 
 import PasswordField from "../PasswordField";
 import AttachmentsSection from "./AttachmentsSection";
 import PasswordGenerator, { CHAR_KEYS } from "./PasswordGenerator";
 import StrengthBar from "./StrengthBar";
+import { PasswordHistoryList } from "./PasswordHistoryDialog";
 import { generatePassword } from "../../lib/passwordGenerator";
 import { GLOW } from "../../lib/brand";
+import { MAX_FOLDER_LENGTH, folderLength, folderProblem } from "../../lib/folders";
 
 const EMPTY_FORM = {
   password_name: "",
@@ -181,30 +180,6 @@ const CustomFieldRow = ({ field, onChange, onToggleHidden, onRemove }) => (
   </Stack>
 );
 
-const HistoryRow = ({ entry, onCopy }) => {
-  const [show, setShow] = useState(false);
-  const when = new Date(entry.changed_at).toLocaleDateString();
-  return (
-    <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-      <Typography
-        variant="body2"
-        sx={{ fontFamily: "'Space Mono', monospace", flex: 1, color: "text.secondary" }}
-      >
-        {show ? entry.value : "••••••••••••"}
-      </Typography>
-      <Typography variant="caption" sx={{ color: "text.disabled" }}>
-        {when}
-      </Typography>
-      <IconButton size="small" onClick={() => setShow((v) => !v)}>
-        {show ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
-      </IconButton>
-      <IconButton size="small" onClick={() => onCopy?.(entry.value)}>
-        <ContentCopyIcon fontSize="small" />
-      </IconButton>
-    </Stack>
-  );
-};
-
 const PasswordFormDialog = ({
   open,
   editTarget,
@@ -302,6 +277,11 @@ const PasswordFormDialog = ({
 
     if (!form.password_value.trim()) {
       setFormError(isNote ? "Note content is required." : "Password value is required.");
+      return;
+    }
+
+    if (form.folder.trim() && folderProblem(form.folder)) {
+      setFormError(folderProblem(form.folder));
       return;
     }
 
@@ -494,7 +474,17 @@ const PasswordFormDialog = ({
             setFormError("");
           }}
           renderInput={(params) => (
-            <TextField {...params} label="Folder (optional)" placeholder="e.g. Work, Personal" />
+            <TextField
+              {...params}
+              label="Folder (optional)"
+              placeholder="e.g. Work, Personal"
+              error={folderLength(form.folder.trim()) > MAX_FOLDER_LENGTH}
+              helperText={
+                folderLength(form.folder.trim()) > MAX_FOLDER_LENGTH - 40
+                  ? `${folderLength(form.folder.trim())}/${MAX_FOLDER_LENGTH}`
+                  : undefined
+              }
+            />
           )}
           sx={{ mt: 1.5 }}
         />
@@ -627,11 +617,7 @@ const PasswordFormDialog = ({
               open={sections.history}
               onToggle={toggleSection("history")}
             >
-              <Stack spacing={1}>
-                {history.map((entry, index) => (
-                  <HistoryRow key={index} entry={entry} onCopy={onCopy} />
-                ))}
-              </Stack>
+              <PasswordHistoryList entry={editTarget} includeCurrent={false} onCopy={onCopy} />
             </FormSection>
           )}
         </Box>

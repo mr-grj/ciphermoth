@@ -249,6 +249,38 @@ describe("bulk entry actions", () => {
     ]);
   });
 
+  it("moves entries to a folder by name, then reloads the list", async () => {
+    const result = { count: 2, unchanged: 0, detail: "2 entries moved to 'Work'." };
+    const actions = build({ "POST /vault/entries/move": [200, result] });
+    await expect(actions.moveMany({ names: ["a/b", "c"], folder: "Work" })).resolves.toEqual(
+      result
+    );
+    expect(body(seen[0])).toEqual({
+      entries: [{ password_name: "a/b" }, { password_name: "c" }],
+      folder: "Work",
+    });
+    expect(calls()).toEqual(["POST /vault/entries/move", "GET /passwords"]);
+  });
+
+  it("sends null to take entries out of their folder", async () => {
+    const actions = build({ "POST /vault/entries/move": [200, { count: 1, unchanged: 0 }] });
+    await actions.moveMany({ names: ["a"], folder: null });
+    expect(body(seen[0])).toEqual({ entries: [{ password_name: "a" }], folder: null });
+  });
+
+  it("reports a refused move and still reloads the list", async () => {
+    const actions = build({
+      "POST /vault/entries/move": [
+        422,
+        { detail: [{ msg: "Value error, Folder name can't be empty." }] },
+      ],
+    });
+    await expect(actions.moveMany({ names: ["a"], folder: "" })).rejects.toThrow(
+      "Folder name can't be empty."
+    );
+    expect(calls()).toEqual(["POST /vault/entries/move", "GET /passwords"]);
+  });
+
   it("restores and purges trashed entries by name and id", async () => {
     const actions = build({
       "POST /vault/trash/restore": [200, { count: 2, detail: "x" }],

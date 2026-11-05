@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { duplicateName, fromControl, isDeleteKey } from "./shortcuts";
+import { duplicateName, fromControl, isDeleteKey, isHistoryKey } from "./shortcuts";
 
 const key = (k, mods = {}) => ({ key: k, altKey: false, ctrlKey: false, shiftKey: false, ...mods });
 
@@ -32,5 +32,16 @@ describe("duplicateName", () => {
     expect(duplicateName("GitHub", ["GitHub"])).toBe("GitHub (copy)");
     expect(duplicateName("GitHub", ["GitHub", "GitHub (copy)"])).toBe("GitHub (copy 2)");
     expect(duplicateName("GitHub", ["GitHub (copy)", "GitHub (copy 2)"])).toBe("GitHub (copy 3)");
+  });
+});
+
+describe("isHistoryKey", () => {
+  it("accepts H alone, never with a modifier", () => {
+    expect(isHistoryKey(key("h"))).toBe(true);
+    expect(isHistoryKey(key("H"))).toBe(true);
+    for (const mod of ["altKey", "ctrlKey", "shiftKey", "metaKey"]) {
+      expect(isHistoryKey(key("h", { [mod]: true }))).toBe(false);
+    }
+    expect(isHistoryKey(key("j"))).toBe(false);
   });
 });

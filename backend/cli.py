@@ -42,6 +42,7 @@ _SESSION_HEADER = "x-ciphermoth-session"
 _SESSIONS = "vault-sessions"
 _SLASH_NAMES = "entry-names-with-slash"
 _BULK = "bulk-entry-actions"
+_BULK_MOVE = "bulk-entry-move"
 _SECURITY_KEYS = "security-keys"
 _RECOVERY = "recovery-code"
 _SERVER_TOO_OLD = (
@@ -533,6 +534,63 @@ def pw_delete(
     _ok(f"Moved {len(names)} entries to trash")
 
 
+@pw_app.command(
+    "move",
+    help=(
+        "Move one or more entries into a folder, or out of their folder with "
+        "--no-folder. Several names move together or, if one is missing, not at all."
+    ),
+)
+def pw_move(
+    names: Annotated[list[str], typer.Argument(help="Entry names.")],
+    folder: Annotated[
+        str | None,
+        typer.Option("--folder", "-f", help="Folder to move the entries into."),
+    ] = None,
+    no_folder: Annotated[
+        bool,
+        typer.Option("--no-folder", help="Take the entries out of their folder."),
+    ] = False,
+) -> None:
+    if (folder is None) == (not no_folder):
+        _die("Give either --folder NAME or --no-folder.")
+    if folder is not None:
+        folder = folder.strip()
+        if not folder:
+            _die("Folder name can't be empty. Use --no-folder to remove the folder.")
+    names = list(dict.fromkeys(names))
+
+    with _vault() as vault:
+        if _BULK_MOVE not in vault.features:
+            _die("Moving entries to a folder needs CipherMoth 3.5.0 or newer.")
+        resp = vault.send(
+            "POST",
+            "/vault/entries/move",
+            json={
+                "entries": [{"password_name": name} for name in names],
+                "folder": folder,
+            },
+        )
+
+    _check(resp)
+
+    result = resp.json()
+    count = result.get("count", 0)
+    moved = (
+        f"Moved {_count(count)} to [cyan]{escape(folder)}[/cyan]"
+        if folder is not None
+        else f"Took {_count(count)} out of their folder"
+    )
+    unchanged = result.get("unchanged", 0)
+    if unchanged:
+        moved += f" ({_count(unchanged)} already there)"
+    _ok(moved)
+
+
+def _count(count: int) -> str:
+    return f"{count} {'entry' if count == 1 else 'entries'}"
+
+
 def _delete_one(name: str, yes: bool) -> None:
     with _vault() as vault:
         exists = vault.send("GET", vault.entry_path(name), name=name)
@@ -547,6 +605,41 @@ def _delete_one(name: str, yes: bool) -> None:
     _check(resp)
 
     _ok(f"Moved [cyan]{escape(name)}[/cyan] to trash")
+
+
+@pw_app.command(
+    "history",
+    help="Reveal an entry's earlier passwords, newest first (the last 10 are kept).",
+)
+def pw_history(name: Annotated[str, typer.Argument(help="Entry name.")]) -> None:
+    with _vault() as vault:
+        item = _entry(vault.send("GET", vault.entry_path(name), name=name), name)
+
+    history = item.get("password_history") or []
+    if not history:
+        _out.print(f"[dim]No earlier passwords for {escape(name)}.[/dim]")
+        return
+
+    table = Table(show_header=True, header_style="bold", box=None, padding=(0, 2, 0, 0))
+    table.add_column("In use until", style="dim", no_wrap=True)
+    table.add_column("Password")
+    for entry in history:
+        table.add_row(
+            escape(_local_time(entry.get("changed_at"))),
+            escape(str(entry.get("value", ""))),
+        )
+    _out.print(f"\n  [bold cyan]{escape(name)}[/bold cyan]")
+    _out.print(table)
+
+
+def _local_time(value: object) -> str:
+    try:
+        moment = datetime.fromisoformat(str(value))
+    except ValueError:
+        return str(value)
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=UTC)
+    return moment.astimezone().strftime("%Y-%m-%d %H:%M")
 
 
 @pw_app.command("trash", help="List the entries waiting in the trash.")

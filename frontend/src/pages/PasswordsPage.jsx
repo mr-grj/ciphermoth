@@ -18,6 +18,7 @@ import AddIcon from "@mui/icons-material/Add";
 import CloseIcon from "@mui/icons-material/Close";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
 import DownloadIcon from "@mui/icons-material/Download";
+import DriveFileMoveOutlinedIcon from "@mui/icons-material/DriveFileMoveOutlined";
 import HealthAndSafetyIcon from "@mui/icons-material/HealthAndSafety";
 import SearchIcon from "@mui/icons-material/Search";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
@@ -33,15 +34,21 @@ import HealthDialog from "../components/vault/HealthDialog";
 import ImportDialog from "../components/vault/ImportDialog";
 import PasswordFormDialog from "../components/vault/PasswordFormDialog";
 import EntryContextMenu from "../components/vault/EntryContextMenu";
+import EntryFilterMenu from "../components/vault/EntryFilterMenu";
+import MoveToFolderDialog from "../components/vault/MoveToFolderDialog";
+import PasswordHistoryDialog from "../components/vault/PasswordHistoryDialog";
 import TrashDialog from "../components/vault/TrashDialog";
 import { createColumns, openUrl } from "../components/vault/columns";
 import { gridBaseSx } from "../components/vault/gridStyles";
 import useClipboard from "../hooks/useClipboard";
 import useMenuAction from "../hooks/useMenuAction";
 import { generateTotp } from "../lib/totp";
-import { duplicateName, fromControl, isDeleteKey } from "../lib/shortcuts";
+import { duplicateName, fromControl, isDeleteKey, isHistoryKey } from "../lib/shortcuts";
+import { hasHistory, restorePayload } from "../lib/passwordHistory";
 import { PAGE_SIZES, loadPageSize, savePageSize } from "../lib/gridPreferences";
 import { entriesWord, gridSelectionModel, mergeSelection, pruneSelection } from "../lib/selection";
+import { folderCounts, shortFolder, undoMoves } from "../lib/folders";
+import { applyEntryFilters, entryFilterCounts, entryFilterLabels } from "../lib/entryFilters";
 
 // Column header + pagination footer + about four rows. A shorter window scrolls the page.
 const MIN_GRID_HEIGHT = 280;
@@ -79,6 +86,7 @@ const PasswordsPage = () => {
     create,
     update,
     trashMany,
+    moveMany,
     restoreMany,
     backup,
     importPasswords,
@@ -101,6 +109,10 @@ const PasswordsPage = () => {
   const [contextMenu, setContextMenu] = useState(null);
   // Names waiting for the Move to Trash confirmation: one row, or the selection.
   const [trashTargets, setTrashTargets] = useState(null);
+  // Names waiting for a folder in the Move to folder dialog.
+  const [moveTargets, setMoveTargets] = useState(null);
+  // The name of the entry whose password history is open.
+  const [historyName, setHistoryName] = useState(null);
   const [selected, setSelected] = useState(() => new Set());
   const [backupOpen, setBackupOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -109,6 +121,8 @@ const PasswordsPage = () => {
   const [removeDamagedOpen, setRemoveDamagedOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [folderFilter, setFolderFilter] = useState("");
+  // Quick filters (favorites, notes, attachments...), all of which must match.
+  const [entryFilters, setEntryFilters] = useState(() => new Set());
   const [paginationModel, setPaginationModel] = useState(() => ({
     page: 0,
     pageSize: loadPageSize(),
@@ -116,6 +130,7 @@ const PasswordsPage = () => {
   const [columnOverrides, setColumnOverrides] = useState({});
   const gridApi = useGridApiRef();
   const compactHeader = useMediaQuery((theme) => theme.breakpoints.down("md"));
+  const compactSelection = useMediaQuery((theme) => theme.breakpoints.down("sm"));
   const wideEnoughForFolders = useMediaQuery((theme) => theme.breakpoints.up("md"));
   const wideEnoughForTags = useMediaQuery((theme) => theme.breakpoints.up("lg"));
 
@@ -235,6 +250,29 @@ const PasswordsPage = () => {
 
   const askToTrash = useCallback((name) => setTrashTargets([name]), []);
 
+  // Read from the live list, so the dialog follows a restore (and closes if the entry
+  // goes away).
+  const historyEntry = useMemo(
+    () => (historyName ? (passwords.find((p) => p.password_name === historyName) ?? null) : null),
+    [historyName, passwords]
+  );
+  const openHistory = useCallback((row) => setHistoryName(row.password_name), []);
+
+  const handleRestoreHistory = async (value) => {
+    const entry = historyEntry;
+    if (!entry) return false;
+    try {
+      await update(restorePayload(entry, value));
+      enqueueSnackbar(`${entry.password_name} uses the earlier password again.`, {
+        variant: "success",
+      });
+      return true;
+    } catch (err) {
+      enqueueSnackbar(err.message, { variant: "error" });
+      return false;
+    }
+  };
+
   const undoTrash = async (rows) => {
     try {
       await restoreMany(rows);
@@ -338,8 +376,9 @@ const PasswordsPage = () => {
         onCopy: copy,
         onEdit: openEdit,
         onDelete: askToTrash,
+        onHistory: openHistory,
       }),
-    [visibleRows, toggleVisibility, handleToggleFavorite, copy, openEdit, askToTrash]
+    [visibleRows, toggleVisibility, handleToggleFavorite, copy, openEdit, askToTrash, openHistory]
   );
 
   const folderOptions = useMemo(
@@ -351,7 +390,9 @@ const PasswordsPage = () => {
   );
   const activeFolder = folderOptions.includes(folderFilter) ? folderFilter : "";
 
-  const filteredPasswords = useMemo(() => {
+  // What the folder and the search show; the quick filters narrow it further and
+  // count their matches within it.
+  const searchedPasswords = useMemo(() => {
     const query = search.trim().toLowerCase();
     const byFolder = activeFolder ? passwords.filter((p) => p.folder === activeFolder) : passwords;
     const matches = !query
@@ -376,6 +417,11 @@ const PasswordsPage = () => {
         Number(b.favorite) - Number(a.favorite) || a.password_name.localeCompare(b.password_name)
     );
   }, [passwords, search, activeFolder]);
+  const filterCounts = useMemo(() => entryFilterCounts(searchedPasswords), [searchedPasswords]);
+  const filteredPasswords = useMemo(
+    () => applyEntryFilters(searchedPasswords, entryFilters),
+    [searchedPasswords, entryFilters]
+  );
 
   const visibleIds = useMemo(
     () => filteredPasswords.map((p) => p.password_name),
@@ -389,22 +435,95 @@ const PasswordsPage = () => {
   const trashHidden = (trashTargets ?? []).filter((name) => !visibleIds.includes(name)).length;
   const handleSelectionChange = useCallback(
     (model) => {
-      console.log("SEL", model.type, JSON.stringify([...model.ids]));
       setSelected((prev) => mergeSelection(prev, visibleIds, model));
     },
     [visibleIds]
   );
   const clearSelection = useCallback(() => setSelected(new Set()), []);
-  const trashSelected = () => {
-    const visibleFirst = [
-      ...visibleIds.filter((name) => selected.has(name)),
-      ...[...selected].filter((name) => !rowSelectionModel.ids.has(name)),
-    ];
-    setTrashTargets(visibleFirst);
+  // The selection with the rows on screen first, in their on-screen order.
+  const selectedVisibleFirst = () => [
+    ...visibleIds.filter((name) => selected.has(name)),
+    ...[...selected].filter((name) => !rowSelectionModel.ids.has(name)),
+  ];
+  const trashSelected = () => setTrashTargets(selectedVisibleFirst());
+  const moveSelected = () => setMoveTargets(selectedVisibleFirst());
+  const askToMove = useCallback((name) => setMoveTargets([name]), []);
+
+  const counts = useMemo(() => folderCounts(passwords), [passwords]);
+  const moveRows = useMemo(() => {
+    if (!moveTargets) return null;
+    const byName = new Map(passwords.map((p) => [p.password_name, p]));
+    return moveTargets.map((name) => byName.get(name)).filter(Boolean);
+  }, [moveTargets, passwords]);
+  const moveHidden = useMemo(() => {
+    const shown = new Set(visibleIds);
+    return (moveRows ?? []).filter((row) => !shown.has(row.password_name)).length;
+  }, [moveRows, visibleIds]);
+  // Every entry waiting to move is gone (trashed or renamed meanwhile): nothing to ask.
+  useEffect(() => {
+    if (moveRows && moveRows.length === 0) setMoveTargets(null);
+  }, [moveRows]);
+
+  const undoMove = async (moves) => {
+    try {
+      for (const { names, folder } of moves) await moveMany({ names, folder });
+      const count = moves.reduce((sum, { names }) => sum + names.length, 0);
+      enqueueSnackbar(count === 1 ? "Moved it back." : `Moved ${entriesWord(count)} back.`, {
+        variant: "success",
+      });
+    } catch (err) {
+      enqueueSnackbar(err.message, { variant: "error" });
+    }
   };
 
-  // Delete moves the selection (or else the focused row) to the trash; Escape
-  // clears the selection. Keys typed into anything editable are left alone.
+  // Keeps the dialog open on failure, so the folder can be fixed and tried again.
+  const handleMove = async (folder) => {
+    const rows = moveRows;
+    if (!rows.length) {
+      setMoveTargets(null);
+      return;
+    }
+    const names = rows.map((row) => row.password_name);
+    try {
+      const { count } = await moveMany({ names, folder });
+      setMoveTargets(null);
+      const movedNames = new Set(names);
+      setSelected((prev) => new Set([...prev].filter((name) => !movedNames.has(name))));
+      const where = folder === null ? null : `“${shortFolder(folder)}”`;
+      if (count === 0) {
+        enqueueSnackbar(where ? `Already in ${where}.` : "Already without a folder.", {
+          variant: "info",
+        });
+        return;
+      }
+      const moved = names.length === 1 ? shortFolder(names[0]) : entriesWord(count);
+      enqueueSnackbar(
+        where
+          ? `Moved ${moved} to ${where}.`
+          : `Took ${moved} out of ${names.length === 1 ? "its" : "their"} folder.`,
+        {
+          variant: "success",
+          preventDuplicate: false,
+          action: (key) => (
+            <Button
+              color="inherit"
+              size="small"
+              sx={{ fontWeight: 700 }}
+              onClick={() => {
+                closeSnackbar(key);
+                undoMove(undoMoves(rows, folder));
+              }}
+            >
+              Undo
+            </Button>
+          ),
+        }
+      );
+    } catch (err) {
+      enqueueSnackbar(err.message, { variant: "error" });
+    }
+  };
+
   // Delete or Backspace moves the selection (or else the focused row) to the trash,
   // Enter edits the focused row, Escape clears the selection. Keys typed into
   // anything editable are left alone.
@@ -416,6 +535,9 @@ const PasswordsPage = () => {
       event.preventDefault();
       if (selected.size > 0) trashSelected();
       else askToTrash(params.row.password_name);
+    } else if (isHistoryKey(event) && hasHistory(params.row)) {
+      event.preventDefault();
+      openHistory(params.row);
     } else if (event.key === "Enter" && !fromControl(event)) {
       event.preventDefault();
       openEdit(params.row);
@@ -462,6 +584,9 @@ const PasswordsPage = () => {
     toggleFavorite: handleToggleFavorite,
     trash: askToTrash,
     trashSelection: trashSelected,
+    move: askToMove,
+    moveSelection: moveSelected,
+    history: openHistory,
     clearSelection,
   };
 
@@ -502,6 +627,21 @@ const PasswordsPage = () => {
     setFolderFilter(next);
     setPaginationModel((previous) => ({ ...previous, page: 0 }));
   };
+  const updateEntryFilters = (next) => {
+    setEntryFilters(next);
+    setPaginationModel((previous) => ({ ...previous, page: 0 }));
+  };
+  const clearEntryFilters = () => updateEntryFilters(new Set());
+
+  const query = search.trim();
+  let emptyMessage = "No passwords in this folder.";
+  if (query && entryFilters.size) {
+    emptyMessage = `No passwords match “${query}” and your filters (${entryFilterLabels(entryFilters).join(", ")}).`;
+  } else if (query) {
+    emptyMessage = `No passwords match “${query}”.`;
+  } else if (entryFilters.size) {
+    emptyMessage = `No passwords match your filters (${entryFilterLabels(entryFilters).join(", ")}).`;
+  }
 
   // Every page starts at its first row, not at the scroll offset of the previous page.
   const shownPage = useRef(paginationModel.page);
@@ -618,23 +758,52 @@ const PasswordsPage = () => {
               },
             }}
           />
-          {folderOptions.length > 0 && (
-            <TextField
-              select
-              size="small"
-              label="Folder"
-              value={activeFolder}
-              onChange={(e) => updateFolder(e.target.value)}
-              sx={{ width: { xs: "100%", sm: 200 } }}
-            >
-              <MenuItem value="">All folders</MenuItem>
-              {folderOptions.map((f) => (
-                <MenuItem key={f} value={f}>
-                  {f}
-                </MenuItem>
-              ))}
-            </TextField>
-          )}
+          <Stack direction="row" spacing={1.5} sx={{ width: { xs: "100%", sm: "auto" } }}>
+            {folderOptions.length > 0 && (
+              <TextField
+                select
+                size="small"
+                label={
+                  activeFolder ? `Folder (${entriesWord(counts.get(activeFolder) ?? 0)})` : "Folder"
+                }
+                value={activeFolder}
+                onChange={(e) => updateFolder(e.target.value)}
+                sx={{ flex: { xs: 1, sm: "none" }, minWidth: 0, width: { sm: 200 } }}
+                slotProps={{
+                  select: {
+                    // The count is in the label, so the field shows the name alone.
+                    renderValue: (value) => value,
+                    // Long folder names end in an ellipsis instead of widening the menu.
+                    MenuProps: { slotProps: { paper: { sx: { maxWidth: 320 } } } },
+                  },
+                }}
+              >
+                <MenuItem value="">All folders</MenuItem>
+                {folderOptions.map((f) => (
+                  <MenuItem key={f} value={f} title={f} sx={{ display: "flex", gap: 2 }}>
+                    <Box
+                      component="span"
+                      sx={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}
+                    >
+                      {f}
+                    </Box>
+                    <Box
+                      component="span"
+                      sx={{ ml: "auto", color: "text.disabled", typography: "caption" }}
+                    >
+                      {counts.get(f)}
+                    </Box>
+                  </MenuItem>
+                ))}
+              </TextField>
+            )}
+            <EntryFilterMenu
+              active={entryFilters}
+              counts={filterCounts}
+              onChange={updateEntryFilters}
+              compact={compactSelection}
+            />
+          </Stack>
           {selected.size > 0 && (
             <SelectionBar
               count={selected.size}
@@ -653,16 +822,25 @@ const PasswordsPage = () => {
                 zIndex: 2,
               }}
             >
-              <Button
+              <HeaderAction
+                size="small"
+                label="Move to folder"
+                icon={<DriveFileMoveOutlinedIcon fontSize="small" />}
+                compact={compactSelection}
+                onClick={moveSelected}
+                sx={compactSelection ? { minWidth: 34, px: 0.75 } : { bgcolor: "background.paper" }}
+              />
+              <HeaderAction
                 size="small"
                 color="error"
                 variant="contained"
                 disableElevation
-                startIcon={<DeleteOutlineIcon />}
+                label="Move to Trash"
+                icon={<DeleteOutlineIcon fontSize="small" />}
+                compact={compactSelection}
                 onClick={trashSelected}
-              >
-                Move to Trash
-              </Button>
+                sx={compactSelection ? { minWidth: 34, px: 0.75 } : undefined}
+              />
             </SelectionBar>
           )}
         </Stack>
@@ -754,18 +932,24 @@ const PasswordsPage = () => {
                     height: "100%",
                   }}
                 >
-                  <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                    {search.trim() ? (
-                      <>No passwords match &ldquo;{search.trim()}&rdquo;.</>
-                    ) : (
-                      "No passwords in this folder."
-                    )}
+                  <Typography
+                    variant="body2"
+                    sx={{ color: "text.secondary", textAlign: "center", px: 2 }}
+                  >
+                    {emptyMessage}
                   </Typography>
-                  {search && (
-                    <Button size="small" onClick={clearSearch}>
-                      Clear search
-                    </Button>
-                  )}
+                  <Stack direction="row" spacing={1}>
+                    {search && (
+                      <Button size="small" onClick={clearSearch}>
+                        Clear search
+                      </Button>
+                    )}
+                    {entryFilters.size > 0 && (
+                      <Button size="small" onClick={clearEntryFilters}>
+                        Clear filters
+                      </Button>
+                    )}
+                  </Stack>
                 </Box>
               ),
             }}
@@ -875,6 +1059,21 @@ const PasswordsPage = () => {
         removed entry takes its attachments with it. If you have a snapshot from before the damage,
         restoring it keeps them instead.
       </ConfirmDialog>
+      <PasswordHistoryDialog
+        entry={historyEntry}
+        onClose={() => setHistoryName(null)}
+        onCopy={copy}
+        onRestore={handleRestoreHistory}
+      />
+      <MoveToFolderDialog
+        open={!!moveTargets}
+        entries={moveRows}
+        folders={folderOptions}
+        counts={counts}
+        hidden={moveHidden}
+        onClose={() => setMoveTargets(null)}
+        onMove={handleMove}
+      />
       <EntryContextMenu
         menu={contextMenu}
         onClose={() => setContextMenu(null)}

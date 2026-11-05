@@ -23,6 +23,7 @@ from errors import InvalidRequest, VaultDamaged
 from helpers import VaultKey
 from models import AttachmentModel, EntryModel, utc_now
 from schemas import (
+    BulkMoveResult,
     BulkResult,
     ImportRowReport,
     OnConflict,
@@ -304,6 +305,33 @@ class PasswordCRUD(BaseCRUD):
             count=len(names),
             detail=_entries_word(len(names)) + " moved to trash.",
         )
+
+    async def move_passwords(
+        self, names: Sequence[str], folder: str | None, key: VaultKey
+    ) -> BulkMoveResult:
+        """
+        Put every named active entry in `folder` (None: no folder) in one
+        transaction: one missing or unreadable entry moves none. Entries already
+        there are left untouched; a moved entry counts as edited, so it is no
+        longer marked as backed up.
+        """
+        moved = 0
+        for name in names:
+            model, document = await find_entry(self.session, key, name)
+            if (document.folder or None) == folder:
+                continue
+            seal_entry(key, model, document.model_copy(update={"folder": folder}))
+            model.backed_up = False
+            moved += 1
+        await self.session.flush()
+        unchanged = len(names) - moved
+        if folder is None:
+            detail = f"{_entries_word(moved)} taken out of their folder."
+        else:
+            detail = f"{_entries_word(moved)} moved to '{folder}'."
+        if unchanged:
+            detail += f" {_entries_word(unchanged)} already there."
+        return BulkMoveResult(count=moved, unchanged=unchanged, detail=detail)
 
     async def restore_passwords(
         self, targets: Sequence[TrashedEntryRef], key: VaultKey

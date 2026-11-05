@@ -10,6 +10,8 @@ from api.endpoints.deps import (
 )
 from api.responses import inject_responses
 from schemas import (
+    BulkMovePayload,
+    BulkMoveResult,
     BulkResult,
     BulkTrashedPayload,
     BulkTrashPayload,
@@ -71,6 +73,20 @@ async def trash_entries(
     body: BulkTrashPayload, crud: PasswordCRUDDep, key: VaultKeyDep
 ) -> BulkResult:
     return await crud.trash_passwords([e.password_name for e in body.entries], key)
+
+
+@router.post(
+    "/entries/move",
+    name="vault:move-entries",
+    response_model=BulkMoveResult,
+    responses=_BULK_RESPONSES,
+)
+async def move_entries(
+    body: BulkMovePayload, crud: PasswordCRUDDep, key: VaultKeyDep
+) -> BulkMoveResult:
+    return await crud.move_passwords(
+        [e.password_name for e in body.entries], body.folder, key
+    )
 
 
 @router.post(

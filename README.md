@@ -80,9 +80,10 @@ Then open **[http://localhost:3000](http://localhost:3000)**. [CONTRIBUTING.md](
 - built-in two-factor: paste a 2FA secret, and CipherMoth shows the live rolling code, computed in the browser
 - secure notes for free-form secrets (recovery codes, Wi-Fi, passport details), encrypted just like passwords
 - attach files to any entry (recovery-code PDFs, license keys, key files), up to 5 MB each, encrypted with your vault key
-- search, favorites, folders, tags, and password history to keep a growing vault tidy
+- search, favorites, folders, tags, and password history to keep a growing vault tidy; move a whole selection into a folder (or a new one) in one go, with Undo; quick filters for favorites, secure notes, entries with notes, attachments or 2FA
 - trash for deletions you can restore from or empty for good when you're sure, one entry or a whole selection at a time (with Undo)
-- quick actions: double-click to edit, right-click for copy username/password/2FA code, open website, duplicate, favorite and trash, plus keyboard shortcuts
+- quick actions: double-click to edit, right-click for copy username/password/2FA code, open website, password history, duplicate, favorite, move to folder and trash, plus keyboard shortcuts
+- password history: the last 10 passwords of every login, with when each was replaced, to copy one or use it again
 - a native macOS menu bar in the desktop app: new login or note, find, import, backup, trash, health, settings and lock, each with its usual shortcut
 - light and dark themes that flip across the whole app, toggled by a moth that flutters off as the colours fade (and remembers your pick)
 - vault health check that flags weak, reused, and old passwords, entirely on your device

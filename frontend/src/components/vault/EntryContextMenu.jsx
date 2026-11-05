@@ -1,7 +1,9 @@
 import { Divider, ListItemIcon, ListItemText, Menu, MenuItem, Typography } from "@mui/material";
 import ClearAllIcon from "@mui/icons-material/ClearAll";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
+import DriveFileMoveOutlinedIcon from "@mui/icons-material/DriveFileMoveOutlined";
 import EditIcon from "@mui/icons-material/Edit";
+import HistoryIcon from "@mui/icons-material/History";
 import KeyIcon from "@mui/icons-material/Key";
 import LinkIcon from "@mui/icons-material/Link";
 import LibraryAddOutlinedIcon from "@mui/icons-material/LibraryAddOutlined";
@@ -13,9 +15,10 @@ import StarBorderIcon from "@mui/icons-material/StarBorder";
 import StickyNote2OutlinedIcon from "@mui/icons-material/StickyNote2Outlined";
 
 import { DELETE_KEY_LABEL } from "../../lib/shortcuts";
+import { hasHistory } from "../../lib/passwordHistory";
 
-const Item = ({ icon, label, hint, onClick, danger = false }) => (
-  <MenuItem onClick={onClick} sx={danger ? { color: "error.main" } : undefined}>
+const Item = ({ icon, label, hint, onClick, danger = false, disabled = false }) => (
+  <MenuItem onClick={onClick} disabled={disabled} sx={danger ? { color: "error.main" } : undefined}>
     <ListItemIcon sx={danger ? { color: "error.main" } : undefined}>{icon}</ListItemIcon>
     <ListItemText>{label}</ListItemText>
     {hint && (
@@ -61,6 +64,12 @@ const EntryContextMenu = ({ menu, onClose, actions }) => {
   if (menu?.selection > 1) {
     items = [
       <Heading key="heading">{menu.selection} selected</Heading>,
+      <Item
+        key="move"
+        icon={<DriveFileMoveOutlinedIcon fontSize="small" />}
+        label={`Move ${menu.selection} to folder…`}
+        onClick={run(actions.moveSelection)}
+      />,
       <Item
         key="trash"
         danger
@@ -119,6 +128,20 @@ const EntryContextMenu = ({ menu, onClose, actions }) => {
           onClick={run(() => actions.openUrl(row.url))}
         />
       ),
+      !note && (
+        <Item
+          key="history"
+          icon={<HistoryIcon fontSize="small" />}
+          label={
+            hasHistory(row)
+              ? `Password history (${row.password_history.length})`
+              : "No password history yet"
+          }
+          hint={hasHistory(row) ? "H" : undefined}
+          disabled={!hasHistory(row)}
+          onClick={run(() => actions.history(row))}
+        />
+      ),
       <Divider key="divider-entry" />,
       <Item
         key="edit"
@@ -138,6 +161,12 @@ const EntryContextMenu = ({ menu, onClose, actions }) => {
         icon={row.favorite ? <StarIcon fontSize="small" /> : <StarBorderIcon fontSize="small" />}
         label={row.favorite ? "Remove from favorites" : "Add to favorites"}
         onClick={run(() => actions.toggleFavorite(row))}
+      />,
+      <Item
+        key="move"
+        icon={<DriveFileMoveOutlinedIcon fontSize="small" />}
+        label="Move to folder…"
+        onClick={run(() => actions.move(row.password_name))}
       />,
       <Divider key="divider-trash" />,
       <Item

@@ -556,9 +556,36 @@ class BulkTrashedPayload(BaseModel):
         return self
 
 
+class BulkMovePayload(BulkTrashPayload):
+    """
+    Active entries to move into one folder together, by name. The folder
+    follows the entry form's rules; null takes the entries out of their folder,
+    and an empty name is refused rather than read as null.
+    """
+
+    folder: str | None = Field(max_length=_MAX_FOLDER_LENGTH)
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    @field_validator("folder")
+    @classmethod
+    def _named(cls, value: str | None) -> str | None:
+        require_unicode_text(value)
+        if value == "":
+            raise ValueError(
+                "Folder name can't be empty. Send null to take the entries "
+                "out of their folder."
+            )
+        return value
+
+
 class BulkResult(BaseModel):
     count: int
     detail: str
+
+
+class BulkMoveResult(BulkResult):
+    unchanged: int
 
 
 class SettingsResponse(BaseModel):

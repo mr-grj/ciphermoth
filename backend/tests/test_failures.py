@@ -79,6 +79,16 @@ WRITES: dict[str, Write] = {
         "/passwords/alpha/favorite", json={"favorite": True}, headers=h
     ),
     "delete": lambda c, h: c.delete("/passwords/alpha", headers=h),
+    "move-many": lambda c, h: c.post(
+        "/vault/entries/move",
+        json={"entries": [{"password_name": "alpha"}], "folder": "Work"},
+        headers=h,
+    ),
+    "trash-many": lambda c, h: c.post(
+        "/vault/entries/trash",
+        json={"entries": [{"password_name": "alpha"}]},
+        headers=h,
+    ),
     "restore": lambda c, h: c.post("/passwords/trashed/restore", headers=h),
     "purge": lambda c, h: c.delete("/passwords/trashed/purge", headers=h),
     "attachment-add": lambda c, h: c.post(
