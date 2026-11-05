@@ -31,7 +31,7 @@ section = (
     .strip()
 )
 notes.write_text(
-    f"{section}\n\nDownload the file for your OS and CPU below. macOS: open the DMG and drag CipherMoth to Applications. Windows: run the installer. Linux: use the AppImage or install the .deb. Create a master password on first launch.\n\nThese installers have no Apple notarization or Microsoft verified-publisher certificate. Tauri updater signatures are separate and mandatory. See [installation and update instructions](https://github.com/{repo}/blob/{tag}/docs/UPDATING.md#desktop-updates).\n\nAppImage supports built-in updates; Debian uses package updates. SHA256SUMS and per-target source/build provenance are attached.\n"
+    f"{section}\n\nDownload the file for your OS and CPU below. macOS: open the DMG and drag CipherMoth to Applications. Windows: run the installer. Linux: use the AppImage or install the .deb. Create a master password on first launch.\n\nThese installers have no Apple notarization or Microsoft verified-publisher certificate. Tauri updater signatures are separate and mandatory. See [installation and update instructions](https://github.com/{repo}/blob/{tag}/docs/UPDATING.md#desktop-updates).\n\nAppImage supports built-in updates; Debian uses package updates. SHA256SUMS and per-target source/build provenance are attached.\n\nBrowser extension: ciphermoth-extension-chromium-{version}.zip (load unpacked) and ciphermoth-extension-firefox-{version}.xpi (signed by Mozilla, when present) are reproducible builds of this tag; see [the extension guide](https://github.com/{repo}/blob/{tag}/docs/EXTENSION.md) for installing and checking them.\n"
 )
 # If this fails because a draft already exists, inspect it before resuming;
 # an automatic retry must not replace previously staged artifacts.

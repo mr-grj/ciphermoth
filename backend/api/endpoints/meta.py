@@ -11,6 +11,7 @@ def get_meta() -> MetaResponse:
     return MetaResponse(
         version=get_api_settings().version,
         features=[
+            "browser-extension",
             "bulk-entry-actions",
             "bulk-entry-move",
             "entry-names-with-slash",

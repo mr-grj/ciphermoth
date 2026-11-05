@@ -17,6 +17,10 @@ Updates replace application files, not the local SQLite vault. Use **Backup** pe
 
 The production identity is `com.ciphermoth.desktop`. It never opens or migrates the old Alpha vault automatically. Export a complete encrypted backup in Alpha and import it into a newly created production vault if you choose to move your data. Docker remains independent. [Desktop data paths](../desktop/README.md#data-isolation) and [maintainer release instructions](../desktop/RELEASING.md) provide technical details.
 
+## Browser extension updates
+
+The extension shares CipherMoth's version number and is released with it. Installed from a store (once listed), it updates itself. Installed from a file, it does not: download the new `ciphermoth-extension-*` file from the release, check it against `SHA256SUMS`, and load it again (Chromium: replace the unpacked folder's contents and click **Reload** on `chrome://extensions`; Firefox: open the new signed `.xpi`). Your connection settings stay; you unlock again. An extension needs a server that lists the `browser-extension` feature in `/api/meta`; an older server makes the popup say "CipherMoth needs an update". Updating the server ends every extension session, like every other session. Details: [docs/EXTENSION.md](EXTENSION.md).
+
 ## Docker edition
 
 A self-hosted CipherMoth keeps the whole vault in one SQLite file, `vault.db`, in the `vault_data` Docker volume. Updating replaces the two containers; the volume stays. Snapshot and file-management commands do not need your master password; exporting or importing a portable backup does.

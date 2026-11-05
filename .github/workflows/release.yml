@@ -33,6 +33,65 @@ jobs:
           python desktop/release/version.py --check "$version"
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
+  # The browser extension: reproducible packages (docs/EXTENSION.md), checked
+  # by rebuilding, then the Firefox package signed by addons.mozilla.org as an
+  # unlisted add-on when the AMO credentials exist in the protected
+  # extension-release environment. Store uploads (Chrome Web Store, AMO
+  # listing) stay manual for now.
+  extension:
+    needs: source
+    runs-on: ubuntu-latest
+    environment: extension-release
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    env:
+      RELEASE_VERSION: ${{ needs.source.outputs.version }}
+      AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+      AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: extension/package-lock.json
+      - name: Install dependencies
+        working-directory: extension
+        run: npm ci
+      - name: Test, lint and build reproducibly
+        working-directory: extension
+        run: |
+          test "$(node -p 'require("./package.json").version')" = "$RELEASE_VERSION"
+          npm run typecheck
+          npm run lint
+          npm test
+          npm run package
+          cp dist/packages/SHA256SUMS "$RUNNER_TEMP/SHA256SUMS"
+          node scripts/verify.mjs "$RUNNER_TEMP/SHA256SUMS"
+          npm run lint:firefox
+      - name: Sign the Firefox package (unlisted, addons.mozilla.org)
+        if: env.AMO_JWT_ISSUER != ''
+        working-directory: extension
+        run: |
+          npx web-ext sign --channel unlisted --source-dir dist/firefox \
+            --artifacts-dir "$RUNNER_TEMP/signed" \
+            --api-key "$AMO_JWT_ISSUER" --api-secret "$AMO_JWT_SECRET"
+          cp "$RUNNER_TEMP"/signed/*.xpi "dist/packages/ciphermoth-extension-firefox-$RELEASE_VERSION.xpi"
+      - name: Build provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: extension/dist/packages/ciphermoth-extension-*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: extension-packages
+          path: |
+            extension/dist/packages/ciphermoth-extension-*
+          if-no-files-found: error
+
   desktop:
     needs: source
     uses: ./.github/workflows/desktop.yml
@@ -189,7 +248,7 @@ jobs:
       contents: read
 
   publish:
-    needs: [source, desktop, smoke]
+    needs: [source, desktop, smoke, extension]
     runs-on: ubuntu-latest
     environment: desktop-release
     permissions:
@@ -218,6 +277,20 @@ jobs:
           cd ../..
           python desktop/release/manifest.py --artifacts release-assets --version "$RELEASE_VERSION" --commit "$GITHUB_SHA" --verifier desktop/src-tauri/target/release/examples/verify_update --public-key release-assets/updater.pub
           cd release-assets && sha256sum -c SHA256SUMS
+      - uses: actions/download-artifact@v4
+        with:
+          name: extension-packages
+          path: extension-assets
+      - name: Add the browser extension packages
+        run: |
+          cd extension-assets
+          ls ciphermoth-extension-chromium-*.zip ciphermoth-extension-firefox-*.zip
+          for file in ciphermoth-extension-*; do
+            test ! -e "../release-assets/$file"
+            cp "$file" ../release-assets/
+            sha256sum "$file" >> ../release-assets/SHA256SUMS
+          done
+          cd ../release-assets && sha256sum -c SHA256SUMS
       - name: Stage and publish the complete stable release
         env:
           GH_TOKEN: ${{ github.token }}

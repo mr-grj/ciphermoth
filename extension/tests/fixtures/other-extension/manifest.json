@@ -1,0 +1,7 @@
+{
+  "manifest_version": 3,
+  "name": "Other extension (attack lab)",
+  "version": "1.0.0",
+  "description": "Tries to talk to CipherMoth from outside.",
+  "background": { "service_worker": "background.js" }
+}

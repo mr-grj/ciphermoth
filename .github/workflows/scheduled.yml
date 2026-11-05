@@ -34,6 +34,9 @@ jobs:
       - name: Audit the frontend image's file server
         run: node scripts/npm_audit.mjs docker/frontend/serve
 
+      - name: Audit the browser extension's dependencies
+        run: node scripts/npm_audit.mjs extension
+
   stress:
     name: Stress tests (fuzzing, process kills)
     runs-on: ubuntu-latest

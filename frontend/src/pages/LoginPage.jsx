@@ -21,6 +21,13 @@ import ThemeToggle from "../components/ThemeToggle";
 import { getMasterPasswordStrength } from "../lib/passwordStrength";
 import { GLOW, GLOW_SOFT, INK, WARN } from "../lib/brand";
 import { LOGOUT_NOTICE } from "../utils";
+import { pendingHandoff } from "../lib/extensionHandoff";
+
+const handoffBrowser = () => {
+  const handoff = pendingHandoff();
+  if (!handoff) return null;
+  return handoff.browser === "Browser" ? "the browser extension" : `${handoff.browser}`;
+};
 
 const unlockButtonSx = {
   bgcolor: GLOW,
@@ -33,6 +40,7 @@ const unlockButtonSx = {
 };
 
 const LoginPage = () => {
+  const [connectingBrowser] = useState(handoffBrowser);
   const { enqueueSnackbar } = useSnackbar();
 
   const { fetchStatus, unlock, create, setValue, setConfirm, setError } = useStoreActions(
@@ -175,7 +183,9 @@ const LoginPage = () => {
                     color: "text.secondary",
                   }}
                 >
-                  Your secrets stay in the dark.
+                  {connectingBrowser
+                    ? `Unlock to connect ${connectingBrowser}.`
+                    : "Your secrets stay in the dark."}
                 </Typography>
               </>
             ) : (

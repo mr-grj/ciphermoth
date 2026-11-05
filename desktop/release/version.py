@@ -16,6 +16,8 @@ def versions():
         for name in (
             "frontend/package.json",
             "desktop/package.json",
+            "extension/package.json",
+            "extension/manifest/base.json",
             "desktop/src-tauri/tauri.conf.json",
         )
     }
@@ -29,7 +31,11 @@ def versions():
         r'CORE_VERSION = "([^"]+)"',
         (ROOT / "desktop/core/desktop_core/entry.py").read_text(),
     )[1]
-    for name in ("frontend/package-lock.json", "desktop/package-lock.json"):
+    for name in (
+        "frontend/package-lock.json",
+        "desktop/package-lock.json",
+        "extension/package-lock.json",
+    ):
         data = json.loads((ROOT / name).read_text())
         values[name] = data["version"]
         values[name + " root"] = data["packages"][""]["version"]
@@ -52,7 +58,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     assert re.fullmatch(r"\d+\.\d+\.\d+", args.version), "Stable X.Y.Z required"
     if not args.check:
-        for folder in ("frontend", "desktop"):
+        for folder in ("frontend", "desktop", "extension"):
             subprocess.run(
                 [
                     "npm",
@@ -64,10 +70,11 @@ if __name__ == "__main__":
                 cwd=ROOT / folder,
                 check=True,
             )
-        p = ROOT / "desktop/src-tauri/tauri.conf.json"
-        data = json.loads(p.read_text())
-        data["version"] = args.version
-        p.write_text(json.dumps(data, indent=2) + "\n")
+        for name in ("desktop/src-tauri/tauri.conf.json", "extension/manifest/base.json"):
+            p = ROOT / name
+            data = json.loads(p.read_text())
+            data["version"] = args.version
+            p.write_text(json.dumps(data, indent=2) + "\n")
         for name in (
             "backend/pyproject.toml",
             "desktop/src-tauri/Cargo.toml",

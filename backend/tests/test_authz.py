@@ -33,6 +33,8 @@ PUBLIC_ROUTES = {
     ("POST", "/api/master_password/recover"),
     ("GET", "/api/meta"),
     ("GET", "/api/health"),
+    ("POST", "/api/extension/unlock"),
+    ("POST", "/api/extension/lock"),
 }
 
 SETTINGS_BODY = {
@@ -207,6 +209,15 @@ PROTECTED_ROUTES: dict[tuple[str, str], Spec] = {
         json={"master_password": MASTER_PASSWORD},
         headers=h,
     ),
+    ("POST", "/api/extension/sessions"): lambda c, h, x: c.post(
+        "/extension/sessions", json={"browser": "Firefox"}, headers=h
+    ),
+    ("GET", "/api/extension/sessions"): lambda c, h, x: c.get(
+        "/extension/sessions", headers=h
+    ),
+    ("DELETE", "/api/extension/sessions/{session_id}"): lambda c, h, x: c.delete(
+        f"/extension/sessions/{x['extension_id']}", headers=h
+    ),
     ("PATCH", "/api/master_password/update"): lambda c, h, x: c.patch(
         "/master_password/update",
         json={
@@ -218,6 +229,32 @@ PROTECTED_ROUTES: dict[tuple[str, str], Spec] = {
 }
 
 ROUTE_IDS = [f"{method} {path}" for method, path in PROTECTED_ROUTES]
+
+# The routes an extension session opens (and nothing else does); the second
+# matrix in test_extension_authz.py. Deny by default: every other route refuses
+# extension tokens.
+EXTENSION_ROUTES: dict[tuple[str, str], Spec] = {
+    ("POST", "/api/extension/matches"): lambda c, h, x: c.post(
+        "/extension/matches", json={"origin": "https://x.test"}, headers=h
+    ),
+    ("POST", "/api/extension/search"): lambda c, h, x: c.post(
+        "/extension/search", json={"query": "alp"}, headers=h
+    ),
+    ("POST", "/api/extension/credential"): lambda c, h, x: c.post(
+        "/extension/credential",
+        json={"id": x["alpha_id"], "origin": "https://x.test"},
+        headers=h,
+    ),
+    ("POST", "/api/extension/totp"): lambda c, h, x: c.post(
+        "/extension/totp",
+        json={"id": x["alpha_id"], "origin": "https://x.test"},
+        headers=h,
+    ),
+    ("POST", "/api/extension/session"): lambda c, h, x: c.post(
+        "/extension/session", headers=h
+    ),
+}
+EXTENSION_IDS = [f"{method} {path}" for method, path in EXTENSION_ROUTES]
 REACHED = {
     ("DELETE", "/api/vault/damaged/{kind}/{row_id}"): 400,
     # Reached the handler: a vault without security keys has none to challenge,
@@ -250,10 +287,20 @@ async def seed(client: httpx.AsyncClient, headers: Headers) -> dict:
         [{"name": "from-backup", "value": "restored-Value-1"}], MASTER_PASSWORD
     )
     trash = await client.get("/passwords/trash", headers=headers)
+    resp = await client.post(
+        "/extension/sessions", json={"browser": "Chrome"}, headers=headers
+    )
+    assert resp.status_code == 200, resp.text
+    listed = await client.get("/passwords", headers=headers)
     return {
         "attachment_id": attachment_id,
         "backup_zip": backup_zip,
         "beta_id": trash.json()[0]["id"],
+        "alpha_id": next(
+            p["id"] for p in listed.json() if p["password_name"] == "alpha"
+        ),
+        "extension_id": resp.json()["id"],
+        "extension_token": resp.json()["session_token"],
     }
 
 
@@ -299,7 +346,9 @@ def test_every_api_route_is_classified() -> None:
         if path.startswith("/api")
         for method in operations
     }
-    assert routes == PUBLIC_ROUTES | set(PROTECTED_ROUTES)
+    assert routes == PUBLIC_ROUTES | set(PROTECTED_ROUTES) | set(EXTENSION_ROUTES)
+    assert not set(EXTENSION_ROUTES) & (PUBLIC_ROUTES | set(PROTECTED_ROUTES))
+    assert all(path.startswith("/api/extension/") for _, path in EXTENSION_ROUTES)
 
 
 @pytest.mark.parametrize("route", list(PROTECTED_ROUTES), ids=ROUTE_IDS)
@@ -379,7 +428,7 @@ async def test_sessions_and_keys_from_before_a_rotation_are_rejected(
 async def test_uninitialized_vault_rejects_everything(
     client: httpx.AsyncClient, route: tuple[str, str]
 ) -> None:
-    ctx = {"attachment_id": 1, "backup_zip": b"PK", "beta_id": 1}
+    ctx = {"attachment_id": 1, "backup_zip": b"PK", "beta_id": 1, "extension_id": "x"}
     credentials = {
         **_as_key_headers(forged_keys("A" * 43 + "=")),
         "random token": auth("A" * 43),

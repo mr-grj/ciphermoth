@@ -1,0 +1,41 @@
+import { normalizeOrigin, originString, serverOrigin } from "./url";
+
+export interface Target {
+  vault: string;
+  api: string;
+}
+
+const apiFor = (vault: string, api: string | null): string | null => {
+  if (!api) return `${vault}/api`;
+  const origin = serverOrigin(api);
+  if (!origin) return null;
+  const raw = api.includes("://") ? api : `https://${api}`;
+  let path: string;
+  try {
+    path = new URL(raw).pathname.replace(/\/+$/, "");
+  } catch {
+    return null;
+  }
+  return `${originString(origin)}${path || "/api"}`;
+};
+
+// The vault (web app) origin and the API base the user typed, or a message
+// saying what is wrong. HTTPS is required except on this computer.
+export const targetFor = (vaultInput: string, apiInput: string | null): Target | string => {
+  const vault = serverOrigin(vaultInput);
+  if (!vault) {
+    return normalizeOrigin(vaultInput)
+      ? "Use an https:// address (plain http only works for localhost)."
+      : "That doesn't look like a web address.";
+  }
+  const vaultOrigin = originString(vault);
+  const api = apiFor(vaultOrigin, apiInput?.trim() || null);
+  if (!api) return "Use an https:// address for the API (plain http only works for localhost).";
+  return { vault: vaultOrigin, api };
+};
+
+// The host permissions a target needs: the vault's origin (for the handoff's
+// bridge script) and the API's, if it is elsewhere. Nothing else, ever.
+export const permissionOrigins = (target: Target): string[] => [
+  ...new Set([`${target.vault}/*`, `${new URL(target.api).origin}/*`]),
+];

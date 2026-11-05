@@ -1,7 +1,7 @@
 import base64
 from datetime import datetime
 from enum import StrEnum
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import (
     BaseModel,
@@ -646,3 +646,83 @@ class HealthResponse(BaseModel):
 class DamagedRows(BaseModel):
     entries: list[int]
     attachments: list[int]
+
+
+# The browser extension (docs/EXTENSION.md). Every body is strict: an unknown or
+# missing field is refused, so a confused or hostile caller cannot widen a
+# request.
+
+ExtensionBrowser = Literal[
+    "Chrome", "Chromium", "Edge", "Brave", "Opera", "Vivaldi", "Firefox", "Browser"
+]
+_Origin = Annotated[str, StringConstraints(min_length=1, max_length=2048)]
+
+
+class _ExtensionBody(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+
+class ExtensionUnlockPayload(MasterPassword):
+    """The master password typed into the extension's popup. Never a security
+    key: a vault that needs one is unlocked in the web app (handoff)."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    browser: ExtensionBrowser = "Browser"
+
+
+class ExtensionSessionRequest(_ExtensionBody):
+    browser: ExtensionBrowser
+
+
+class ExtensionSessionCreated(BaseModel):
+    session_token: str
+    id: str
+    idle_timeout_ms: int
+
+
+class ExtensionSessionInfo(BaseModel):
+    id: str
+    browser: str
+    created: datetime
+    last_used: datetime
+
+
+class ExtensionMatchRequest(_ExtensionBody):
+    origin: _Origin
+    subdomains: bool = False
+
+
+class ExtensionSearchRequest(_ExtensionBody):
+    query: Annotated[str, StringConstraints(max_length=200)]
+
+
+class ExtensionLoginRequest(_ExtensionBody):
+    id: Annotated[int, Field(ge=1, le=2**62)]
+    origin: _Origin
+    subdomains: bool = False
+    confirmed_mismatch: bool = False
+
+
+class ExtensionLogin(BaseModel):
+    id: int
+    name: str
+    username: str | None
+    host: str | None
+    favorite: bool
+    has_totp: bool
+
+
+class ExtensionLogins(BaseModel):
+    logins: list[ExtensionLogin]
+    truncated: bool
+
+
+class ExtensionCredential(BaseModel):
+    username: str | None
+    password: str
+
+
+class ExtensionTotp(BaseModel):
+    code: str
+    expires_in: int

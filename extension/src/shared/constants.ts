@@ -1,0 +1,34 @@
+// Build-time constants (scripts/build.mjs). __E2E__ is true only in the test
+// build, which the store packages never are; production code paths that read
+// it are removed as dead code.
+declare const __E2E__: boolean;
+declare const __TARGET__: "chromium" | "firefox";
+declare const __VERSION__: string;
+
+export const E2E = __E2E__;
+export const TARGET = __TARGET__;
+export const VERSION = __VERSION__;
+
+export const FEATURE = "browser-extension";
+export const SESSION_HEADER = "x-ciphermoth-session";
+export const REQUEST_TIMEOUT_MS = 15_000;
+export const MAX_RESPONSE_BYTES = 1024 * 1024;
+export const HANDOFF_TTL_MS = 5 * 60 * 1000;
+export const CLIPBOARD_CLEAR_MS = E2E ? 3_000 : 30_000;
+export const BADGE_MS = 2_000;
+export const BRIDGE_SCRIPT_ID = "ciphermoth-vault-bridge";
+export const SESSION_MESSAGE = "ciphermoth:extension-session";
+export const CONNECTED_MESSAGE = "ciphermoth:extension-connected";
+export const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+
+export const BROWSERS = [
+  "Chrome",
+  "Chromium",
+  "Edge",
+  "Brave",
+  "Opera",
+  "Vivaldi",
+  "Firefox",
+  "Browser",
+] as const;
+export type BrowserName = (typeof BROWSERS)[number];

@@ -1,6 +1,7 @@
 import base64
 import logging
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,7 +15,7 @@ from device_unlock import (
     Enrollment,
     PasswordIntervalDays,
 )
-from errors import InvalidKey, InvalidRequest, SessionRequired
+from errors import InvalidKey, InvalidRequest, NotFound, SessionRequired, UseHandoff
 from helpers import DecryptionFailed, VaultKey, open_device_wrapped_key
 from schemas import (
     Confirmation,
@@ -23,6 +24,9 @@ from schemas import (
     DeviceUnlockRequest,
     DeviceUnlockResult,
     DeviceUnlockStatus,
+    ExtensionSessionCreated,
+    ExtensionSessionInfo,
+    ExtensionUnlockPayload,
     MasterPasswordCreate,
     MasterPasswordUpdate,
     MasterPasswordUpdatePayload,
@@ -33,12 +37,16 @@ from schemas import (
     VaultSessionStatus,
     VaultUnlock,
 )
-from vault_sessions import VaultSessions
+from vault_sessions import Scope, VaultSessions
 from webauthn import TIMEOUT_MS, Challenges, session_binding
 
 logger = logging.getLogger(__name__)
 
 _SESSION_ENDED = "Your session expired or was locked. Unlock the vault again."
+
+
+def _utc(timestamp: float) -> datetime:
+    return datetime.fromtimestamp(timestamp, UTC)
 
 
 def _encode_base64url(value: bytes) -> str:
@@ -146,14 +154,84 @@ class VaultAccess(BaseCRUD):
         )
 
     async def authorize(
-        self, credential: SessionToken, *, refresh: bool = True
+        self,
+        credential: SessionToken,
+        *,
+        refresh: bool = True,
+        scope: Scope = Scope.FULL,
     ) -> VaultKey:
-        key = self.vault_sessions.resolve(credential.token, refresh=refresh)
+        key = self.vault_sessions.resolve(
+            credential.token, refresh=refresh, scope=scope
+        )
         try:
             return await self.master_password.verify_vault_key(key)
         except InvalidKey:
             self.vault_sessions.revoke(credential.token)
             raise SessionRequired(_SESSION_ENDED) from None
+
+    async def unlock_extension(self, body: ExtensionUnlockPayload) -> VaultUnlock:
+        """
+        An extension session from the master password typed into the
+        extension's popup. A vault that needs a security key is refused before
+        any KDF runs: WebAuthn from an extension cannot answer for the vault's
+        relying party, so the user unlocks in the web app and connects the
+        extension from there (``connect_extension``).
+        """
+        security_key_required, _ = await self.master_password.security_key_status()
+        if security_key_required:
+            raise UseHandoff(
+                "This vault needs a security key. Unlock it in CipherMoth and "
+                "connect the extension from there."
+            )
+        key = await self.master_password.unlock(body.master_password)
+        if key is None:
+            return VaultUnlock(valid=False)
+        await self._refresh_idle_timeout()
+        token, _ = self._open_extension(key, body.browser)
+        return VaultUnlock(
+            valid=True,
+            session_token=token,
+            idle_timeout_ms=self.vault_sessions.idle_timeout_ms,
+        )
+
+    def _open_extension(self, key: VaultKey, browser: str) -> tuple[str, str]:
+        token, handle = self.vault_sessions.open_extension(key, browser)
+        after_rollback(self.session, lambda: self.vault_sessions.revoke(token))
+        return token, handle
+
+    async def connect_extension(
+        self, key: VaultKey, browser: str
+    ) -> ExtensionSessionCreated:
+        """An extension session for the handoff, opened from the key of an
+        unlocked full session (already checked against the vault)."""
+        await self._refresh_idle_timeout()
+        token, handle = self._open_extension(key, browser)
+        return ExtensionSessionCreated(
+            session_token=token,
+            id=handle,
+            idle_timeout_ms=self.vault_sessions.idle_timeout_ms,
+        )
+
+    def extension_sessions(self) -> list[ExtensionSessionInfo]:
+        return [
+            ExtensionSessionInfo(
+                id=info.handle,
+                browser=info.browser,
+                created=_utc(info.created),
+                last_used=_utc(info.last_used),
+            )
+            for info in self.vault_sessions.extension_sessions()
+        ]
+
+    def disconnect_extension(self, handle: str) -> None:
+        if not self.vault_sessions.revoke_extension(handle):
+            raise NotFound("No such browser extension session.")
+
+    def extension_status(self, credential: SessionToken) -> VaultSessionStatus:
+        info = self.vault_sessions.info(credential.token, scope=Scope.EXTENSION)
+        return VaultSessionStatus(
+            idle_timeout_ms=info.idle_timeout_ms, expires_in_ms=info.expires_in_ms
+        )
 
     def status(self, credential: SessionToken) -> VaultSessionStatus:
         info = self.vault_sessions.info(credential.token)

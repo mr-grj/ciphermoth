@@ -15,6 +15,22 @@ class InvalidKey(Forbidden):
     pass
 
 
+class WrongScope(Forbidden):
+    """A live session used on a route its scope does not allow: a browser
+    extension session outside /api/extension, or a full session on the routes
+    only the extension calls."""
+
+
+class UseHandoff(VaultError):
+    """The browser extension cannot unlock this vault with the master password
+    alone (it needs a security key): unlock in the web app and connect."""
+
+
+class OriginMismatch(VaultError):
+    """The extension asked for a login on a page its saved address does not
+    match, without the user confirming it in the popup."""
+
+
 class NotFound(VaultError):
     pass
 

@@ -68,6 +68,7 @@ release-dry:
 lint:
 	cd backend && uv run ruff check . ../docker/smoke
 	cd frontend && npm run lint
+	cd extension && npm run lint
 
 .PHONY: typecheck
 typecheck:
@@ -77,6 +78,7 @@ typecheck:
 format:
 	cd backend && uv run ruff format . ../docker/smoke
 	cd frontend && npm run format
+	cd extension && npm run format
 
 # Tests use a throwaway SQLite vault in a temporary folder; no services needed.
 .PHONY: test
@@ -85,12 +87,19 @@ test:
 	cd frontend && npm test
 	node --test docker/frontend/runtime-config.test.mjs
 	node --test scripts/npm_audit.test.mjs
+	cd extension && npm test
 
 # Builds the frontend image and checks its Content-Security-Policy in Chromium.
 .PHONY: test-browser
 test-browser:
 	docker build -f docker/frontend/Dockerfile --build-arg VITE_API_URL=__CIPHERMOTH_API_URL__ -t ciphermoth-frontend:browser-test .
 	cd docker/frontend/browser && npm ci && npx playwright install chromium && npm test
+
+# The browser extension in Playwright Chromium against a live backend: user
+# flows and the attack lab (extension/tests). Needs uv and Node only.
+.PHONY: test-extension
+test-extension:
+	cd extension && npm ci && npx playwright install chromium && npm run test:e2e
 
 # Fuzzing with many more Hypothesis examples, fault injection and scale tests.
 .PHONY: test-stress
@@ -101,6 +110,7 @@ test-stress:
 check:
 	cd backend && uv run ruff check . ../docker/smoke && uv run ruff format --check . ../docker/smoke && uv run ty check . ../docker/smoke
 	cd frontend && npm run lint && npm run format:check
+	cd extension && npm run typecheck && npm run lint && npm run format:check
 
 # Desktop uses a private Python process, never the Docker/server installation.
 .PHONY: desktop-setup desktop-dev desktop-build desktop-test desktop-check

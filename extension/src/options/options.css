@@ -1,0 +1,119 @@
+@import "../ui/base.css";
+
+body {
+  min-height: 100vh;
+}
+
+main {
+  max-width: 620px;
+  margin: 0 auto;
+  padding: 40px 24px 64px;
+}
+
+h1 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 6px;
+  font-size: 24px;
+}
+
+h1 .moth {
+  color: var(--glow);
+  display: flex;
+}
+
+.tagline {
+  margin: 0 0 28px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+section {
+  padding: 20px 0;
+  border-top: 1px solid var(--line);
+}
+
+h2 {
+  margin: 0 0 10px;
+  font-size: 15px;
+}
+
+section p {
+  margin: 0 0 10px;
+  color: var(--muted);
+}
+
+label {
+  display: block;
+  margin: 10px 0 6px;
+  font-weight: 600;
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.toggle {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin: 8px 0;
+}
+
+.toggle input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--glow);
+}
+
+.toggle span {
+  font-weight: 600;
+}
+
+.toggle small {
+  display: block;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+details summary {
+  cursor: pointer;
+  color: var(--muted);
+  margin: 10px 0 0;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  font-size: 12px;
+}
+
+.status.on::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--glow);
+}
+
+code {
+  font-family: var(--mono);
+  font-size: 12.5px;
+}
+
+.buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}

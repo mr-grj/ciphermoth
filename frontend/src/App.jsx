@@ -6,6 +6,8 @@ import { useStoreActions } from "easy-peasy";
 import DesktopGate from "./platform/DesktopGate";
 import ThemeToggle from "./components/ThemeToggle";
 import SecurityKeyPrompt from "./components/security/SecurityKeyPrompt";
+import ConnectExtensionDialog from "./components/extension/ConnectExtensionDialog";
+import { IS_DESKTOP } from "./platform";
 import TopMenu from "./components/TopMenu";
 import { ColorModeProvider } from "./hooks/useColorMode";
 import useAutoLogout from "./hooks/useAutoLogout";
@@ -82,6 +84,7 @@ const AppContent = () => {
       </Box>
       <ThemeToggle />
       <SecurityKeyPrompt />
+      {!IS_DESKTOP && <ConnectExtensionDialog />}
     </Box>
   );
 };

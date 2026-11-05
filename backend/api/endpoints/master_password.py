@@ -37,6 +37,7 @@ from schemas import (
     VaultSessionStatus,
     VaultUnlock,
 )
+from vault_sessions import Scope
 
 router = APIRouter(tags=["master-password"])
 
@@ -127,7 +128,7 @@ async def recover(
 async def lock(
     token: SessionTokenHeader, vault_sessions: VaultSessionsDep
 ) -> VaultLock:
-    vault_sessions.revoke(token)
+    vault_sessions.revoke(token, scope=Scope.FULL)
     return VaultLock(locked=True)
 
 

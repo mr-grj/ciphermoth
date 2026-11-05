@@ -16,10 +16,13 @@ from errors import (
     InvalidKey,
     InvalidRequest,
     NotFound,
+    OriginMismatch,
     SessionRequired,
+    UseHandoff,
     VaultBusy,
     VaultDamaged,
     VaultError,
+    WrongScope,
 )
 
 logger = logging.getLogger(__name__)
@@ -28,6 +31,9 @@ logger = logging.getLogger(__name__)
 _ERROR_RESPONSES: tuple[tuple[type[VaultError], int, str | None], ...] = (
     (SessionRequired, status.HTTP_401_UNAUTHORIZED, "invalid_session"),
     (InvalidKey, status.HTTP_403_FORBIDDEN, "invalid_key"),
+    (WrongScope, status.HTTP_403_FORBIDDEN, "extension_scope"),
+    (UseHandoff, status.HTTP_409_CONFLICT, "use_handoff"),
+    (OriginMismatch, status.HTTP_409_CONFLICT, "origin_mismatch"),
     (Forbidden, status.HTTP_403_FORBIDDEN, None),
     (NotFound, status.HTTP_404_NOT_FOUND, None),
     (InvalidRequest, status.HTTP_400_BAD_REQUEST, None),

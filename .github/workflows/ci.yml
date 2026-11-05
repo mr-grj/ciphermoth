@@ -134,6 +134,100 @@ jobs:
         working-directory: docker/frontend/browser
         run: npm test
 
+  extension:
+    name: Browser extension (types, ESLint, Prettier, Vitest, web-ext lint, reproducible build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: extension/package-lock.json
+
+      - name: Install dependencies
+        working-directory: extension
+        run: npm ci
+
+      - name: Type check
+        working-directory: extension
+        run: npm run typecheck
+
+      - name: Lint
+        working-directory: extension
+        run: npm run lint
+
+      - name: Format check
+        working-directory: extension
+        run: npm run format:check
+
+      - name: Unit tests (URL vectors, messages, manifests, clipboard, packages)
+        working-directory: extension
+        run: npm test
+
+      - name: Build both packages twice and compare
+        working-directory: extension
+        run: |
+          npm run package
+          cp dist/packages/SHA256SUMS "$RUNNER_TEMP/SHA256SUMS"
+          node scripts/verify.mjs "$RUNNER_TEMP/SHA256SUMS"
+
+      - name: web-ext lint (Firefox)
+        working-directory: extension
+        run: npm run lint:firefox
+
+  extension-e2e:
+    name: Browser extension e2e and attack lab (Chromium)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      UV_PYTHON_PREFERENCE: only-managed
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: uv sync --frozen
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            extension/package-lock.json
+
+      - name: Install frontend and extension dependencies
+        run: |
+          npm ci --prefix frontend
+          npm ci --prefix extension
+
+      - name: Install Chromium
+        working-directory: extension
+        run: npx playwright install --with-deps chromium
+
+      - name: Flows and attack lab against a live backend
+        working-directory: extension
+        run: npm run test:e2e
+
+      - name: Keep the report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: extension-e2e-report
+          path: |
+            extension/playwright-report
+            extension/test-results
+          retention-days: 7
+
   images:
     name: Images and Compose install (${{ matrix.platform.slug }})
     runs-on: ${{ matrix.platform.runner }}

@@ -11,6 +11,7 @@ from crud.attachment import AttachmentCRUD
 from crud.backup import BackupCRUD
 from crud.damage import DamageCRUD
 from crud.engine import Database
+from crud.extension import ExtensionCRUD
 from crud.master_password import MasterPasswordCRUD
 from crud.password import PasswordCRUD
 from crud.security import SecurityCRUD
@@ -19,7 +20,7 @@ from crud.vault_access import SessionToken, VaultAccess
 from device_unlock import DeviceUnlockStore
 from errors import Forbidden, InvalidRequest, SessionRequired
 from helpers import VaultKey
-from vault_sessions import VaultSessions
+from vault_sessions import Scope, VaultSessions
 from webauthn import Challenges, session_binding
 
 SESSION_HEADER = "x-ciphermoth-session"
@@ -61,6 +62,14 @@ _READ_ONLY_ROUTES = frozenset(
         "security:challenge",
         "security:key-options",
         "passwords:backup",
+        "extension:unlock",
+        "extension:connect",
+        "extension:disconnect",
+        "extension:matches",
+        "extension:search",
+        "extension:credential",
+        "extension:totp",
+        "extension:session-activity",
     }
 )
 
@@ -219,3 +228,38 @@ async def require_master_password(
 ) -> None:
     if not await crud.is_initialized():
         raise Forbidden("No master password set.")
+
+
+async def get_extension_crud(session: SessionDep) -> ExtensionCRUD:
+    return ExtensionCRUD(session)
+
+
+ExtensionCRUDDep = Annotated[ExtensionCRUD, Depends(get_extension_crud)]
+
+
+async def get_extension_credential(
+    token: SessionTokenHeader, vault_sessions: VaultSessionsDep
+) -> SessionToken:
+    """
+    A browser extension session token, resolved in memory before the request
+    touches the database, like ``get_credential``. A full session's token is
+    refused here (403 ``extension_scope``), and ``get_credential`` refuses an
+    extension's on every other route: the two kinds never open each other's
+    routes.
+    """
+    if token is None:
+        raise SessionRequired("The vault is locked. Unlock it first.")
+    vault_sessions.resolve(token, refresh=False, scope=Scope.EXTENSION)
+    return SessionToken(token)
+
+
+ExtensionCredentialDep = Annotated[SessionToken, Depends(get_extension_credential)]
+
+
+async def get_extension_key(
+    access: VaultAccessDep, credential: ExtensionCredentialDep
+) -> VaultKey:
+    return await access.authorize(credential, scope=Scope.EXTENSION)
+
+
+ExtensionKeyDep = Annotated[VaultKey, Depends(get_extension_key)]

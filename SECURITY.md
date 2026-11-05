@@ -17,6 +17,7 @@ Things I want to know about:
 - Encryption weaknesses or key leakage
 - SQL injection, command injection, that whole family
 - Anything that could expose the vault to an unauthorized party
+- The browser extension filling a login where it should not (another site, a hidden field, a frame), or its session reaching more than it should
 
 Things that are out of scope:
 
@@ -99,6 +100,17 @@ Optional (Settings → Security), and strongly recommended once you use a securi
 - **What it can do.** Whoever holds the code can set a new master password and open the vault, also without your security keys (that is its purpose: a forgotten password, lost keys). Treat it like the vault itself: write it down or print it and keep it offline. Guessing it is not practical (2^160 codes, each guess an Argon2id run plus the API's rate limit).
 - **Using it** re-keys the vault exactly like a master password change, ends every other session, turns biometric unlock off and replaces the code with a new one shown once. Your security keys keep working (the vault keeps their factor key sealed under the vault key) unless you say you lost them, which removes them.
 - **Without one**, nobody can reset a forgotten master password: not the server, not the maintainer.
+
+## The browser extension
+
+Optional (Chrome, Brave, Edge, Opera, Vivaldi, Firefox), for the server edition. It fills a login into the page you are on only when you click its button or press its shortcut. The full guide, with what it guarantees and what it cannot, is [docs/EXTENSION.md](docs/EXTENSION.md).
+
+- **A session that can only fill.** Unlocking (with the master password in the extension's popup, or in the web app, which then hands a token to the extension) opens an *extension session*: a random token mapped to the vault key in the server's memory, like any session, with the same inactivity timeout and 12-hour limit, and ended by the same events (lock, master password change, recovery, restart). The server, not the extension, limits it to five routes under `/api/extension/`: the logins whose saved address matches a page, a search over logins (name, username, site), one login's username and password at the moment of a fill or copy, a 2FA code (never the secret), and a heartbeat. Every other route refuses it with `403 extension_scope`, and those five refuse a normal session. A test matrix classifies every API route for both kinds of token, deny by default. At most 8 extension sessions exist, apart from web sessions; Settings → Browser extension lists them (browser and times, never tokens) and disconnects any.
+- **What the extension keeps.** The token sits in the browser's memory-only session storage, readable only by the extension's own pages, and goes when the browser exits. Its settings (the vault's address, two preferences) are the only thing written to disk. No password, entry name or token: the tests scan the whole browser profile for them after a session.
+- **What it sends.** Only to the address you configured, only the page's origin (scheme, host and port) to find matches. Requests refuse redirects, send no cookies and fail on TLS errors. No favicons, analytics or remote configuration.
+- **The handoff.** "Unlock in CipherMoth" opens your vault with a random single-use 256-bit request in the URL fragment (never sent to a server). After you confirm in the web app, it posts the token to its own page, where a script of the extension, registered only on your vault's address and only while that request is pending, passes it on. The extension accepts it once, from that tab's top frame, on that origin, with that request, within five minutes, and only after the server confirms it.
+- **Filling.** Only after your click or shortcut (pages cannot trigger either), only the top frame, only when the page's origin still equals the one matched (checked again inside the page), only fields a person can see and use: not hidden, transparent, masked, clipped, covered, read-only, off-screen or in a frame, and never a sign-up form. Matching is exact (scheme, host, port) unless you turn on subdomains, which never crosses a public suffix. Nothing is ever drawn inside a page, so there is nothing to click-jack. Hostile test pages for all of this (an "attack lab") run in CI.
+- **Limits.** The guarantees are per origin: once a visible field on the right site is filled, that site's own scripts can read it, as they could if you typed it. A stolen extension token can, until it expires or you disconnect it, read login passwords one by one (rate-limited) though nothing else. Malware running as your user can read browser memory. Reports about any of this are very welcome.
 
 ## One thing worth knowing
 

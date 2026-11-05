@@ -18,6 +18,7 @@ dependencies = [
     "typer>=0.26.0",
     "httpx>=0.28.0",
     "fido2>=2.2.1",
+    "idna>=3.10",
 ]
 
 [dependency-groups]

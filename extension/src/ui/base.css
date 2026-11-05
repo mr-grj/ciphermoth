@@ -1,0 +1,185 @@
+/* CipherMoth extension pages. Brand tokens mirror frontend/src/lib/brand.js
+   (the build checks they stay equal). Dark by default, light when the system
+   asks for it. */
+
+@font-face {
+  font-family: "Space Grotesk";
+  src: url("fonts/space-grotesk.woff2") format("woff2");
+  font-weight: 300 700;
+  font-display: block;
+}
+
+@font-face {
+  font-family: "Space Mono";
+  src: url("fonts/space-mono.woff2") format("woff2");
+  font-weight: 400;
+  font-display: block;
+}
+
+:root {
+  --ink: #0b0b0c;
+  --paper-dark: #141416;
+  --surface: #f4f4f2;
+  --glow: #7dd3c0;
+  --glow-soft: #a8e6d8;
+  --warn: #e0982f;
+  --weak: #d15b5b;
+  --totp: #1f7a68;
+
+  --bg: var(--ink);
+  --panel: var(--paper-dark);
+  --raised: #1c1c1f;
+  --text: #f4f4f2;
+  --muted: #a3a6a9;
+  --faint: #6f7276;
+  --line: rgba(255, 255, 255, 0.1);
+  --hover: rgba(125, 211, 192, 0.08);
+  --selected: rgba(125, 211, 192, 0.16);
+  --accent: var(--glow);
+  --accent-text: var(--ink);
+  --focus: var(--glow);
+  --danger: #ec8a8a;
+  --warn-text: #f0b866;
+  color-scheme: dark;
+
+  --sans: "Space Grotesk", system-ui, sans-serif;
+  --mono: "Space Mono", ui-monospace, monospace;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #ffffff;
+    --panel: var(--surface);
+    --raised: #ffffff;
+    --text: #0b0b0c;
+    --muted: #55585c;
+    --faint: #6c6f73;
+    --line: #e2e2df;
+    --hover: rgba(11, 11, 12, 0.04);
+    --selected: rgba(31, 122, 104, 0.12);
+    --accent: var(--ink);
+    --accent-text: #f4f4f2;
+    --focus: #1f7a68;
+    --danger: #b03a3a;
+    --warn-text: #8a5300;
+    color-scheme: light;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.45 var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.mono {
+  font-family: var(--mono);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: transparent;
+  cursor: pointer;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.button:hover {
+  background: var(--hover);
+}
+
+.button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.button.primary:hover {
+  filter: brightness(1.06);
+}
+
+.button.danger {
+  color: var(--danger);
+}
+
+.button[disabled] {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.field {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--raised);
+  outline: none;
+}
+
+.field:focus-visible,
+.field:focus {
+  border-color: var(--focus);
+  box-shadow: 0 0 0 1px var(--focus);
+}
+
+.error {
+  color: var(--danger);
+}
+
+.warn {
+  color: var(--warn-text);
+}
+
+.wordmark {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.wordmark span {
+  color: var(--glow);
+}
+
+@media (prefers-color-scheme: light) {
+  .wordmark span {
+    color: var(--totp);
+  }
+}

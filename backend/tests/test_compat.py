@@ -49,6 +49,7 @@ async def test_vault_lifecycle_and_unlock(client: httpx.AsyncClient) -> None:
     assert (await client.get("/meta")).json() == {
         "version": get_api_settings().version,
         "features": [
+            "browser-extension",
             "bulk-entry-actions",
             "bulk-entry-move",
             "entry-names-with-slash",

@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Shadow DOM login</title>
+  </head>
+  <body style="font: 16px system-ui; padding: 40px">
+    <login-box></login-box>
+    <script>
+      customElements.define(
+        "login-box",
+        class extends HTMLElement {
+          constructor() {
+            super();
+            const root = this.attachShadow({ mode: "open" });
+            const form = document.createElement("form");
+            for (const [id, type, auto] of [
+              ["user", "email", "username"],
+              ["pass", "password", "current-password"],
+            ]) {
+              const input = document.createElement("input");
+              input.id = id;
+              input.type = type;
+              input.autocomplete = auto;
+              input.style.cssText = "display:block;margin:8px 0;padding:8px;width:280px";
+              form.append(input);
+            }
+            root.append(form);
+          }
+        }
+      );
+      window.shadowValues = () =>
+        Array.from(document.querySelector("login-box").shadowRoot.querySelectorAll("input")).map(
+          (i) => ({ id: i.id, value: i.value })
+        );
+    </script>
+  </body>
+</html>

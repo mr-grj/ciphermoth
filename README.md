@@ -36,6 +36,8 @@ So there's **CipherMoth**. It lives on your hardware and keeps your secrets in a
 | ![Set up your vault](docs/screenshots/00-login.png) | ![Vault overview](docs/screenshots/01-vault.png) |
 | **Add a password, generate a strong one** | **Vault health, computed on your device** |
 | ![Add password with generator](docs/screenshots/02-add-generator.png) | ![Vault health report](docs/screenshots/03-health.png) |
+| **The browser extension, only when you ask** | **Light, following your system** |
+| ![Browser extension popup, dark](docs/screenshots/04-extension-dark.png) | ![Browser extension popup, light](docs/screenshots/05-extension-light.png) |
 
 ## Get started
 
@@ -90,6 +92,7 @@ Then open **[http://localhost:3000](http://localhost:3000)**. [CONTRIBUTING.md](
 - cryptographically secure password generator (not the `Math.random()` kind) with a strength indicator on every entry
 - import from Chrome, Bitwarden, KeePass, Proton Pass, and friends via CSV
 - complete encrypted backups (`.cmbackup`): every entry, the trash, password history, attachments and settings, restorable into this vault or a new one
+- a **browser extension** for Chrome, Brave, Edge, Opera, Vivaldi and Firefox that fills a login on the page you're on **only when you ask** (toolbar button or Ctrl/⌘+Shift+L): nothing appears inside pages, nothing fills on page load, no "save this login?" nagging. It unlocks with your master password or hands off to CipherMoth for a security key, and its session can only fill: it cannot list your vault, read notes or export anything. No CipherMoth account, ever: it talks only to your own server, and only the page's origin is sent to find matches ([docs/EXTENSION.md](./docs/EXTENSION.md))
 - a CLI (`ciphermoth`) for the self-hosted edition, and native desktop auto-lock plus clipboard-clearing (for the small things that matter ^^)
 - optional desktop update checks through GitHub Releases: you choose when to install, Tauri verifies the signature, and your local vault stays in place. No account or telemetry. AppImage supports built-in updates; Debian uses package updates. Docker images remain signed with cosign
 
@@ -101,7 +104,7 @@ CipherMoth is probably a good fit if you:
 - want it to work offline, with optional updates and backups you control
 - like small, auditable software and are happy owning your own backups
 
-It's probably not for you (yet) if you need browser autofill, a mobile app, family or team sharing, managed cloud sync,
+It's probably not for you (yet) if you need autofill that pops up inside every login form, a mobile app, family or team sharing, managed cloud sync,
 or someone else who can recover your vault for you. No hard feelings, those are real needs, just not what this is trying
 to be.
 
@@ -170,6 +173,7 @@ To report a vulnerability, see [SECURITY.md](./SECURITY.md).
 | Frontend | React 19, Vite, MUI v9, easy-peasy |
 | Package manager | uv (backend), npm (frontend) |
 | Desktop | Tauri 2, Rust, PyInstaller onedir |
+| Browser extension | Manifest V3, TypeScript, Preact, esbuild (reproducible), Playwright |
 | Infrastructure | Docker, Docker Compose v2, GitHub Actions |
 
 ## Docs
@@ -177,6 +181,7 @@ To report a vulnerability, see [SECURITY.md](./SECURITY.md).
 - **[CONTRIBUTING.md](./CONTRIBUTING.md)** - hacking on CipherMoth, self-hosting on a server, configuration, and updates
 - **[docs/UPDATING.md](./docs/UPDATING.md)** - desktop installation and updates, Docker snapshots and older vaults
 - **[desktop/README.md](desktop/README.md)** - native builds, data paths and desktop internals
+- **[docs/EXTENSION.md](./docs/EXTENSION.md)** - the browser extension: install, connect, what it can and cannot do, checking a download
 - **[docs/CLI.md](./docs/CLI.md)** - the `ciphermoth` command-line reference. A plain Docker install already has it: `install.sh` leaves a `cip` script in your CipherMoth folder, so `./cip password list` just works (no Python, no clone)
 - **[SECURITY.md](./SECURITY.md)** - reporting a vulnerability
 - Logo, wordmark, and favicon live in [`docs/brand/`](./docs/brand)

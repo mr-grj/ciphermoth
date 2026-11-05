@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Sign in</title>
+    <style>
+      body {
+        font: 16px system-ui;
+        padding: 40px;
+      }
+      input {
+        display: block;
+        margin: 8px 0 16px;
+        padding: 8px;
+        width: 280px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Sign in</h1>
+    <form id="login" action="/session" method="post">
+      <label for="user">Username or email</label>
+      <input id="user" name="login" autocomplete="username" />
+      <label for="pass">Password</label>
+      <input id="pass" name="password" type="password" autocomplete="current-password" />
+      <button type="submit">Sign in</button>
+    </form>
+    <script>
+      // Like React/Vue: the app learns values only from input events.
+      window.__events = [];
+      for (const input of document.querySelectorAll("input")) {
+        input.addEventListener("input", (e) => window.__events.push(["input", e.target.id]));
+        input.addEventListener("change", (e) => window.__events.push(["change", e.target.id]));
+      }
+      window.__submitted = false;
+      document.getElementById("login").addEventListener("submit", (e) => {
+        e.preventDefault();
+        window.__submitted = true;
+      });
+    </script>
+  </body>
+</html>

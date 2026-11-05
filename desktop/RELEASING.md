@@ -32,6 +32,14 @@ Use the existing maintainer Git identity, normal commits, and no bot co-author t
 7. Only after all gates pass, `publish.py` creates one draft, uploads the complete set, downloads it again and checks every hash, then publishes it as a normal stable Latest release. Existing releases are never silently overwritten. If a failed upload leaves a draft, inspect the draft and failure before resuming; do not replace the tag.
 8. Verify the public release and downloads without authentication, the Latest manifest, and a released app's no-update result. Keep the CI run and commit in the release validation report. Do not call the release complete while a platform or Docker gate is failing.
 
+### The browser extension
+
+The extension (`extension/`) is versioned with everything else: `version.py` also updates `extension/package.json`, its lockfile and `extension/manifest/base.json`, and `--check` covers them. Before tagging, run the manual checklist in `extension/VALIDATION.md` on the CI-built packages of the release commit (the `extension` job of a dispatched Release run, or `npm run package` on the exact commit, which is byte-identical).
+
+The Release workflow's `extension` job (environment **extension-release**) checks the version, runs the type check, lint and unit tests, builds both packages, rebuilds them to prove the build reproducible (`scripts/verify.mjs`), runs `web-ext lint`, and attests build provenance. When `AMO_JWT_ISSUER` and `AMO_JWT_SECRET` exist in that environment, it signs the Firefox package as an **unlisted** add-on (`web-ext sign --channel unlisted`) and adds `ciphermoth-extension-firefox-X.Y.Z.xpi`; without them the release carries only the unsigned zips. The publish job appends the extension files to `SHA256SUMS` after `manifest.py`, so they are uploaded, downloaded again and hash-checked with the rest.
+
+Store submissions are manual for now: upload `ciphermoth-extension-chromium-X.Y.Z.zip` to the Chrome Web Store (and Edge Add-ons, Opera add-ons once used) and the Firefox zip to the AMO listing, from the release assets, never from a local build. Every publisher account uses hardware-key 2FA. Keep the Chrome extension signing key (which pins the extension ID through the manifest `key`, needed for desktop native messaging later) offline; record every store-assigned ID. AMO credentials only ever live in the protected environment.
+
 `requireSignedVersion` is mandatory. Do not disable TLS, allow downgrades, expose generic updater plugin capabilities, or sign arbitrary external payloads. Canonical filenames are part of the signature's trusted comment and bind architecture; re-sign after renaming, never edit a `.sig` by hand.
 
 ## Installed update tests
