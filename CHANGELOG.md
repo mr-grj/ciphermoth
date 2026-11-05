@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [3.5.0] - 2026-11-05
 
 Put many secrets in their place at once, and get an old password back when you need it.
 
