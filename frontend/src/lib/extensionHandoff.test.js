@@ -11,6 +11,7 @@ import {
   deliverToken,
   detectBrowser,
   installTarget,
+  isConnectedIn,
   pendingHandoff,
 } from "./extensionHandoff";
 
@@ -26,10 +27,13 @@ const at = (hash) => {
 
 describe("captureHandoff", () => {
   it("keeps a valid request and drops the fragment from the address bar", () => {
-    const env = at(`#/connect-extension?request=${NONCE}&browser=Firefox`);
+    const env = at(
+      `#/connect-extension?request=${NONCE}&browser=Firefox&client=AbCdEfGhIjKlMnOpQrStUv`
+    );
     expect(captureHandoff(env)).toEqual({
       request: NONCE,
       browser: "Firefox",
+      client: "AbCdEfGhIjKlMnOpQrStUv",
       expires: NOW + HANDOFF_TTL_MS,
     });
     expect(env.history.replaceState).toHaveBeenCalledWith(null, "", "/");
@@ -51,6 +55,11 @@ describe("captureHandoff", () => {
   it("names an unknown browser generically", () => {
     const env = at(`#/connect-extension?request=${NONCE}&browser=<script>`);
     expect(captureHandoff(env).browser).toBe("Browser");
+  });
+
+  it("drops a malformed installation id but keeps the request", () => {
+    const env = at(`#/connect-extension?request=${NONCE}&browser=Chrome&client=short!`);
+    expect(captureHandoff(env).client).toBeNull();
   });
 
   it.each(["", "#/passwords", "#/connect-extensions?request=x", "#connect-extension"])(
@@ -151,6 +160,14 @@ describe("detectBrowser and installTarget", () => {
     expect(detectBrowser({ userAgent: ua.Chrome, brave: {} })).toBe("Brave");
     expect(detectBrowser({ userAgent: "Safari/605" })).toBeNull();
   });
+  it("knows a browser is connected only from the vault's list", () => {
+    const sessions = [{ id: "a", browser: "Chrome" }];
+    expect(isConnectedIn(sessions, "Chrome")).toBe(true);
+    expect(isConnectedIn(sessions, "Firefox")).toBe(false);
+    expect(isConnectedIn(sessions, null)).toBe(false);
+    expect(isConnectedIn([], "Chrome")).toBe(false);
+  });
+
   it("points at the docs until a store listing exists", () => {
     expect(installTarget("Chrome")).toEqual({
       url: expect.stringContaining("docs/EXTENSION.md"),

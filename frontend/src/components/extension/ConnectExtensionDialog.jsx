@@ -33,7 +33,7 @@ const ConnectExtensionDialog = () => {
     setPhase("connecting");
     setError("");
     try {
-      const session = await connect(handoff.browser);
+      const session = await connect({ browser: handoff.browser, client: handoff.client });
       const delivered = await deliverToken({
         request: handoff.request,
         token: session.session_token,

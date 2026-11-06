@@ -83,7 +83,7 @@ async def connect(
 ) -> ExtensionSessionCreated:
     """The handoff: an unlocked web app session opens an extension session for
     the browser it runs in and passes the token to the extension."""
-    return await access.connect_extension(key, body.browser)
+    return await access.connect_extension(key, body.browser, body.client)
 
 
 @router.get(

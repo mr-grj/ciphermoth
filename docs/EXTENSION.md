@@ -109,7 +109,10 @@ routes: list the logins saved for a site, search logins, read one login's userna
 password at the moment of a fill or copy, compute a 2FA code, and keep the session alive.
 Every other route refuses it (`403 extension_scope`), so it cannot list the vault, read
 notes, history, custom fields or attachments, export, back up, change settings or delete
-anything. At most 8 extension sessions exist at a time, separate from web sessions. The
+anything. Each browser profile has one extension session: unlocking again (also after a
+browser restart, which drops the old token) replaces it, using a random installation id the
+extension keeps; it is not a secret and opens nothing. At most 8 extension sessions exist at
+a time, separate from web sessions. The
 token lives in the browser's memory-only session storage, readable only by the
 extension's own pages.
 

@@ -319,7 +319,21 @@ test("a browser restart forgets the session but keeps the connection", async () 
   expect(await sessionToken(browser)).toBeNull();
   expect(await browser.worker.evaluate(() => chrome.storage.local.get(null))).toEqual({
     config: expect.objectContaining({ vault: "https://vault.test" }),
+    installId: expect.stringMatching(/^[A-Za-z0-9_-]{22}$/),
   });
+  // Unlocking again replaces the session this browser lost on restart: the
+  // vault lists one Chromium, never a stale duplicate.
+  await unlockInPopup(popup);
+  await expect(popup.getByPlaceholder("Search logins")).toBeVisible();
+  const web = await api(stack, "/master_password/unlock", {
+    body: { master_password: MASTER_PASSWORD },
+  });
+  const listed = await api(stack, "/extension/sessions", {
+    method: "GET",
+    token: web.body.session_token,
+  });
+  expect(listed.body).toHaveLength(1);
+  expect((await api(stack, "/extension/session", { token })).status).toBe(401);
 });
 
 test("storage canaries: no secret is left in the browser profile", async () => {

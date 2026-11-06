@@ -32,12 +32,14 @@ export const BROWSERS = [
 ];
 
 const NONCE = /^[A-Za-z0-9_-]{43}$/;
+const CLIENT = /^[A-Za-z0-9_-]{22,43}$/;
 
 const valid = (handoff) =>
   Boolean(handoff) &&
   typeof handoff.request === "string" &&
   NONCE.test(handoff.request) &&
   BROWSERS.includes(handoff.browser) &&
+  (handoff.client === null || handoff.client === undefined || CLIENT.test(handoff.client)) &&
   Number.isFinite(handoff.expires);
 
 // Read the handoff out of the address bar, once, before the app renders. The
@@ -55,6 +57,7 @@ export const captureHandoff = ({
   const handoff = {
     request: params.get("request"),
     browser: BROWSERS.includes(params.get("browser")) ? params.get("browser") : "Browser",
+    client: CLIENT.test(params.get("client") ?? "") ? params.get("client") : null,
     expires: now + HANDOFF_TTL_MS,
   };
   if (!valid(handoff)) return null;
@@ -142,3 +145,9 @@ export const installTarget = (browser) => {
     label: browser ? `Install in ${browser}` : "Install the extension",
   };
 };
+
+// Whether the vault lists a connected browser with this browser's name. Pages
+// cannot detect extensions (on purpose), so this is the honest hint; it may be
+// the same browser on another computer.
+export const isConnectedIn = (sessions, browser) =>
+  Boolean(browser) && Array.isArray(sessions) && sessions.some((s) => s.browser === browser);

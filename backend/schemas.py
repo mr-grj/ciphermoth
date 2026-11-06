@@ -656,6 +656,8 @@ ExtensionBrowser = Literal[
     "Chrome", "Chromium", "Edge", "Brave", "Opera", "Vivaldi", "Firefox", "Browser"
 ]
 _Origin = Annotated[str, StringConstraints(min_length=1, max_length=2048)]
+# The extension installation's random id: one session per browser profile.
+_Client = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9_-]{22,43}$")]
 
 
 class _ExtensionBody(BaseModel):
@@ -669,10 +671,12 @@ class ExtensionUnlockPayload(MasterPassword):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
     browser: ExtensionBrowser = "Browser"
+    client: _Client | None = None
 
 
 class ExtensionSessionRequest(_ExtensionBody):
     browser: ExtensionBrowser
+    client: _Client | None = None
 
 
 class ExtensionSessionCreated(BaseModel):

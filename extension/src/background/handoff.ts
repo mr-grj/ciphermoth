@@ -13,7 +13,7 @@
 //    confirms it is a live extension session.
 
 import { adoptToken, browserName } from "./session";
-import { getConfig, getHandoff, setHandoff } from "./storage";
+import { getConfig, getHandoff, installId, setHandoff } from "./storage";
 import { ext, randomToken, sameSecret } from "../shared/browser";
 import { BRIDGE_SCRIPT_ID, HANDOFF_TTL_MS } from "../shared/constants";
 import type { MessageOf } from "../shared/messages";
@@ -46,7 +46,8 @@ export const startHandoff = async (): Promise<void> => {
       persistAcrossSessions: false,
     },
   ]);
-  const url = `${config.vault}/#/connect-extension?request=${request}&browser=${browserName()}`;
+  const client = await installId();
+  const url = `${config.vault}/#/connect-extension?request=${request}&browser=${browserName()}&client=${client}`;
   const tab = await ext.tabs.create({ url, active: true });
   if (tab.id === undefined) {
     await unregisterBridge();

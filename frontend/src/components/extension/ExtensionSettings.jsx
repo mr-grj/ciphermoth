@@ -12,6 +12,7 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
+import CheckCircleOutlinedIcon from "@mui/icons-material/CheckCircleOutlined";
 import ExtensionOutlinedIcon from "@mui/icons-material/ExtensionOutlined";
 import LinkOffIcon from "@mui/icons-material/LinkOff";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
@@ -25,6 +26,7 @@ import {
   RELEASES_URL,
   detectBrowser,
   installTarget,
+  isConnectedIn,
 } from "../../lib/extensionHandoff";
 
 const Section = ({ icon, title, children }) => (
@@ -53,7 +55,9 @@ const ExtensionSettings = ({ open }) => {
   const loaded = useStoreState((s) => s.ciphermothModels.extension.loaded);
   const { loadSessions, disconnect } = useStoreActions((a) => a.ciphermothModels.extension);
   const [busy, setBusy] = useState(null);
-  const install = installTarget(detectBrowser());
+  const browser = detectBrowser();
+  const install = installTarget(browser);
+  const connected = isConnectedIn(sessions, browser);
 
   useEffect(() => {
     if (open) loadSessions().catch((err) => enqueueSnackbar(err.message, { variant: "error" }));
@@ -78,21 +82,30 @@ const ExtensionSettings = ({ open }) => {
           Fill logins on the sites you visit, only when you ask. Nothing shows up on pages by
           itself, and the extension talks only to this vault.
         </Hint>
-        <Box>
-          <Button
-            variant="contained"
-            size="small"
-            href={install.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            endIcon={<OpenInNewIcon fontSize="small" />}
-          >
-            {install.label}
-          </Button>
-        </Box>
+        {connected ? (
+          // Pages cannot see extensions (on purpose), so this comes from the
+          // vault's list of connected browsers, not from this browser.
+          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+            <CheckCircleOutlinedIcon fontSize="small" color="secondary" />
+            <Typography variant="body2">CipherMoth is connected in {browser}.</Typography>
+          </Stack>
+        ) : (
+          <Box>
+            <Button
+              variant="contained"
+              size="small"
+              href={install.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              endIcon={<OpenInNewIcon fontSize="small" />}
+            >
+              {install.label}
+            </Button>
+          </Box>
+        )}
         <Hint>
           <Link href={EXTENSION_DOCS_URL} target="_blank" rel="noopener noreferrer">
-            Other browsers
+            {connected ? "Install in another browser" : "Other browsers"}
           </Link>
           {" · "}
           <Link href={RELEASES_URL} target="_blank" rel="noopener noreferrer">

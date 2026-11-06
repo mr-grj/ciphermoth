@@ -205,6 +205,74 @@ def test_the_sweeper_and_listing_drop_expired_extension_sessions(
     assert len(store) == 0
 
 
+CLIENT = "c" * 22
+OTHER_CLIENT = "d" * 22
+
+
+def test_one_session_per_extension_installation(app_clock: FakeClock) -> None:
+    store = VaultSessions(idle_timeout_ms=60_000, clock=app_clock)
+    key = helpers.VaultKey(b"k" * 32)
+    full = store.open(key)
+    first, _ = store.open_extension(key, "Chrome", CLIENT)
+    other, _ = store.open_extension(key, "Chrome", OTHER_CLIENT)
+    anonymous, _ = store.open_extension(key, "Chrome")
+    second, handle = store.open_extension(key, "Chrome", CLIENT)
+    assert not _alive(store, first, Scope.EXTENSION)
+    for token in (other, anonymous, second):
+        assert _alive(store, token, Scope.EXTENSION)
+    assert _alive(store, full, Scope.FULL)
+    assert len(store.extension_sessions()) == 3
+    assert handle in {info.handle for info in store.extension_sessions()}
+    # Sessions without an installation id never replace each other.
+    store.open_extension(key, "Chrome")
+    assert _alive(store, anonymous, Scope.EXTENSION)
+
+
+async def test_a_new_unlock_or_handoff_replaces_the_installations_session(
+    client: httpx.AsyncClient,
+) -> None:
+    token = await populated(client)
+    tokens = []
+    for _ in range(2):
+        resp = await client.post(
+            "/extension/unlock",
+            json={"master_password": MASTER_PASSWORD, "client": CLIENT},
+        )
+        tokens.append(resp.json()["session_token"])
+    resp = await client.post(
+        "/extension/sessions",
+        json={"browser": "Chrome", "client": CLIENT},
+        headers=auth(token),
+    )
+    assert resp.status_code == 200, resp.text
+    tokens.append(resp.json()["session_token"])
+    assert [(await post(client, t, "session")).status_code for t in tokens] == [
+        401,
+        401,
+        200,
+    ]
+    listed = (await client.get("/extension/sessions", headers=auth(token))).json()
+    assert len(listed) == 1
+
+
+@pytest.mark.parametrize("bad", ["short", "c" * 44, "c" * 21 + "!", 42])
+async def test_installation_ids_are_validated(
+    client: httpx.AsyncClient, bad: object
+) -> None:
+    token = await populated(client)
+    resp = await client.post(
+        "/extension/unlock", json={"master_password": MASTER_PASSWORD, "client": bad}
+    )
+    assert resp.status_code == 422
+    resp = await client.post(
+        "/extension/sessions",
+        json={"browser": "Chrome", "client": bad},
+        headers=auth(token),
+    )
+    assert resp.status_code == 422
+    assert sessions().extension_sessions() == []
+
+
 def test_listing_never_shows_tokens_and_handles_are_not_tokens(
     app_clock: FakeClock,
 ) -> None:

@@ -17,7 +17,7 @@ import {
   asUnlock,
   request,
 } from "./api";
-import { type Config, getConfig, getSession, setConfig, setSession } from "./storage";
+import { type Config, getConfig, getSession, installId, setConfig, setSession } from "./storage";
 import { ext } from "../shared/browser";
 import { type BrowserName, FEATURE, TARGET } from "../shared/constants";
 import type { Logins } from "./api";
@@ -158,7 +158,7 @@ export const unlock = async (password: string): Promise<Status> => {
   try {
     result = asUnlock(
       await request(config.api, "/extension/unlock", {
-        body: { master_password: password, browser: browserName() },
+        body: { master_password: password, browser: browserName(), client: await installId() },
       })
     );
   } catch (error) {

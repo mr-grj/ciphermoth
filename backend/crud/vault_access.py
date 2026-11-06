@@ -187,25 +187,27 @@ class VaultAccess(BaseCRUD):
         if key is None:
             return VaultUnlock(valid=False)
         await self._refresh_idle_timeout()
-        token, _ = self._open_extension(key, body.browser)
+        token, _ = self._open_extension(key, body.browser, body.client)
         return VaultUnlock(
             valid=True,
             session_token=token,
             idle_timeout_ms=self.vault_sessions.idle_timeout_ms,
         )
 
-    def _open_extension(self, key: VaultKey, browser: str) -> tuple[str, str]:
-        token, handle = self.vault_sessions.open_extension(key, browser)
+    def _open_extension(
+        self, key: VaultKey, browser: str, client: str | None
+    ) -> tuple[str, str]:
+        token, handle = self.vault_sessions.open_extension(key, browser, client)
         after_rollback(self.session, lambda: self.vault_sessions.revoke(token))
         return token, handle
 
     async def connect_extension(
-        self, key: VaultKey, browser: str
+        self, key: VaultKey, browser: str, client: str | None = None
     ) -> ExtensionSessionCreated:
         """An extension session for the handoff, opened from the key of an
         unlocked full session (already checked against the vault)."""
         await self._refresh_idle_timeout()
-        token, handle = self._open_extension(key, browser)
+        token, handle = self._open_extension(key, browser, client)
         return ExtensionSessionCreated(
             session_token=token,
             id=handle,

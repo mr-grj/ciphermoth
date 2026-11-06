@@ -100,6 +100,7 @@ class _Session:
     scope: Scope = Scope.FULL
     handle: str = ""
     browser: str | None = None
+    client: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -163,12 +164,23 @@ class VaultSessions:
     def open(self, key: VaultKey) -> str:
         return self._open(key, Scope.FULL, None)[0]
 
-    def open_extension(self, key: VaultKey, browser: str) -> tuple[str, str]:
-        """A new extension session: its token and its handle."""
-        return self._open(key, Scope.EXTENSION, browser)
+    def open_extension(
+        self, key: VaultKey, browser: str, client: str | None = None
+    ) -> tuple[str, str]:
+        """
+        A new extension session: its token and its handle. ``client`` is the
+        extension installation's random id (not a secret): its previous session
+        ends, so one browser profile has one session even after it lost its
+        token (browser restart, extension reload).
+        """
+        return self._open(key, Scope.EXTENSION, browser, client)
 
     def _open(
-        self, key: VaultKey, scope: Scope, browser: str | None
+        self,
+        key: VaultKey,
+        scope: Scope,
+        browser: str | None,
+        client: str | None = None,
     ) -> tuple[str, str]:
         token = secrets.token_urlsafe(TOKEN_BYTES)
         handle = secrets.token_urlsafe(HANDLE_BYTES)
@@ -180,6 +192,13 @@ class VaultSessions:
         )
         with self._lock:
             self._drop_expired(now)
+            if client is not None:
+                for digest in [
+                    d
+                    for d, s in self._sessions.items()
+                    if s.scope is Scope.EXTENSION and s.client == client
+                ]:
+                    del self._sessions[digest]
             same_scope = [d for d, s in self._sessions.items() if s.scope is scope]
             while len(same_scope) >= cap:
                 del self._sessions[same_scope.pop(0)]
@@ -190,6 +209,7 @@ class VaultSessions:
                 scope=scope,
                 handle=handle,
                 browser=browser,
+                client=client,
             )
         return token, handle
 

@@ -35,9 +35,12 @@ const Extension = {
   }),
 
   // Opens an extension session for the handoff: { session_token, id }.
-  connect: thunk(async (actions, browser) => {
+  connect: thunk(async (actions, { browser, client = null }) => {
     try {
-      const { data } = await apiClient.post("/extension/sessions", { browser });
+      const { data } = await apiClient.post("/extension/sessions", {
+        browser,
+        ...(client ? { client } : {}),
+      });
       return data;
     } catch (err) {
       throw new Error(await errorDetail(err, "Could not connect the extension."));

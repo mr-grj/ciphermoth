@@ -8,6 +8,7 @@ import { setSessionToken } from "../utils";
 import Extension from "./extension";
 
 const TOKEN = "kM3x1y8Qe0bWv7c2Z9pL4tR6sN5aH1jD0fG3uY8iO2w";
+const CLIENT = "AbCdEfGhIjKlMnOpQrStUv";
 const SESSIONS = [
   { id: "h1", browser: "Firefox", created: "2026-11-05T10:00:00+00:00", last_used: null },
 ];
@@ -57,10 +58,15 @@ describe("extension model", () => {
     const { actions } = build({
       "POST /extension/sessions": [200, { session_token: "t", id: "h", idle_timeout_ms: 1 }],
     });
-    await expect(actions.connect("Chrome")).resolves.toMatchObject({ id: "h" });
-    expect(JSON.parse(seen[0].data)).toEqual({ browser: "Chrome" });
+    await expect(actions.connect({ browser: "Chrome", client: CLIENT })).resolves.toMatchObject({
+      id: "h",
+    });
+    expect(JSON.parse(seen[0].data)).toEqual({ browser: "Chrome", client: CLIENT });
 
     const failing = build({ "POST /extension/sessions": [429, { detail: "Too many attempts." }] });
-    await expect(failing.actions.connect("Chrome")).rejects.toThrow("Too many attempts.");
+    await expect(failing.actions.connect({ browser: "Chrome" })).rejects.toThrow(
+      "Too many attempts."
+    );
+    expect(JSON.parse(seen[0].data)).toEqual({ browser: "Chrome" });
   });
 });

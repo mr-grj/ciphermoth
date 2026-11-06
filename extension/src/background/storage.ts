@@ -1,12 +1,12 @@
 // Where the extension keeps state (docs/EXTENSION.md, "Where state lives").
 //
-// storage.local holds only the configuration: the vault's addresses and two
-// preferences. No secret, token or entry name is ever written there.
+// storage.local holds only the configuration (the vault's addresses, two
+// preferences) and a random installation id. No secret, token or entry name.
 // storage.session lives in memory only, is cleared when the browser exits and
 // is readable by extension pages only (TRUSTED_CONTEXTS): the session token,
 // its deadline, a pending handoff and the digest of the last copied value.
 
-import { ext } from "../shared/browser";
+import { ext, randomToken } from "../shared/browser";
 
 export interface Config {
   vault: string;
@@ -61,6 +61,18 @@ export const getConfig = async (): Promise<Config | null> => {
 
 export const setConfig = (config: Config | null): Promise<void> =>
   config ? local().set({ config }) : local().remove("config");
+
+// A random id for this installation (browser profile), sent when a session
+// opens so the server ends this installation's previous one. Not a secret: it
+// opens nothing, it only lets a new unlock replace an old session whose token
+// was lost (browser restart, extension reload).
+export const installId = async (): Promise<string> => {
+  const { installId: stored } = (await local().get("installId")) as { installId?: unknown };
+  if (typeof stored === "string" && /^[A-Za-z0-9_-]{22}$/.test(stored)) return stored;
+  const fresh = randomToken(16);
+  await local().set({ installId: fresh });
+  return fresh;
+};
 
 const read = async <K extends keyof SessionArea>(key: K): Promise<SessionArea[K]> =>
   ((await memory().get(key)) as SessionArea)[key];
