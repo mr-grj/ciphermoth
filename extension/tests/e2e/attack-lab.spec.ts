@@ -164,7 +164,7 @@ test.describe("3. Frames", () => {
       const page = await lab(name);
       await page.waitForTimeout(500);
       const popup = await fillFromPopup(page);
-      await expect(popup.getByRole("alertdialog")).toContainText("No login fields");
+      await expect(popup.getByRole("alertdialog")).toContainText("inside a frame");
       for (const field of await allFrameValues(page)) expect(field.value).toBe("");
     });
   }
@@ -178,7 +178,7 @@ test.describe("3. Frames", () => {
     await choose(popup, "GitHub");
     expect(await promptText(popup)).toContain("saved for github.test");
     await popup.getByRole("button", { name: "Fill anyway" }).click();
-    await expect(popup.getByRole("alertdialog")).toContainText("No login fields");
+    await expect(popup.getByRole("alertdialog")).toContainText("inside a frame");
     for (const field of await allFrameValues(page)) expect(field.value).toBe("");
   });
 });

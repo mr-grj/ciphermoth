@@ -161,7 +161,11 @@ export function fillLogin(request: FillRequest): FillResult {
   if (!passwordField && !usernameField) {
     if (fresh.length) return { filled: [], reason: "new-password" };
     const anyLoginField = passwordFields.length > 0 || inputs.some(isUsernameLike);
-    return { filled: [], reason: anyLoginField ? "hidden" : "no-fields" };
+    if (anyLoginField) return { filled: [], reason: "hidden" };
+    // Nothing to fill here; frames are never filled, so say so when there are
+    // some (the login form is probably in one, as on Apple ID).
+    const framed = document.querySelector("iframe, frame") !== null;
+    return { filled: [], reason: framed ? "frame" : "no-fields" };
   }
 
   const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;

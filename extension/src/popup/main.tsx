@@ -57,7 +57,8 @@ const FILL_MESSAGES: Record<string, string> = {
   hidden: "The login fields on this page are hidden or covered, so nothing was filled.",
   "new-password": "This looks like a sign-up or password change form, so nothing was filled.",
   origin: "The page changed before the fill, so nothing was filled. Try again.",
-  frame: "The login form is inside a frame, which CipherMoth does not fill.",
+  frame:
+    "No login fields on this page itself. If the form is inside a frame, CipherMoth does not fill it: copy instead.",
   blocked: "This page can't be filled. Copy the password instead.",
 };
 

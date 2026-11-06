@@ -45,7 +45,8 @@ For each browser:
 - [ ] GitHub, GitLab: username and password filled, sign-in works.
 - [ ] Google, Microsoft (multi-step): "Username filled. Fill again on the next step.",
       then the password step fills.
-- [ ] Amazon, Apple ID (login in a frame): a clear refusal ("inside a frame") and Copy
+- [ ] Apple ID (login form in a frame): nothing filled, the popup says the form may be inside a frame and offers Copy.
+- [ ] Amazon (email first, then password): fills each step like Google and Microsoft.
       works.
 - [ ] A React single-page app login (for example a self-hosted Grafana or the site of
       your choice): the app accepts the filled values (sign-in button enables).
