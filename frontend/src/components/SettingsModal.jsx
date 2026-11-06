@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Button,
   Dialog,
@@ -66,6 +66,10 @@ const FIELDS = [
   },
 ];
 
+// The tallest tab (Security, with keys and a recovery code) fits on most screens;
+// smaller windows scroll the content instead of resizing the dialog.
+const DIALOG_HEIGHT = "min(768px, calc(100dvh - 64px))";
+
 const toSec = (ms) => Math.round(ms / 1000);
 const toMs = (sec) => Math.round(Number(sec)) * 1000;
 
@@ -88,6 +92,7 @@ const SettingsModal = ({ open, onClose, initialTab = "general" }) => {
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
   const [tab, setTab] = useState(initialTab);
+  const contentRef = useRef(null);
 
   useEffect(() => {
     if (open) {
@@ -127,19 +132,43 @@ const SettingsModal = ({ open, onClose, initialTab = "general" }) => {
 
   const dirty = isDirty(form, settings);
 
+  const changeTab = (_, value) => {
+    setTab(value);
+    if (contentRef.current) contentRef.current.scrollTop = 0;
+  };
+
   return (
-    <Dialog open={open} onClose={saving ? undefined : onClose} maxWidth="xs" fullWidth>
+    // One size for every tab: switching tabs never resizes the dialog; longer
+    // content scrolls inside it.
+    <Dialog
+      open={open}
+      onClose={saving ? undefined : onClose}
+      maxWidth="sm"
+      fullWidth
+      slotProps={{ paper: { sx: { height: DIALOG_HEIGHT } } }}
+    >
       <DialogTitle sx={{ pb: 0 }}>Settings</DialogTitle>
       <Tabs
         value={tab}
-        onChange={(_, value) => setTab(value)}
-        sx={{ px: 3, borderBottom: 1, borderColor: "divider" }}
+        onChange={changeTab}
+        variant="scrollable"
+        scrollButtons={false}
+        sx={{ px: 3, borderBottom: 1, borderColor: "divider", flexShrink: 0 }}
       >
         <Tab label="General" value="general" />
         <Tab label="Security" value="security" />
         {!IS_DESKTOP && <Tab label="Browser extension" value="extension" />}
       </Tabs>
-      <DialogContent>
+      <DialogContent
+        ref={contentRef}
+        sx={{
+          overflowY: "auto",
+          overflowX: "auto",
+          scrollbarGutter: "stable",
+          borderBottom: 1,
+          borderColor: "divider",
+        }}
+      >
         {tab === "security" && <SecuritySettings open={open} />}
         {tab === "extension" && <ExtensionSettings open={open} />}
         <Stack spacing={1.5} sx={{ mt: 1, display: tab === "general" ? "flex" : "none" }}>

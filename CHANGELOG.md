@@ -18,6 +18,7 @@ A browser extension that fills a login only when you ask, and can do nothing els
 
 ### Changed
 
+- The Settings dialog keeps one size on every tab (wider, at most 768 px tall); longer content scrolls inside it instead of the dialog growing and shrinking as you switch tabs.
 - The CLI is unchanged.
 
 ## [3.5.0] - 2026-11-05
