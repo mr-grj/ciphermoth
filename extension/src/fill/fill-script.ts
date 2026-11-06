@@ -150,10 +150,10 @@ export function fillLogin(request: FillRequest): FillResult {
             (input) => (TEXT_TYPES.has(input.type) || input.type === "email") && usable(input)
           ) ??
         null;
-    } else if (passwordFields.length === 0) {
-      // A username-first step of a multi-step login: only when the page has no
-      // password field at all, so a sign-up form or a hidden password field
-      // never gets the username alone.
+    } else if (fresh.length === 0) {
+      // A username-first step of a multi-step login (Google, Amazon and others
+      // keep a hidden password field there for password managers). Never on a
+      // sign-up or password-change form, which has new-password fields.
       usernameField = inputs.find((input) => isUsernameLike(input) && usable(input)) ?? null;
     }
   }

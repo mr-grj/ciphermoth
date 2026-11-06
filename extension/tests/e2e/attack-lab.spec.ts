@@ -151,6 +151,13 @@ test.describe("2. Hidden-field harvesting", () => {
     expect(await filled(page)).toEqual([]);
   });
 
+  test("a username step with a hidden password field fills the username only", async () => {
+    const page = await lab("hf-username-step");
+    const popup = await fillFromPopup(page);
+    await expect(popup.getByRole("status")).toContainText("Username filled");
+    expect(await filled(page)).toEqual(["user"]);
+  });
+
   test("only the visible pair is filled when hidden decoys exist", async () => {
     const page = await lab("hf-mixed");
     await fillFromPopup(page);

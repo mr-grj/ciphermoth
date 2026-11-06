@@ -140,6 +140,18 @@
       stage.append(el("p", { textContent: "Loading…" }));
       setTimeout(() => stage.append(loginForm()), 2500);
     },
+    "hf-username-step": () => {
+      // Google and Amazon style: email step with a hidden password field.
+      const form = el("form");
+      const pass = el(
+        "input",
+        { id: "pass", type: "password", name: "hiddenPassword", tabIndex: -1 },
+        "position:absolute;left:-9999px;width:1px;height:1px"
+      );
+      pass.setAttribute("aria-hidden", "true");
+      form.append(el("input", { id: "user", type: "email", autocomplete: "username" }), pass);
+      stage.append(form);
+    },
     "hf-mixed": () => {
       stage.append(loginForm("hidden-", "display:none"), loginForm("visible-"));
     },
