@@ -25,6 +25,7 @@ export interface PendingHandoff {
   request: string;
   tabId: number;
   vault: string;
+  returnTo: number | null;
   expires: number;
 }
 

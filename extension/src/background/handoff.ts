@@ -48,13 +48,17 @@ export const startHandoff = async (): Promise<void> => {
   ]);
   const client = await installId();
   const url = `${config.vault}/#/connect-extension?request=${request}&browser=${browserName()}&client=${client}`;
+  // Back to this tab when the handoff tab closes (Chrome would otherwise pick a
+  // neighbour). Only its id is read: no tabs permission, no address.
+  const [current] = await ext.tabs.query({ active: true, lastFocusedWindow: true });
+  const returnTo = current?.id ?? null;
   const tab = await ext.tabs.create({ url, active: true });
   if (tab.id === undefined) {
     await unregisterBridge();
     throw new Error("Could not open CipherMoth.");
   }
   const expires = Date.now() + HANDOFF_TTL_MS;
-  await setHandoff({ request, tabId: tab.id, vault: config.vault, expires });
+  await setHandoff({ request, tabId: tab.id, vault: config.vault, expires, returnTo });
   await ext.alarms.create(HANDOFF_ALARM, { when: expires });
 };
 
@@ -91,6 +95,8 @@ export const receiveToken = async (
   if (adopted) {
     setTimeout(() => {
       ext.tabs.remove(pending.tabId).catch(() => {});
+      if (pending.returnTo !== null)
+        ext.tabs.update(pending.returnTo, { active: true }).catch(() => {});
     }, CLOSE_DELAY_MS);
   }
   return adopted;
