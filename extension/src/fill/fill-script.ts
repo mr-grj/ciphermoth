@@ -139,16 +139,17 @@ export function fillLogin(request: FillRequest): FillResult {
           input.form === form &&
           passwordField.compareDocumentPosition(input) & Node.DOCUMENT_POSITION_PRECEDING
       );
+      // Without a form, every formless input on the page counts as "before":
+      // only a field that says it is a username may take it (never a header
+      // search box).
+      const plausible = (input: HTMLInputElement): boolean =>
+        form ? TEXT_TYPES.has(input.type) || input.type === "email" : isUsernameLike(input);
       usernameField =
         before.find((input) => {
           const auto = tokens(input);
           return (auto.includes("username") || auto.includes("email")) && usable(input);
         }) ??
-        before
-          .reverse()
-          .find(
-            (input) => (TEXT_TYPES.has(input.type) || input.type === "email") && usable(input)
-          ) ??
+        before.reverse().find((input) => plausible(input) && usable(input)) ??
         null;
     } else if (fresh.length === 0) {
       // A username-first step of a multi-step login (Google, Amazon and others

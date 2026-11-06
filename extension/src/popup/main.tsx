@@ -288,15 +288,24 @@ const Unlocked = ({ vault, onLocked }: { vault: string | null; onLocked: () => v
       setResults(null);
       return;
     }
+    // An answer for a query the user has since changed or cleared is dropped,
+    // so a slow or out-of-order reply never shows (or fills from) old results.
+    let live = true;
     const timer = setTimeout(() => {
       send<{ logins: Login[] }>({ type: "search", query })
         .then((found) => {
+          if (!live) return;
           setResults(found.logins);
           setSelected(0);
         })
-        .catch(fail);
+        .catch((error) => {
+          if (live) fail(error);
+        });
     }, 120);
-    return () => clearTimeout(timer);
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
   }, [query, fail]);
 
   useEffect(() => {

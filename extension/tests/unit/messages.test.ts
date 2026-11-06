@@ -1,5 +1,9 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
+import { HANDOFF_CHECK_TIMEOUT_MS, REQUEST_TIMEOUT_MS } from "../../src/shared/constants";
 import { parseMessage } from "../../src/shared/messages";
 
 const TOKEN = "kM3x1y8Qe0bWv7c2Z9pL4tR6sN5aH1jD0fG3uY8iO2w";
@@ -40,5 +44,21 @@ describe("parseMessage", () => {
     Object.assign(Object.create({ inherited: true }), { type: "status" }),
   ])("refuses %j", (message) => {
     expect(parseMessage(message)).toBeNull();
+  });
+});
+
+describe("handoff timing", () => {
+  it("checks a handed-over token well before the web app gives up waiting", () => {
+    // The web app ends the session it opened when no acknowledgement arrives in
+    // time; an extension still checking the token would then keep a dead one.
+    const app = readFileSync(
+      join(import.meta.dirname, "../../../frontend/src/lib/extensionHandoff.js"),
+      "utf8"
+    );
+    const match = /export const ACK_TIMEOUT_MS = ([\d_]+);/.exec(app);
+    expect(match).not.toBeNull();
+    const ackTimeout = Number((match?.[1] ?? "0").replaceAll("_", ""));
+    expect(ackTimeout).toBeGreaterThanOrEqual(HANDOFF_CHECK_TIMEOUT_MS + 3_000);
+    expect(HANDOFF_CHECK_TIMEOUT_MS).toBeLessThan(REQUEST_TIMEOUT_MS);
   });
 });

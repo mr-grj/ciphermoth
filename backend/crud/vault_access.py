@@ -177,8 +177,8 @@ class VaultAccess(BaseCRUD):
         relying party, so the user unlocks in the web app and connects the
         extension from there (``connect_extension``).
         """
-        security_key_required, _ = await self.master_password.security_key_status()
-        if security_key_required:
+        model = await fetch_vault(self.session)
+        if model is not None and model.factor_key_escrow is not None:
             raise UseHandoff(
                 "This vault needs a security key. Unlock it in CipherMoth and "
                 "connect the extension from there."

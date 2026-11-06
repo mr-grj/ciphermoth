@@ -824,16 +824,19 @@ def read_legacy_backup(data: bytes, password: str, max_bytes: int) -> bytes:
     return content
 
 
-def generate_totp(secret: str, *, digits: int = 6, period: int = 30) -> str:
+def generate_totp(
+    secret: str, *, digits: int = 6, period: int = 30, now: float | None = None
+) -> str:
     """
     Return the current TOTP code for a base32 secret (RFC 6238, HMAC-SHA1).
 
     Used by the CLI so `password get` can show the live code. The web UI has its
     own Web Crypto implementation; both stay small and dependency-free so the
-    two-factor path is easy to audit.
+    two-factor path is easy to audit. ``now`` (Unix time) lets a caller that
+    also reports the code's remaining lifetime read the clock once.
     """
     key = base64.b32decode(secret + "=" * (-len(secret) % 8), casefold=True)
-    counter = int(time.time()) // period
+    counter = int(time.time() if now is None else now) // period
     digest = hmac.new(key, struct.pack(">Q", counter), hashlib.sha1).digest()
     offset = digest[-1] & 0x0F
     code = struct.unpack(">I", digest[offset : offset + 4])[0] & 0x7FFFFFFF

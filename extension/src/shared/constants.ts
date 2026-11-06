@@ -12,6 +12,10 @@ export const VERSION = __VERSION__;
 export const FEATURE = "browser-extension";
 export const SESSION_HEADER = "x-ciphermoth-session";
 export const REQUEST_TIMEOUT_MS = 15_000;
+// Checking a handed-over token. The web app waits for the extension's answer
+// (ACK_TIMEOUT_MS in frontend/src/lib/extensionHandoff.js, 10 s) and then ends
+// the session it opened, so this must answer well before that.
+export const HANDOFF_CHECK_TIMEOUT_MS = 5_000;
 export const MAX_RESPONSE_BYTES = 1024 * 1024;
 export const HANDOFF_TTL_MS = 5 * 60 * 1000;
 export const CLIPBOARD_CLEAR_MS = E2E ? 3_000 : 30_000;

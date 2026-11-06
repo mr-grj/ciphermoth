@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { hostPattern, permissionOrigins, targetFor } from "../../src/shared/target";
+import { hostPattern, notNeededBy, permissionOrigins, targetFor } from "../../src/shared/target";
 import {
   displayHost,
   normalize,
@@ -99,5 +99,26 @@ describe("server addresses", () => {
     expect(targetFor("http://vault.example", null)).toMatch(/https/);
     expect(targetFor("https://vault.example", "http://api.example")).toMatch(/https/);
     expect(targetFor("not a url", null)).toMatch(/web address/);
+  });
+
+  it("never drops access the stored connection still uses", () => {
+    const patterns = (vault: string, api: string | null) =>
+      permissionOrigins(targetFor(vault, api) as { vault: string; api: string });
+    const held = patterns("https://vault.example", "https://api.example");
+    // Saving the same address again and failing (server down) drops nothing.
+    expect(notNeededBy(patterns("https://vault.example", "https://api.example"), held)).toEqual([]);
+    // Another port of the same host is covered by the same pattern.
+    expect(notNeededBy(patterns("https://vault.example:8443", null), held)).toEqual([]);
+    // A failed new address drops only what it added.
+    expect(notNeededBy(patterns("https://new.example", "https://api.example"), held)).toEqual([
+      "https://new.example/*",
+    ]);
+    // Moving to a new address drops what only the old one used.
+    expect(notNeededBy(held, patterns("https://new.example", "https://api.example"))).toEqual([
+      "https://vault.example/*",
+    ]);
+    expect(notNeededBy(patterns("https://vault.example", null), [])).toEqual([
+      "https://vault.example/*",
+    ]);
   });
 });

@@ -152,6 +152,23 @@
       form.append(el("input", { id: "user", type: "email", autocomplete: "username" }), pass);
       stage.append(form);
     },
+    "hf-formless-search": () => {
+      // A password step without a <form> and no username field: the header's
+      // search box (also formless) must not get the username.
+      stage.append(
+        el("input", { id: "search", type: "text", name: "q", placeholder: "Search" }),
+        el("p", { textContent: "Enter your password" }),
+        el("input", { id: "pass", type: "password", autocomplete: "current-password" })
+      );
+    },
+    "hf-formless-login": () => {
+      // A single-page app login without a <form>: both fields are filled.
+      stage.append(
+        el("input", { id: "search", type: "text", name: "q", placeholder: "Search" }),
+        el("input", { id: "user", type: "text", name: "login_name" }),
+        el("input", { id: "pass", type: "password" })
+      );
+    },
     "hf-mixed": () => {
       stage.append(loginForm("hidden-", "display:none"), loginForm("visible-"));
     },

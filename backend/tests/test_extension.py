@@ -17,6 +17,7 @@ from pathlib import Path
 import httpx
 import pytest
 
+import crud.extension
 import helpers
 from api.rate_limit import limiter
 from crud.engine import Database
@@ -862,6 +863,28 @@ async def test_totp_returns_a_code_and_never_the_secret(
         client, extension, "totp", {"id": ids["GitHub (work)"], "origin": GITHUB}
     )
     assert resp.status_code == 404
+
+
+async def test_totp_code_and_lifetime_come_from_one_clock_reading(
+    client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Two readings straddling a window boundary reported the old code with the
+    # full lifetime of the next window.
+    token = await populated(client)
+    ids = await ids_by_name(client, token)
+    extension = await extension_unlock(client)
+    readings = iter([1_800_000_029.9999, 1_800_000_030.0001])
+    monkeypatch.setattr(
+        crud.extension, "time", type("Clock", (), {"time": lambda: next(readings)})
+    )
+    monkeypatch.setattr(helpers, "time", crud.extension.time)
+    resp = await post(
+        client, extension, "totp", {"id": ids["GitHub"], "origin": GITHUB}
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["code"] == helpers.generate_totp(TOTP_SECRET, now=1_800_000_029)
+    assert body["expires_in"] == 1
 
 
 async def test_an_unusable_stored_totp_secret_is_a_clear_error(

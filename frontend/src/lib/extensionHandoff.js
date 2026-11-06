@@ -18,7 +18,10 @@ export const HANDOFF_ROUTE = "#/connect-extension";
 export const HANDOFF_TTL_MS = 5 * 60 * 1000;
 export const SESSION_MESSAGE = "ciphermoth:extension-session";
 export const CONNECTED_MESSAGE = "ciphermoth:extension-connected";
-export const ACK_TIMEOUT_MS = 4000;
+// Longer than the extension takes to check the token with the server
+// (HANDOFF_CHECK_TIMEOUT_MS, 5 s, in extension/src/shared/constants.ts), so a
+// slow check is never answered late, after this app ended the session.
+export const ACK_TIMEOUT_MS = 10_000;
 
 export const BROWSERS = [
   "Chrome",

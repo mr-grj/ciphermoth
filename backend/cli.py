@@ -45,6 +45,7 @@ _BULK = "bulk-entry-actions"
 _BULK_MOVE = "bulk-entry-move"
 _SECURITY_KEYS = "security-keys"
 _RECOVERY = "recovery-code"
+_EXTENSION = "browser-extension"
 _SERVER_TOO_OLD = (
     "This server runs a CipherMoth release older than 1.5.0, which this CLI no "
     "longer supports. Update the server, or use CipherMoth CLI 1.5.x."
@@ -884,6 +885,53 @@ def cmd_damaged(
         for kind, row_id in rows:
             _check(vault.send("DELETE", f"/vault/damaged/{kind}/{row_id}"))
     _ok(f"Removed {len(rows)} damaged row(s)")
+
+
+@app.command(
+    "browsers",
+    help=(
+        "List the browsers whose CipherMoth extension is connected to this vault, "
+        "and optionally disconnect one."
+    ),
+)
+def cmd_browsers(
+    disconnect: Annotated[
+        str | None,
+        typer.Option("--disconnect", help="ID of the browser to disconnect."),
+    ] = None,
+) -> None:
+    with _vault() as vault:
+        if _EXTENSION not in vault.features:
+            _die("This server has no browser extension support. Update CipherMoth.")
+        if disconnect is not None:
+            _check(
+                vault.send(
+                    "DELETE", f"/extension/sessions/{quote(disconnect, safe='')}"
+                )
+            )
+            _ok("Disconnected. That browser's extension is locked.")
+            return
+        resp = vault.send("GET", "/extension/sessions")
+    _check(resp)
+
+    sessions: list[dict] = resp.json()
+    if not sessions:
+        _out.print("[dim]No browser is connected.[/dim]")
+        return
+
+    table = Table(show_header=True, header_style="bold", box=None, padding=(0, 2, 0, 0))
+    table.add_column("ID", style="dim")
+    table.add_column("Browser", style="cyan")
+    table.add_column("Connected", style="dim")
+    table.add_column("Last used", style="dim")
+    for item in sessions:
+        table.add_row(
+            escape(str(item.get("id", "-"))),
+            escape(str(item.get("browser", "-"))),
+            escape(_local_time(item.get("created"))),
+            escape(_local_time(item.get("last_used"))),
+        )
+    _out.print(table)
 
 
 def _report_import(payload: dict) -> None:

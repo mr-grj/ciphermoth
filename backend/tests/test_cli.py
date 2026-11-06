@@ -206,6 +206,37 @@ async def test_live_server_logs_do_not_contain_secrets(
     assert '"GET /api/passwords/{password_name} HTTP/1.1" 200' in log
 
 
+async def test_cli_lists_and_disconnects_connected_browsers(api: str) -> None:
+    assert "No browser is connected" in ok(cli(api, "browsers"))
+    resp = httpx.post(
+        f"{api}/extension/unlock",
+        json={"master_password": MASTER_PASSWORD, "browser": "Firefox"},
+    )
+    assert resp.status_code == 200, resp.text
+    token = resp.json()["session_token"]
+    listed = ok(cli(api, "browsers"))
+    assert "Firefox" in listed
+    assert token not in listed
+    web = httpx.post(
+        f"{api}/master_password/unlock", json={"master_password": MASTER_PASSWORD}
+    ).json()["session_token"]
+    (session,) = httpx.get(
+        f"{api}/extension/sessions", headers={"x-ciphermoth-session": web}
+    ).json()
+    handle = session["id"]
+    assert handle in listed
+    assert "Disconnected" in ok(cli(api, "browsers", "--disconnect", handle))
+    assert "No browser is connected" in ok(cli(api, "browsers"))
+    ended = httpx.post(
+        f"{api}/extension/session", headers={"x-ciphermoth-session": token}
+    )
+    assert ended.status_code == 401
+    missing = cli(api, "browsers", "--disconnect", "no-such-id")
+    assert missing.exit_code == 1
+    assert "No such browser extension session" in missing.output
+    assert "Traceback" not in missing.output
+
+
 async def test_cli_reports_and_removes_damaged_rows_without_a_traceback(
     api: str, tmp_path: Path
 ) -> None:

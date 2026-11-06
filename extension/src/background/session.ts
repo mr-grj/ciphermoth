@@ -19,7 +19,7 @@ import {
 } from "./api";
 import { type Config, getConfig, getSession, installId, setConfig, setSession } from "./storage";
 import { ext } from "../shared/browser";
-import { type BrowserName, FEATURE, TARGET } from "../shared/constants";
+import { type BrowserName, FEATURE, HANDOFF_CHECK_TIMEOUT_MS, TARGET } from "../shared/constants";
 import type { Logins } from "./api";
 import type { Status } from "../shared/messages";
 import { type Target, permissionOrigins } from "../shared/target";
@@ -185,7 +185,12 @@ export const adoptToken = async (token: string): Promise<boolean> => {
   const config = await getConfig();
   if (!config) return false;
   try {
-    const live = asSessionStatus(await request(config.api, "/extension/session", { token }));
+    const live = asSessionStatus(
+      await request(config.api, "/extension/session", {
+        token,
+        timeoutMs: HANDOFF_CHECK_TIMEOUT_MS,
+      })
+    );
     await remember(token, live.idleTimeoutMs, live.expiresInMs);
     return true;
   } catch {

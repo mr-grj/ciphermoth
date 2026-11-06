@@ -56,12 +56,13 @@ export interface CallOptions {
   method?: "GET" | "POST";
   body?: unknown;
   token?: string | null;
+  timeoutMs?: number;
 }
 
 export const request = async (
   apiBase: string,
   path: string,
-  { method = "POST", body, token = null }: CallOptions = {}
+  { method = "POST", body, token = null, timeoutMs = REQUEST_TIMEOUT_MS }: CallOptions = {}
 ): Promise<unknown> => {
   const headers: Record<string, string> = { accept: "application/json" };
   if (body !== undefined) headers["content-type"] = "application/json";
@@ -76,7 +77,7 @@ export const request = async (
       credentials: "omit",
       cache: "no-store",
       referrerPolicy: "no-referrer",
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
     });
   } catch {
     throw new ApiError("Can't reach your CipherMoth.", 0, UNREACHABLE);

@@ -48,3 +48,8 @@ export const hostPattern = (origin: string): string => {
 export const permissionOrigins = (target: Target): string[] => [
   ...new Set([hostPattern(target.vault), hostPattern(target.api)]),
 ];
+
+// The patterns of `origins` that `keep` (another target's patterns) does not
+// need, so removing them never takes access a working connection uses.
+export const notNeededBy = (origins: string[], keep: string[]): string[] =>
+  origins.filter((origin) => !keep.includes(origin));

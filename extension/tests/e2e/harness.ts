@@ -47,6 +47,9 @@ export interface Stack {
   backend: string;
   spki: string;
   requests: RecordedRequest[];
+  // Hold the next request to an API path (e.g. "/api/extension/search") this
+  // many milliseconds before passing it on. Used once, then forgotten.
+  delays: Map<string, number>;
   stop: () => Promise<void>;
 }
 
@@ -154,7 +157,8 @@ const route = (
   req: http.IncomingMessage,
   res: http.ServerResponse,
   backendPort: number,
-  requests: RecordedRequest[]
+  requests: RecordedRequest[],
+  delays: Map<string, number>
 ) => {
   const host = (req.headers.host ?? "").replace(/:\d+$/, "").toLowerCase();
   const url = new URL(req.url ?? "/", "http://x");
@@ -171,7 +175,13 @@ const route = (
       .end(body);
 
   if (host === "vault.test") {
-    if (url.pathname.startsWith("/api/")) return proxy(req, res, backendPort);
+    if (url.pathname.startsWith("/api/")) {
+      const delay = delays.get(url.pathname);
+      if (delay === undefined) return proxy(req, res, backendPort);
+      delays.delete(url.pathname);
+      setTimeout(() => proxy(req, res, backendPort), delay);
+      return;
+    }
     return serveFile(res, FRONTEND_DIST, url.pathname, "index.html");
   }
   if (host === "redirect.test") {
@@ -243,8 +253,9 @@ export const startStack = async (): Promise<Stack> => {
   const main = makeCertificate("main");
   const other = makeCertificate("untrusted");
   const requests: RecordedRequest[] = [];
+  const delays = new Map<string, number>();
   const handler = (req: http.IncomingMessage, res: http.ServerResponse) =>
-    route(req, res, backendPort, requests);
+    route(req, res, backendPort, requests, delays);
   const secure = https.createServer(
     {
       key: main.key,
@@ -290,6 +301,7 @@ export const startStack = async (): Promise<Stack> => {
     backend: backendUrl,
     spki: main.spki,
     requests,
+    delays,
     stop: async () => {
       for (const socket of sockets) socket.destroy();
       secure.closeAllConnections();

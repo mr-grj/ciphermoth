@@ -6,7 +6,7 @@ import { TARGET, VERSION } from "../shared/constants";
 import type { Status } from "../shared/messages";
 import { serverOrigin } from "../shared/url";
 import { MothIcon, send } from "../ui/shared";
-import { permissionOrigins, targetFor } from "../shared/target";
+import { notNeededBy, permissionOrigins, targetFor } from "../shared/target";
 
 const formatTimeout = (ms: number | null): string => {
   if (!ms) return "your vault's inactivity timeout";
@@ -33,6 +33,12 @@ const Connection = ({ status, reload }: { status: Status; reload: () => void }) 
     // Ask for exactly the vault's origin (and the API's, if separate), right
     // here in the click: the browser shows the user which site it is.
     const origins = permissionOrigins(target);
+    // Access the stored connection uses stays, whatever happens to this attempt.
+    const held =
+      status.vault && status.api ? permissionOrigins({ vault: status.vault, api: status.api }) : [];
+    const drop = async (patterns: string[]) => {
+      if (patterns.length) await ext.permissions.remove({ origins: patterns }).catch(() => false);
+    };
     const granted = await ext.permissions.request({ origins }).catch(() => false);
     if (!granted) {
       setMessage({
@@ -49,17 +55,19 @@ const Connection = ({ status, reload }: { status: Status; reload: () => void }) 
         api: target.api,
       });
       if (next.phase === "too-old") {
-        await ext.permissions.remove({ origins }).catch(() => false);
+        await drop(notNeededBy(origins, held));
         setMessage({ text: next.error ?? "Update CipherMoth first.", bad: true });
         return;
       }
+      // A new address: the old one's access is no longer needed.
+      await drop(notNeededBy(held, origins));
       setMessage({
         text: "Connected. Open CipherMoth from the toolbar to unlock.",
         bad: false,
       });
       reload();
     } catch (err) {
-      await ext.permissions.remove({ origins }).catch(() => false);
+      await drop(notNeededBy(origins, held));
       setMessage({
         text: err instanceof Error ? err.message : "Could not connect.",
         bad: true,

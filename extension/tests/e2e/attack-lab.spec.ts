@@ -158,6 +158,19 @@ test.describe("2. Hidden-field harvesting", () => {
     expect(await filled(page)).toEqual(["user"]);
   });
 
+  test("a formless password step never puts the username in a search box", async () => {
+    const page = await lab("hf-formless-search");
+    const popup = await fillFromPopup(page);
+    await expect(popup.getByRole("status")).toContainText("Password filled");
+    expect(await filled(page)).toEqual(["pass"]);
+  });
+
+  test("a formless login fills its username field, not the search box", async () => {
+    const page = await lab("hf-formless-login");
+    await fillFromPopup(page);
+    await expect.poll(() => filled(page)).toEqual(["user", "pass"]);
+  });
+
   test("only the visible pair is filled when hidden decoys exist", async () => {
     const page = await lab("hf-mixed");
     await fillFromPopup(page);

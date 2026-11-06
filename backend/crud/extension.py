@@ -215,10 +215,11 @@ class ExtensionCRUD(BaseCRUD):
             raise InvalidRequest("This login's 2FA secret is not valid.") from None
         if secret is None:
             raise NotFound("This login has no 2FA code.")
+        # One clock reading for both, so a code is never reported with the
+        # lifetime of the next window.
+        now = int(time.time())
         try:
-            code = generate_totp(secret, period=TOTP_PERIOD)
+            code = generate_totp(secret, period=TOTP_PERIOD, now=now)
         except ValueError:
             raise InvalidRequest("This login's 2FA secret is not valid.") from None
-        return ExtensionTotp(
-            code=code, expires_in=TOTP_PERIOD - int(time.time()) % TOTP_PERIOD
-        )
+        return ExtensionTotp(code=code, expires_in=TOTP_PERIOD - now % TOTP_PERIOD)

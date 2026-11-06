@@ -136,6 +136,23 @@ test("keyboard: arrows choose, and the second login fills", async () => {
   await expect.poll(() => page.inputValue("#pass")).toBe(WORK_PASSWORD);
 });
 
+test("a late search answer never replaces what the box shows now", async () => {
+  const page = await site("https://github.test/login.html");
+  const popup = await openPopup(browser, page);
+  await expect(popup.getByRole("option")).toHaveCount(2);
+  stack.delays.set("/api/extension/search", 1500);
+  const seen = stack.requests.length;
+  const search = popup.getByPlaceholder("Search logins");
+  await search.fill("intranet");
+  await expect
+    .poll(() => stack.requests.slice(seen).some((r) => r.path === "/api/extension/search"))
+    .toBe(true);
+  await search.fill("");
+  await popup.waitForTimeout(2000);
+  await expect(popup.getByRole("option")).toHaveCount(2);
+  await expect(row(popup, "Intranet")).toHaveCount(0);
+});
+
 test("open shadow roots are filled", async () => {
   const page = await site("https://github.test/shadow.html");
   const popup = await openPopup(browser, page);

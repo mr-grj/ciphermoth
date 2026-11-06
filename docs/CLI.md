@@ -63,6 +63,7 @@ ciphermoth backup [--out <dir>]              Save a complete encrypted backup (.
 ciphermoth import <file> [--on-conflict]     Restore a .cmbackup, or a backup ZIP from 2.0 or earlier (skip|overwrite)
 ciphermoth import-csv <file> [--on-conflict] Import a CSV from another manager (skip|overwrite)
 ciphermoth damaged [--remove] [--yes]        List (or remove) entries and attachments the vault cannot read
+ciphermoth browsers [--disconnect <id>]      List the browsers with a connected extension (or disconnect one)
 ciphermoth recover                           Forgot the master password? Set a new one with your recovery code
 ```
 
