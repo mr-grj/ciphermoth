@@ -58,8 +58,9 @@ with signing turned off.
 
 1. On first install the extension opens its settings. Enter the address you open
    CipherMoth at, for example `https://vault.example.com`, and click **Connect**. The
-   browser asks to let the extension access **that one address** (and the API's, if it
-   runs elsewhere). Plain `http://` is accepted only for `localhost`, `127.0.0.1` and
+   browser asks to let the extension access **that one host name** (and the API's, if it
+   runs elsewhere; the permission covers all ports of that host, because Firefox cannot
+   grant a single port). Plain `http://` is accepted only for `localhost`, `127.0.0.1` and
    `[::1]`.
    - When the API is not at `/api` on the same address (the Docker defaults put the UI on
      port 3000 and the API on 8000), open **API on another address?** and enter it, for

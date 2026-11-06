@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { targetFor, permissionOrigins } from "../../src/shared/target";
+import { hostPattern, permissionOrigins, targetFor } from "../../src/shared/target";
 import {
   displayHost,
   normalize,
@@ -84,10 +84,15 @@ describe("server addresses", () => {
     });
     const split = targetFor("http://localhost:3000", "http://localhost:8000");
     expect(split).toEqual({ vault: "http://localhost:3000", api: "http://localhost:8000/api" });
+    // Firefox refuses ports in match patterns; a host pattern covers all ports.
     expect(permissionOrigins(split as { vault: string; api: string })).toEqual([
-      "http://localhost:3000/*",
-      "http://localhost:8000/*",
+      "http://localhost/*",
     ]);
+    expect(
+      permissionOrigins(targetFor("https://vault.example:8443", "https://api.example") as never)
+    ).toEqual(["https://vault.example/*", "https://api.example/*"]);
+    expect(hostPattern("http://[::1]:3000")).toBe("http://[::1]/*");
+    for (const pattern of permissionOrigins(split as never)) expect(pattern).not.toMatch(/:\d/);
     expect(
       permissionOrigins(targetFor("https://v.example", "https://v.example/api/") as never)
     ).toEqual(["https://v.example/*"]);

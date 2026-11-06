@@ -17,6 +17,7 @@ import { getConfig, getHandoff, installId, setHandoff } from "./storage";
 import { ext, randomToken, sameSecret } from "../shared/browser";
 import { BRIDGE_SCRIPT_ID, HANDOFF_TTL_MS } from "../shared/constants";
 import type { MessageOf } from "../shared/messages";
+import { hostPattern } from "../shared/target";
 
 export const HANDOFF_ALARM = "ciphermoth-handoff-expired";
 const CLOSE_DELAY_MS = 1500;
@@ -39,7 +40,7 @@ export const startHandoff = async (): Promise<void> => {
   await ext.scripting.registerContentScripts([
     {
       id: BRIDGE_SCRIPT_ID,
-      matches: [`${config.vault}/*`],
+      matches: [hostPattern(config.vault)],
       js: ["bridge.js"],
       runAt: "document_start",
       allFrames: false,
