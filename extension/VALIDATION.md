@@ -11,7 +11,8 @@ security key registered (YubiKey) for the handoff checks.
 
 ## 1. Each browser (latest stable)
 
-Chrome · Brave · Edge · Opera · Vivaldi · Firefox · Firefox ESR
+Chrome · Brave · Firefox · Firefox ESR (the release browsers). Edge, Opera and Vivaldi are
+best effort: a quick load-and-fill check when convenient.
 
 For each browser:
 

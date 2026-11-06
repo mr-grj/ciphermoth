@@ -11,8 +11,9 @@ extension never asks to save logins.
 > to find matches, never its path, title or contents. No favicons, no analytics, no
 > remote configuration.
 
-Works with Chrome, Brave, Edge, Opera and Vivaldi (Chromium 120 or newer) and Firefox 128
-or newer, against a CipherMoth server (Docker edition) that lists the `browser-extension`
+Tested on every release with Chrome and Brave (Chromium 120 or newer) and Firefox 128 or
+newer; Edge, Opera and Vivaldi run the same Chromium build and should work too. It needs
+a CipherMoth server (Docker edition) that lists the `browser-extension`
 feature (3.6.0 and later). Connecting it to the desktop app is planned (phase 2).
 
 ## Install
