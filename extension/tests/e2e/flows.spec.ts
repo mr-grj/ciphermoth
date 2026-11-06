@@ -261,7 +261,7 @@ test("unlock in CipherMoth: the handoff through the real web app", async () => {
   await vault.getByRole("button", { name: "Unlock Vault" }).click();
   const dialog = vault.getByRole("dialog", { name: /Connect Chromium to this vault/ });
   await expect(dialog).toBeVisible();
-  await expect(dialog).toContainText("It cannot see your vault list");
+  await expect(dialog).toContainText("It cannot see notes, history or attachments");
   await dialog.getByRole("button", { name: "Connect" }).click();
   await expect(vault.getByRole("dialog", { name: "Connected" })).toBeVisible();
   await expect.poll(() => sessionToken(browser)).toMatch(/^[A-Za-z0-9_-]{43}$/);

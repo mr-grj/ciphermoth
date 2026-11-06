@@ -109,7 +109,8 @@ changes, or until the browser or the server restarts.
 the server maps to your vault key, like a web session, but limited by the server to five
 routes: list the logins saved for a site, search logins, read one login's username and
 password at the moment of a fill or copy, compute a 2FA code, and keep the session alive.
-Every other route refuses it (`403 extension_scope`), so it cannot list the vault, read
+Every other route refuses it (`403 extension_scope`). Search does show your logins' names,
+usernames and sites (50 per query), but it cannot open the full vault list, read
 notes, history, custom fields or attachments, export, back up, change settings or delete
 anything. Each browser profile has one extension session: unlocking again (also after a
 browser restart, which drops the old token) replaces it, using a random installation id the

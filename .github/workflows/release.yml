@@ -48,8 +48,9 @@ jobs:
       attestations: write
     env:
       RELEASE_VERSION: ${{ needs.source.outputs.version }}
-      AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
-      AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+      # Only whether signing is configured; the credentials themselves are given
+      # to the signing step alone, never to npm ci or the build.
+      HAS_AMO_CREDENTIALS: ${{ secrets.AMO_JWT_ISSUER != '' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -74,8 +75,11 @@ jobs:
           node scripts/verify.mjs "$RUNNER_TEMP/SHA256SUMS"
           npm run lint:firefox
       - name: Sign the Firefox package (unlisted, addons.mozilla.org)
-        if: env.AMO_JWT_ISSUER != ''
+        if: env.HAS_AMO_CREDENTIALS == 'true'
         working-directory: extension
+        env:
+          AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+          AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
         run: |
           npx web-ext sign --channel unlisted --source-dir dist/firefox \
             --artifacts-dir "$RUNNER_TEMP/signed" \

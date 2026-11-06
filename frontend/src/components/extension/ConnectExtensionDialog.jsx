@@ -82,9 +82,10 @@ const ConnectExtensionDialog = () => {
               you choose, only when you ask.
             </Typography>
             <Typography variant="body2" sx={{ color: "text.secondary" }}>
-              It cannot see your vault list, notes or attachments, export or change anything. It
-              locks with your inactivity timeout, and you can disconnect it in Settings → Browser
-              extension.
+              It can search your logins (names, usernames, sites) and reads a password only when you
+              fill or copy it. It cannot see notes, history or attachments, export or change
+              anything. It locks with your inactivity timeout, and you can disconnect it in Settings
+              → Browser extension.
             </Typography>
             <Typography variant="body2" sx={{ color: "text.secondary" }}>
               Didn’t ask for this? Choose Cancel.
