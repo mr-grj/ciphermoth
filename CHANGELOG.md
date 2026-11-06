@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [3.6.0] - 2026-11-06
 
 A browser extension that fills a login only when you ask, and can do nothing else.
 
