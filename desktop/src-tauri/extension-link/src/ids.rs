@@ -32,9 +32,13 @@ impl Caller {
             .strip_prefix("chrome-extension://")
             .and_then(|rest| rest.strip_suffix('/'))
         {
-            return CHROMIUM_IDS.contains(&id).then(|| Caller::Chromium(id.to_string()));
+            return CHROMIUM_IDS
+                .contains(&id)
+                .then(|| Caller::Chromium(id.to_string()));
         }
-        FIREFOX_IDS.contains(&origin).then(|| Caller::Firefox(origin.to_string()))
+        FIREFOX_IDS
+            .contains(&origin)
+            .then(|| Caller::Firefox(origin.to_string()))
     }
 }
 
@@ -65,7 +69,11 @@ mod tests {
         let chrome = "chrome-extension://emeejhcdcdnlhejcpeohdafdnkmbaddn/";
         assert!(caller_from_args(&args(&[chrome])).is_some());
         assert!(caller_from_args(&args(&[chrome, "--parent-window=1234"])).is_some());
-        assert!(caller_from_args(&args(&["/x/com.ciphermoth.desktop.json", "ciphermoth@mr-grj.github.io"])).is_some());
+        assert!(caller_from_args(&args(&[
+            "/x/com.ciphermoth.desktop.json",
+            "ciphermoth@mr-grj.github.io"
+        ]))
+        .is_some());
         for refused in [
             &["chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/"][..],
             &["chrome-extension://emeejhcdcdnlhejcpeohdafdnkmbaddn"],
@@ -75,7 +83,10 @@ mod tests {
             &[chrome, "--parent-window=1", "--parent-window=2"],
             &["/x/manifest.json", "evil@example.com"],
             &["/x/manifest.json", "ciphermoth@mr-grj.github.io.evil"],
-            &["/x/manifest.json", "chrome-extension://emeejhcdcdnlhejcpeohdafdnkmbaddn/"],
+            &[
+                "/x/manifest.json",
+                "chrome-extension://emeejhcdcdnlhejcpeohdafdnkmbaddn/",
+            ],
             &["ciphermoth@mr-grj.github.io"],
             &[],
         ] {
@@ -87,8 +98,12 @@ mod tests {
     fn the_chromium_id_matches_the_manifest_key() {
         use base64::Engine;
         use sha2::{Digest, Sha256};
-        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../../extension/manifest/chromium.json");
-        let manifest: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../../extension/manifest/chromium.json"
+        );
+        let manifest: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
         let der = base64::engine::general_purpose::STANDARD
             .decode(manifest["key"].as_str().unwrap())
             .unwrap();

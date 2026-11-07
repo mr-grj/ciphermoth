@@ -64,7 +64,9 @@ pub struct Store {
 }
 
 pub fn now() -> u64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_secs())
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs())
 }
 
 impl Store {
@@ -79,18 +81,30 @@ impl Store {
                 _ => {
                     let aside = dir.join(format!("config.json.unreadable-{}", now()));
                     std::fs::rename(&path, aside)?;
-                    Config { version: VERSION, ..Config::default() }
+                    Config {
+                        version: VERSION,
+                        ..Config::default()
+                    }
                 }
             },
-            Err(e) if e.kind() == io::ErrorKind::NotFound => Config { version: VERSION, ..Config::default() },
+            Err(e) if e.kind() == io::ErrorKind::NotFound => Config {
+                version: VERSION,
+                ..Config::default()
+            },
             Err(e) => return Err(e),
         };
-        Ok(Store { path, config: Mutex::new(config) })
+        Ok(Store {
+            path,
+            config: Mutex::new(config),
+        })
     }
 
     fn save(&self, config: &Config) -> io::Result<()> {
         let dir = self.path.parent().expect("config has a folder");
-        let partial = dir.join(format!(".config.json.{}.partial", crate::wire::b64(&crate::channel::random::<6>())));
+        let partial = dir.join(format!(
+            ".config.json.{}.partial",
+            crate::wire::b64(&crate::channel::random::<6>())
+        ));
         let mut options = std::fs::OpenOptions::new();
         options.write(true).create_new(true);
         #[cfg(unix)]
@@ -153,7 +167,13 @@ impl Store {
     }
 
     pub fn find(&self, id: &str) -> Option<Pairing> {
-        self.config.lock().unwrap().pairings.iter().find(|p| p.id == id).cloned()
+        self.config
+            .lock()
+            .unwrap()
+            .pairings
+            .iter()
+            .find(|p| p.id == id)
+            .cloned()
     }
 
     pub fn touch(&self, id: &str) -> io::Result<()> {
@@ -179,7 +199,12 @@ impl Store {
             .unwrap()
             .pairings
             .iter()
-            .map(|p| PairingInfo { id: p.id.clone(), browser: p.browser.clone(), created: p.created, last_used: p.last_used })
+            .map(|p| PairingInfo {
+                id: p.id.clone(),
+                browser: p.browser.clone(),
+                created: p.created,
+                last_used: p.last_used,
+            })
             .collect()
     }
 }
@@ -207,7 +232,10 @@ mod tests {
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            let mode = std::fs::metadata(link.join("config.json")).unwrap().permissions().mode();
+            let mode = std::fs::metadata(link.join("config.json"))
+                .unwrap()
+                .permissions()
+                .mode();
             assert_eq!(mode & 0o777, 0o600);
         }
         assert!(again.remove(&id).unwrap());
@@ -232,13 +260,21 @@ mod tests {
     #[test]
     fn an_unreadable_file_is_kept_aside_and_the_switch_is_off() {
         let dir = tempfile::tempdir().unwrap();
-        std::fs::write(dir.path().join("config.json"), b"{\"enabled\": true, \"surprise\": 1}").unwrap();
+        std::fs::write(
+            dir.path().join("config.json"),
+            b"{\"enabled\": true, \"surprise\": 1}",
+        )
+        .unwrap();
         let store = Store::open(dir.path()).unwrap();
         assert!(!store.enabled());
         let kept: Vec<_> = std::fs::read_dir(dir.path())
             .unwrap()
             .filter_map(|e| e.ok())
-            .filter(|e| e.file_name().to_string_lossy().starts_with("config.json.unreadable-"))
+            .filter(|e| {
+                e.file_name()
+                    .to_string_lossy()
+                    .starts_with("config.json.unreadable-")
+            })
             .collect();
         assert_eq!(kept.len(), 1);
     }

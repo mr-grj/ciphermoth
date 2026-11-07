@@ -78,6 +78,7 @@ test("onboarding: connect to the vault from the options page", async () => {
   const stored = await browser.worker.evaluate(() => chrome.storage.local.get(null));
   expect(stored).toEqual({
     config: {
+      mode: "server",
       vault: "https://vault.test",
       api: "https://vault.test/api",
       subdomains: false,

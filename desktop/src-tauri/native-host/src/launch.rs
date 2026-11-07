@@ -16,11 +16,17 @@ fn invalid(message: &str) -> io::Error {
 
 pub fn target(identity: &Identity) -> io::Result<(PathBuf, Vec<String>)> {
     let raw = std::fs::read(identity.link_dir()?.join("launch.json"))?;
-    let value: serde_json::Value = serde_json::from_slice(&raw).map_err(|_| invalid("launch.json"))?;
-    let program = value["program"].as_str().map(PathBuf::from).filter(|p| p.is_absolute() && p.is_file());
-    let args: Option<Vec<String>> = value["args"]
-        .as_array()
-        .and_then(|list| list.iter().map(|a| a.as_str().map(str::to_string)).collect());
+    let value: serde_json::Value =
+        serde_json::from_slice(&raw).map_err(|_| invalid("launch.json"))?;
+    let program = value["program"]
+        .as_str()
+        .map(PathBuf::from)
+        .filter(|p| p.is_absolute() && p.is_file());
+    let args: Option<Vec<String>> = value["args"].as_array().and_then(|list| {
+        list.iter()
+            .map(|a| a.as_str().map(str::to_string))
+            .collect()
+    });
     match (program, args) {
         (Some(program), Some(args)) if args.len() <= 8 => Ok((program, args)),
         _ => Err(invalid("launch.json")),
@@ -30,7 +36,10 @@ pub fn target(identity: &Identity) -> io::Result<(PathBuf, Vec<String>)> {
 /// The `.app` bundle an executable belongs to.
 #[cfg(target_os = "macos")]
 fn bundle(program: &Path) -> Option<PathBuf> {
-    program.ancestors().find(|p| p.extension().is_some_and(|e| e == "app")).map(Path::to_path_buf)
+    program
+        .ancestors()
+        .find(|p| p.extension().is_some_and(|e| e == "app"))
+        .map(Path::to_path_buf)
 }
 
 pub fn start(identity: &Identity) -> io::Result<()> {
@@ -43,13 +52,18 @@ pub fn start(identity: &Identity) -> io::Result<()> {
         if !args.is_empty() {
             command.arg("--args").args(&args);
         }
-        return command.stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).status().and_then(|s| {
-            if s.success() {
-                Ok(())
-            } else {
-                Err(invalid("open failed"))
-            }
-        });
+        return command
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .and_then(|s| {
+                if s.success() {
+                    Ok(())
+                } else {
+                    Err(invalid("open failed"))
+                }
+            });
     }
     detached(&program, &args)
 }
@@ -58,7 +72,11 @@ pub fn start(identity: &Identity) -> io::Result<()> {
 fn detached(program: &Path, args: &[String]) -> io::Result<()> {
     use std::os::unix::process::CommandExt;
     let mut command = Command::new(program);
-    command.args(args).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
+    command
+        .args(args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
     // SAFETY: setsid is async-signal-safe; a new session leaves the browser's
     // process group, so closing the browser does not end the app.
     unsafe {
@@ -114,8 +132,12 @@ mod tests {
             std::fs::write(dir.join("launch.json"), bad.to_string()).unwrap();
             assert!(target(&identity).is_err(), "{bad}");
         }
-        let good = serde_json::json!({"program": program.to_string_lossy(), "args": ["--qa-root", "/x"]});
+        let good =
+            serde_json::json!({"program": program.to_string_lossy(), "args": ["--qa-root", "/x"]});
         std::fs::write(dir.join("launch.json"), good.to_string()).unwrap();
-        assert_eq!(target(&identity).unwrap(), (program, vec!["--qa-root".to_string(), "/x".to_string()]));
+        assert_eq!(
+            target(&identity).unwrap(),
+            (program, vec!["--qa-root".to_string(), "/x".to_string()])
+        );
     }
 }

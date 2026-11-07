@@ -38,7 +38,20 @@ The extension (`extension/`) is versioned with everything else: `version.py` als
 
 The Release workflow's `extension` job (environment **extension-release**) checks the version, runs the type check, lint and unit tests, builds both packages, rebuilds them to prove the build reproducible (`scripts/verify.mjs`), runs `web-ext lint`, and attests build provenance. When `AMO_JWT_ISSUER` and `AMO_JWT_SECRET` exist in that environment, it signs the Firefox package as an **unlisted** add-on (`web-ext sign --channel unlisted`) and adds `ciphermoth-extension-firefox-X.Y.Z.xpi`; without them the release carries only the unsigned zips. The publish job appends the extension files to `SHA256SUMS` after `manifest.py`, so they are uploaded, downloaded again and hash-checked with the rest.
 
-Store submissions are manual for now: upload `ciphermoth-extension-chromium-X.Y.Z.zip` to the Chrome Web Store (and Edge Add-ons, Opera add-ons once used) and the Firefox zip to the AMO listing, from the release assets, never from a local build. Every publisher account uses hardware-key 2FA. Keep the Chrome extension signing key (which pins the extension ID through the manifest `key`, needed for desktop native messaging later) offline; record every store-assigned ID. AMO credentials only ever live in the protected environment.
+Store submissions are manual for now: upload `ciphermoth-extension-chromium-X.Y.Z.zip` to the Chrome Web Store (and Edge Add-ons, Opera add-ons once used) and the Firefox zip to the AMO listing, from the release assets, never from a local build. Every publisher account uses hardware-key 2FA. Keep the Chrome extension signing key (which pins the extension ID through the manifest `key`, which desktop mode's native host trusts) offline; record every store-assigned ID. AMO credentials only ever live in the protected environment.
+
+**The Chromium id is a throwaway for now** (design decision 34): `extension/manifest/chromium.json` carries a public `key` whose private half was discarded, so desktop mode works for unpacked builds but no store item can ever have that id. Before the first Chrome Web Store upload, generate the real pair offline:
+
+```sh
+openssl genrsa -out ciphermoth-extension.pem 2048        # keep offline, never commit
+openssl rsa -in ciphermoth-extension.pem -pubout -outform DER | base64 | tr -d '\n'   # the manifest "key"
+```
+
+Replace `key` in `extension/manifest/chromium.json` and the id in `CHROMIUM_IDS` (`desktop/src-tauri/extension-link/src/ids.rs`; `cargo test` and the extension's manifest test compute the id from the key and fail until both agree), then upload the first zip with the private key as `key.pem` at its root so the store keeps that id. Ids assigned by other stores (Edge Add-ons, Opera) go into `CHROMIUM_IDS` too. Changing the id later unpairs every browser.
+
+### The native host
+
+Every package ships `ciphermoth-native-host` next to the app executable (`bundle.externalBin`). `desktop/build-native-host.mjs` builds it for the runner's target before the app (`beforeBuildCommand`; `--qa` for the QA build, whose host has its own identity and never reaches a production app; `--debug` for `tauri dev`). A release build of the app refuses to compile without the real host (`build.rs`); debug builds get a stand-in that exits 3. `production.py` checks the installed host is there, has the right architecture, refuses a caller it does not trust and finds no production app on the runner; `native.py` drives the QA app's own host through pairing and a fill (`harness/extension.py`).
 
 `requireSignedVersion` is mandatory. Do not disable TLS, allow downgrades, expose generic updater plugin capabilities, or sign arbitrary external payloads. Canonical filenames are part of the signature's trusted comment and bind architecture; re-sign after renaming, never edit a `.sig` by hand.
 

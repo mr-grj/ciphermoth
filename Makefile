@@ -129,8 +129,8 @@ desktop-build:
 
 desktop-test:
 	desktop/core/build/venv/bin/python -m pytest desktop/core/tests
-	cd desktop/src-tauri && cargo test
+	cd desktop/src-tauri && cargo test --workspace
 
 desktop-check:
-	cd desktop/src-tauri && cargo fmt --check && cargo clippy --all-targets -- -D warnings
+	cd desktop/src-tauri && cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings
 	cd backend && uv run ruff check ../desktop --exclude build --exclude dist --exclude target

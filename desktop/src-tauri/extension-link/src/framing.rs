@@ -119,12 +119,23 @@ mod tests {
     #[test]
     fn the_limit_is_inclusive_and_checked_before_allocation() {
         let body = format!("\"{}\"", "a".repeat(MAX_MESSAGE - 2));
-        assert_eq!(read_frame(&mut Cursor::new(framed(body.as_bytes()))).unwrap().len(), MAX_MESSAGE);
+        assert_eq!(
+            read_frame(&mut Cursor::new(framed(body.as_bytes())))
+                .unwrap()
+                .len(),
+            MAX_MESSAGE
+        );
         let mut huge = (u32::MAX).to_ne_bytes().to_vec();
         huge.extend_from_slice(b"{}");
-        assert!(matches!(read_frame(&mut Cursor::new(huge)), Err(FrameError::TooLarge(_))));
+        assert!(matches!(
+            read_frame(&mut Cursor::new(huge)),
+            Err(FrameError::TooLarge(_))
+        ));
         let over = ((MAX_MESSAGE + 1) as u32).to_ne_bytes().to_vec();
-        assert!(matches!(read_frame(&mut Cursor::new(over)), Err(FrameError::TooLarge(_))));
+        assert!(matches!(
+            read_frame(&mut Cursor::new(over)),
+            Err(FrameError::TooLarge(_))
+        ));
         assert!(encode(&vec![b'x'; MAX_MESSAGE + 1]).is_err());
         assert!(encode(b"").is_err());
     }
@@ -134,14 +145,30 @@ mod tests {
         let whole = framed(br#"{"t":"x"}"#);
         for cut in 1..whole.len() {
             assert!(
-                matches!(read_frame(&mut Cursor::new(&whole[..cut])), Err(FrameError::Truncated)),
+                matches!(
+                    read_frame(&mut Cursor::new(&whole[..cut])),
+                    Err(FrameError::Truncated)
+                ),
                 "cut at {cut}"
             );
         }
-        assert!(matches!(read_frame(&mut Cursor::new(framed(b""))), Err(FrameError::Empty)));
-        for body in [&b"[1]"[..], b"\"s\"", b"42", b"{", b"\xff\xfe{}", b"{\"a\":\"\xc3\x28\"}"] {
+        assert!(matches!(
+            read_frame(&mut Cursor::new(framed(b""))),
+            Err(FrameError::Empty)
+        ));
+        for body in [
+            &b"[1]"[..],
+            b"\"s\"",
+            b"42",
+            b"{",
+            b"\xff\xfe{}",
+            b"{\"a\":\"\xc3\x28\"}",
+        ] {
             assert!(
-                matches!(read_object(&mut Cursor::new(framed(body))), Err(FrameError::NotJson)),
+                matches!(
+                    read_object(&mut Cursor::new(framed(body))),
+                    Err(FrameError::NotJson)
+                ),
                 "{body:?}"
             );
         }

@@ -90,6 +90,8 @@ try {
   if (fresh) {
     const { workflows } = await import("./qaWorkflows");
     await workflows(checks);
+    const { extensionWorkflow } = await import("./qaExtension");
+    await extensionWorkflow(checks);
   }
   if (import.meta.env.VITE_DESKTOP_DIALOG_QA === "1" && !sessionStorage.getItem("qa-files")) {
     const { getSessionToken } = await import("../utils");

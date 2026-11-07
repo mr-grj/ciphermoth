@@ -43,7 +43,7 @@ export const UNPAIRED = "unpaired";
 const APP_CLOSED = "app_closed";
 const PROTOCOL = "protocol";
 
-const MESSAGES: Record<string, string> = {
+export const MESSAGES: Record<string, string> = {
   [NO_HOST]:
     "CipherMoth can't be reached from this browser. In the CipherMoth app, turn on Settings → Browser extension → Allow browser extensions.",
   [APP_NOT_RUNNING]: "The CipherMoth app isn't running.",
@@ -55,6 +55,9 @@ const MESSAGES: Record<string, string> = {
   busy: "CipherMoth is pairing another browser. Try again in a moment.",
   disabled: "Browser extensions are turned off in the CipherMoth app.",
   caller: "CipherMoth doesn't trust this copy of the extension.",
+  // Every code the app or the host can send needs an entry: failure() turns
+  // unknown codes into "protocol".
+  unknown_pairing: "This browser isn't paired with the CipherMoth app any more.",
   launch_failed: "CipherMoth could not be started. Open it yourself.",
   timeout: "CipherMoth didn't answer in time.",
 };
@@ -249,17 +252,12 @@ export const call = (op: string, extra: Record<string, unknown> = {}): Promise<u
         idleTimer = setTimeout(drop, IDLE_MS);
         return value;
       } catch (error) {
+        const closed = error instanceof ApiError && error.code === APP_CLOSED;
         const transport =
-          !(error instanceof ApiError) || link.port.closed || error.code === PROTOCOL;
+          !(error instanceof ApiError) || closed || link.port.closed || error.code === PROTOCOL;
         if (transport) drop();
-        if (
-          transport &&
-          reused &&
-          attempt === 0 &&
-          error instanceof ApiError &&
-          error.code === APP_CLOSED
-        )
-          continue;
+        // The app ended a connection we had kept open: try once on a new one.
+        if (closed && reused && attempt === 0) continue;
         throw error;
       }
     }

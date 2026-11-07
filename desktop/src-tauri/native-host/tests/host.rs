@@ -74,16 +74,31 @@ fn without_the_app_it_says_so_and_bad_frames_end_it() {
     let root = tempfile::tempdir().unwrap();
     let mut child = host(root.path(), &[CHROME]);
     send(&mut child, json!({"t": "hello", "id": "x", "nonce": "y"}));
-    assert_eq!(receive(&mut child), json!({"t": "error", "code": "app_not_running"}));
+    assert_eq!(
+        receive(&mut child),
+        json!({"t": "error", "code": "app_not_running"})
+    );
     send(&mut child, json!({"t": "launch"}));
-    assert_eq!(receive(&mut child), json!({"t": "error", "code": "launch_failed"}));
+    assert_eq!(
+        receive(&mut child),
+        json!({"t": "error", "code": "launch_failed"})
+    );
     // A length over 64 KiB ends the host before it allocates or reads on.
-    child.stdin.as_mut().unwrap().write_all(&(70_000u32).to_ne_bytes()).unwrap();
+    child
+        .stdin
+        .as_mut()
+        .unwrap()
+        .write_all(&(70_000u32).to_ne_bytes())
+        .unwrap();
     assert_eq!(finished(&mut child), Some(1));
 
     let mut child = host(root.path(), &[CHROME]);
     send(&mut child, json!({"t": "export"}));
-    assert_eq!(finished(&mut child), Some(1), "unknown message types are refused");
+    assert_eq!(
+        finished(&mut child),
+        Some(1),
+        "unknown message types are refused"
+    );
 }
 
 #[test]
@@ -91,17 +106,26 @@ fn it_relays_both_ways_and_only_our_message_types() {
     let root = tempfile::tempdir().unwrap();
     let listener = app_socket(root.path());
     let mut child = host(root.path(), &["/x/com.ciphermoth.desktop.qa.json", FIREFOX]);
-    send(&mut child, json!({"t": "hello", "id": "abc", "nonce": "def"}));
+    send(
+        &mut child,
+        json!({"t": "hello", "id": "abc", "nonce": "def"}),
+    );
     let (mut app, _) = listener.accept().unwrap();
     let hello = framing::read_object(&mut app).unwrap();
-    assert_eq!(Value::Object(hello), json!({"t": "host", "caller": FIREFOX, "version": "1"}));
+    assert_eq!(
+        Value::Object(hello),
+        json!({"t": "host", "caller": FIREFOX, "version": "1"})
+    );
     let forwarded = framing::read_object(&mut app).unwrap();
     assert_eq!(forwarded["t"], "hello");
     framing::write_object(&mut app, &json!({"t": "hello_ok", "nonce": "n"})).unwrap();
     assert_eq!(receive(&mut child)["t"], "hello_ok");
     // The app sending anything but a protocol message ends the relay.
     framing::write_object(&mut app, &json!({"t": "pair_commit"})).unwrap();
-    assert_eq!(receive(&mut child), json!({"t": "error", "code": "app_closed"}));
+    assert_eq!(
+        receive(&mut child),
+        json!({"t": "error", "code": "app_closed"})
+    );
     assert_eq!(finished(&mut child), Some(0));
 }
 
@@ -110,12 +134,20 @@ fn the_launch_target_is_started() {
     let root = tempfile::tempdir().unwrap();
     let marker = root.path().join("started");
     let script = root.path().join("fake-app.sh");
-    std::fs::write(&script, format!("#!/bin/sh\ntouch '{}'\n", marker.display())).unwrap();
+    std::fs::write(
+        &script,
+        format!("#!/bin/sh\ntouch '{}'\n", marker.display()),
+    )
+    .unwrap();
     use std::os::unix::fs::PermissionsExt;
     std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o700)).unwrap();
     let link = Identity::Qa(root.path().to_path_buf()).link_dir().unwrap();
     std::fs::create_dir_all(&link).unwrap();
-    std::fs::write(link.join("launch.json"), json!({"program": script, "args": []}).to_string()).unwrap();
+    std::fs::write(
+        link.join("launch.json"),
+        json!({"program": script, "args": []}).to_string(),
+    )
+    .unwrap();
     let mut child = host(root.path(), &[CHROME]);
     send(&mut child, json!({"t": "launch"}));
     assert_eq!(receive(&mut child), json!({"t": "launched"}));

@@ -47,14 +47,23 @@ impl Desktop for Fake {
         if !self.unlocked() {
             return Err(Refusal::Locked);
         }
-        self.calls.lock().unwrap().push((token.to_string(), route.to_string()));
+        self.calls
+            .lock()
+            .unwrap()
+            .push((token.to_string(), route.to_string()));
         if self.accepted.lock().unwrap().as_deref() != Some(token) {
-            return Ok((401, json!({"detail": "Session ended.", "code": "invalid_session"})));
+            return Ok((
+                401,
+                json!({"detail": "Session ended.", "code": "invalid_session"}),
+            ));
         }
         if route == "credential" && body["id"] == 404 {
             return Ok((404, json!({"detail": "No such login."})));
         }
-        Ok((200, json!({"logins": [], "truncated": false, "route": route})))
+        Ok((
+            200,
+            json!({"logins": [], "truncated": false, "route": route}),
+        ))
     }
     fn show(&self) {
         self.shown.fetch_add(1, Ordering::SeqCst);
@@ -90,7 +99,12 @@ impl Rig {
         });
         let endpoint = Endpoint(dir.path().join("run/s"));
         let running = link.start(&endpoint).unwrap();
-        Rig { link, endpoint, running: Some(running), _dir: dir }
+        Rig {
+            link,
+            endpoint,
+            running: Some(running),
+            _dir: dir,
+        }
     }
 
     fn fake(&self) -> &Fake {
@@ -100,8 +114,14 @@ impl Rig {
     /// A connection as the native host makes it.
     fn connect(&self) -> Stream {
         let mut stream = self.endpoint.connect().unwrap();
-        stream.set_read_timeout(Some(Duration::from_secs(10))).unwrap();
-        send(&mut stream, json!({"t": "host", "caller": CHROME, "version": "test"})).unwrap();
+        stream
+            .set_read_timeout(Some(Duration::from_secs(10)))
+            .unwrap();
+        send(
+            &mut stream,
+            json!({"t": "host", "caller": CHROME, "version": "test"}),
+        )
+        .unwrap();
         stream
     }
 
@@ -136,22 +156,37 @@ fn closed(stream: &mut Stream) -> bool {
 fn pairing_shows_the_same_code_on_both_sides_and_then_fills() {
     let rig = Rig::new();
     let (id, key, sas) = rig.pair();
-    assert_eq!(rig.fake().codes.lock().unwrap().as_slice(), std::slice::from_ref(&sas));
+    assert_eq!(
+        rig.fake().codes.lock().unwrap().as_slice(),
+        std::slice::from_ref(&sas)
+    );
     assert_eq!(sas.len(), 6);
     assert!(rig.fake().store.find(&id).is_some());
     let (mut stream, mut session) = rig.session(&id, &key);
-    let status = session.request(&mut stream, json!({"op": "status"})).unwrap();
+    let status = session
+        .request(&mut stream, json!({"op": "status"}))
+        .unwrap();
     assert_eq!(status["value"]["state"], "unlocked");
     let found = session
-        .request(&mut stream, json!({"op": "api", "route": "matches", "body": {"origin": "https://github.com"}}))
+        .request(
+            &mut stream,
+            json!({"op": "api", "route": "matches", "body": {"origin": "https://github.com"}}),
+        )
         .unwrap();
     assert_eq!(found["ok"], true);
     assert_eq!(found["value"]["route"], "matches");
     // One session per pairing, reused, and named by the pairing.
-    session.request(&mut stream, json!({"op": "api", "route": "search", "body": {"query": "x"}})).unwrap();
+    session
+        .request(
+            &mut stream,
+            json!({"op": "api", "route": "search", "body": {"query": "x"}}),
+        )
+        .unwrap();
     assert_eq!(rig.fake().sessions.load(Ordering::SeqCst), 1);
     let calls = rig.fake().calls.lock().unwrap().clone();
-    assert!(calls.iter().all(|(token, _)| token == &format!("token-{id}-0")));
+    assert!(calls
+        .iter()
+        .all(|(token, _)| token == &format!("token-{id}-0")));
 }
 
 #[test]
@@ -161,8 +196,15 @@ fn a_pairing_on_the_same_connection_goes_straight_to_hello() {
     let start = client::pair_commit(&mut stream, "Firefox").unwrap();
     let revealed = client::pair_reveal(&mut stream, start).unwrap().unwrap();
     let id = client::pair_result(&mut stream).unwrap().unwrap();
-    let mut session = client::hello(&mut stream, &id, &revealed.key).unwrap().unwrap();
-    assert_eq!(session.request(&mut stream, json!({"op": "status"})).unwrap()["ok"], true);
+    let mut session = client::hello(&mut stream, &id, &revealed.key)
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        session
+            .request(&mut stream, json!({"op": "status"}))
+            .unwrap()["ok"],
+        true
+    );
 }
 
 #[test]
@@ -172,7 +214,10 @@ fn a_denied_pairing_stores_nothing() {
     let mut stream = rig.connect();
     let start = client::pair_commit(&mut stream, "Chrome").unwrap();
     client::pair_reveal(&mut stream, start).unwrap().unwrap();
-    assert_eq!(client::pair_result(&mut stream).unwrap(), Err("denied".to_string()));
+    assert_eq!(
+        client::pair_result(&mut stream).unwrap(),
+        Err("denied".to_string())
+    );
     assert!(rig.fake().store.list().is_empty());
 }
 
@@ -186,15 +231,26 @@ fn a_middle_that_swaps_keys_shows_a_different_code() {
     let mut to_app = rig.connect();
     // The attacker's side toward the app.
     let attacker_start = client::pair_commit(&mut to_app, "Chrome").unwrap();
-    let attacker_view = client::pair_reveal(&mut to_app, attacker_start).unwrap().unwrap();
+    let attacker_view = client::pair_reveal(&mut to_app, attacker_start)
+        .unwrap()
+        .unwrap();
     // The extension's own exchange (with the attacker answering as the app).
     let ext = Exchange::new();
     let ext_nonce = channel::random::<16>();
     let attacker_app = Exchange::new();
     let attacker_nonce = channel::random::<16>();
-    let t = channel::transcript("Chrome", &ext.public, &ext_nonce, &attacker_app.public, &attacker_nonce);
+    let t = channel::transcript(
+        "Chrome",
+        &ext.public,
+        &ext_nonce,
+        &attacker_app.public,
+        &attacker_nonce,
+    );
     let extension_view = ext.finish(&attacker_app.public, &t).unwrap();
-    assert_eq!(client::pair_result(&mut to_app).unwrap(), Err("denied".to_string()));
+    assert_eq!(
+        client::pair_result(&mut to_app).unwrap(),
+        Err("denied".to_string())
+    );
     let shown_by_app = rig.fake().codes.lock().unwrap()[0].clone();
     assert_eq!(shown_by_app, attacker_view.sas);
     assert_ne!(*extension_view.key, *attacker_view.key);
@@ -208,8 +264,15 @@ fn a_reveal_that_breaks_the_commitment_is_refused_before_any_dialog() {
     client::pair_commit(&mut stream, "Chrome").unwrap();
     receive(&mut stream).unwrap();
     let other = Exchange::new();
-    send(&mut stream, json!({"t": "pair_reveal", "pub": b64(&other.public), "nonce": b64(&[0; 16])})).unwrap();
-    assert_eq!(client::refusal(&receive(&mut stream).unwrap()).as_deref(), Some("protocol"));
+    send(
+        &mut stream,
+        json!({"t": "pair_reveal", "pub": b64(&other.public), "nonce": b64(&[0; 16])}),
+    )
+    .unwrap();
+    assert_eq!(
+        client::refusal(&receive(&mut stream).unwrap()).as_deref(),
+        Some("protocol")
+    );
     assert!(rig.fake().codes.lock().unwrap().is_empty());
 }
 
@@ -220,10 +283,21 @@ fn a_low_order_key_is_refused() {
     let weak = [0u8; 32];
     let nonce = [9u8; 16];
     let commit = channel::commit(&weak, &nonce);
-    send(&mut stream, json!({"t": "pair_commit", "browser": "Chrome", "commit": b64(&commit)})).unwrap();
+    send(
+        &mut stream,
+        json!({"t": "pair_commit", "browser": "Chrome", "commit": b64(&commit)}),
+    )
+    .unwrap();
     receive(&mut stream).unwrap();
-    send(&mut stream, json!({"t": "pair_reveal", "pub": b64(&weak), "nonce": b64(&nonce)})).unwrap();
-    assert_eq!(client::refusal(&receive(&mut stream).unwrap()).as_deref(), Some("protocol"));
+    send(
+        &mut stream,
+        json!({"t": "pair_reveal", "pub": b64(&weak), "nonce": b64(&nonce)}),
+    )
+    .unwrap();
+    assert_eq!(
+        client::refusal(&receive(&mut stream).unwrap()).as_deref(),
+        Some("protocol")
+    );
     assert!(rig.fake().codes.lock().unwrap().is_empty());
 }
 
@@ -269,7 +343,13 @@ fn a_wrong_pairing_key_or_unknown_id_gets_nothing() {
     let rig = Rig::new();
     let (id, _key, _) = rig.pair();
     let mut stream = rig.connect();
-    assert_eq!(client::hello(&mut stream, &b64(&[1; 16]), &[0; 32]).unwrap().err().as_deref(), Some("unknown_pairing"));
+    assert_eq!(
+        client::hello(&mut stream, &b64(&[1; 16]), &[0; 32])
+            .unwrap()
+            .err()
+            .as_deref(),
+        Some("unknown_pairing")
+    );
     let (mut stream, mut session) = rig.session(&id, &[0; 32]);
     send(&mut stream, session.seal(json!({"op": "status"}))).unwrap();
     assert!(closed(&mut stream));
@@ -282,12 +362,26 @@ fn locked_vault_and_unknown_requests() {
     let (id, key, _) = rig.pair();
     rig.fake().unlocked.store(false, Ordering::SeqCst);
     let (mut stream, mut session) = rig.session(&id, &key);
-    assert_eq!(session.request(&mut stream, json!({"op": "status"})).unwrap()["value"]["state"], "locked");
+    assert_eq!(
+        session
+            .request(&mut stream, json!({"op": "status"}))
+            .unwrap()["value"]["state"],
+        "locked"
+    );
     let refused = session
-        .request(&mut stream, json!({"op": "api", "route": "credential", "body": {"id": 1}}))
+        .request(
+            &mut stream,
+            json!({"op": "api", "route": "credential", "body": {"id": 1}}),
+        )
         .unwrap();
-    assert_eq!((refused["ok"].clone(), refused["code"].clone()), (json!(false), json!("locked")));
-    assert_eq!(session.request(&mut stream, json!({"op": "show"})).unwrap()["ok"], true);
+    assert_eq!(
+        (refused["ok"].clone(), refused["code"].clone()),
+        (json!(false), json!("locked"))
+    );
+    assert_eq!(
+        session.request(&mut stream, json!({"op": "show"})).unwrap()["ok"],
+        true
+    );
     assert_eq!(rig.fake().shown.load(Ordering::SeqCst), 1);
     for bad in [
         json!({"op": "api", "route": "sessions", "body": {}}),
@@ -295,12 +389,21 @@ fn locked_vault_and_unknown_requests() {
         json!({"op": "status", "extra": 1}),
         json!({"op": "export"}),
     ] {
-        assert_eq!(session.request(&mut stream, bad).unwrap()["code"], "protocol");
+        assert_eq!(
+            session.request(&mut stream, bad).unwrap()["code"],
+            "protocol"
+        );
     }
     // Pairing needs an unlocked vault.
     let mut stream = rig.connect();
     let start = client::pair_commit(&mut stream, "Chrome").unwrap();
-    assert_eq!(client::pair_reveal(&mut stream, start).unwrap().err().as_deref(), Some("locked"));
+    assert_eq!(
+        client::pair_reveal(&mut stream, start)
+            .unwrap()
+            .err()
+            .as_deref(),
+        Some("locked")
+    );
 }
 
 #[test]
@@ -311,12 +414,21 @@ fn an_ended_session_is_replaced_once_and_lock_forgets_tokens() {
     let call = json!({"op": "api", "route": "matches", "body": {}});
     session.request(&mut stream, call.clone()).unwrap();
     *rig.fake().accepted.lock().unwrap() = None; // the core ended it (idle)
-    assert_eq!(session.request(&mut stream, call.clone()).unwrap()["ok"], true);
+    assert_eq!(
+        session.request(&mut stream, call.clone()).unwrap()["ok"],
+        true
+    );
     assert_eq!(rig.fake().sessions.load(Ordering::SeqCst), 2);
     let missing = session
-        .request(&mut stream, json!({"op": "api", "route": "credential", "body": {"id": 404}}))
+        .request(
+            &mut stream,
+            json!({"op": "api", "route": "credential", "body": {"id": 404}}),
+        )
         .unwrap();
-    assert_eq!((missing["status"].clone(), missing["detail"].clone()), (json!(404), json!("No such login.")));
+    assert_eq!(
+        (missing["status"].clone(), missing["detail"].clone()),
+        (json!(404), json!("No such login."))
+    );
     session.request(&mut stream, json!({"op": "lock"})).unwrap();
     assert_eq!(rig.fake().locked.load(Ordering::SeqCst), 1);
     assert!(rig.link.tokens.lock().unwrap().is_empty());
@@ -328,19 +440,30 @@ fn strangers_disabled_switch_and_too_many_connections() {
     let mut stream = rig.endpoint.connect().unwrap();
     send(&mut stream, json!({"t": "host", "caller": "chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/", "version": "x"}))
         .unwrap();
-    assert_eq!(client::refusal(&receive(&mut stream).unwrap()).as_deref(), Some("caller"));
+    assert_eq!(
+        client::refusal(&receive(&mut stream).unwrap()).as_deref(),
+        Some("caller")
+    );
 
     rig.fake().store.set_enabled(false).unwrap();
     let mut stream = rig.connect();
     let start = client::pair_commit(&mut stream, "Chrome").unwrap();
-    assert_eq!(client::pair_reveal(&mut stream, start).unwrap().err().as_deref(), Some("disabled"));
+    assert_eq!(
+        client::pair_reveal(&mut stream, start)
+            .unwrap()
+            .err()
+            .as_deref(),
+        Some("disabled")
+    );
     rig.fake().store.set_enabled(true).unwrap();
 
     let (tx, rx) = mpsc::channel();
     let held: Vec<Stream> = (0..MAX_CONNECTIONS).map(|_| rig.connect()).collect();
     std::thread::sleep(Duration::from_millis(200));
     let mut extra = rig.endpoint.connect().unwrap();
-    extra.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+    extra
+        .set_read_timeout(Some(Duration::from_secs(5)))
+        .unwrap();
     tx.send(()).unwrap();
     assert!(closed(&mut extra), "the ninth connection is closed at once");
     drop(held);

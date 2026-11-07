@@ -48,7 +48,11 @@ mod unix {
 
     #[cfg(target_os = "linux")]
     pub fn peer_uid(stream: &UnixStream) -> io::Result<u32> {
-        let mut cred = libc::ucred { pid: 0, uid: 0, gid: 0 };
+        let mut cred = libc::ucred {
+            pid: 0,
+            uid: 0,
+            gid: 0,
+        };
         let mut len = std::mem::size_of::<libc::ucred>() as libc::socklen_t;
         // SAFETY: valid fd, out buffer of the stated length.
         let rc = unsafe {
@@ -105,21 +109,31 @@ mod unix {
     /// Listen at `path`. A stale socket left by a crash is replaced; a live one
     /// (another CipherMoth already listening) is an error, never taken over.
     pub fn listen(path: &Path) -> io::Result<Listener> {
-        let parent = path.parent().ok_or_else(|| refused("socket path has no folder"))?;
+        let parent = path
+            .parent()
+            .ok_or_else(|| refused("socket path has no folder"))?;
         crate::identity::private_dir(parent)?;
         if let Ok(meta) = std::fs::symlink_metadata(path) {
             if !meta.file_type().is_socket() || meta.uid() != own_uid() {
                 return Err(refused("something else is at the socket path"));
             }
             if UnixStream::connect(path).is_ok() {
-                return Err(io::Error::new(io::ErrorKind::AddrInUse, "another CipherMoth is listening"));
+                return Err(io::Error::new(
+                    io::ErrorKind::AddrInUse,
+                    "another CipherMoth is listening",
+                ));
             }
             std::fs::remove_file(path)?;
         }
         let inner = UnixListener::bind(path)?;
         std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))?;
         let inode = std::fs::symlink_metadata(path)?.ino();
-        Ok(Listener { inner, path: path.to_path_buf(), inode, stopped: Arc::new(AtomicBool::new(false)) })
+        Ok(Listener {
+            inner,
+            path: path.to_path_buf(),
+            inode,
+            stopped: Arc::new(AtomicBool::new(false)),
+        })
     }
 
     impl Listener {
@@ -147,7 +161,11 @@ mod unix {
         }
 
         pub fn stopper(&self) -> Stopper {
-            Stopper { path: self.path.clone(), inode: self.inode, stopped: self.stopped.clone() }
+            Stopper {
+                path: self.path.clone(),
+                inode: self.inode,
+                stopped: self.stopped.clone(),
+            }
         }
     }
 
@@ -189,20 +207,21 @@ mod windows {
         GENERIC_WRITE, HANDLE, INVALID_HANDLE_VALUE, WAIT_OBJECT_0, WAIT_TIMEOUT,
     };
     use windows_sys::Win32::Security::Authorization::{
-        ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW, SDDL_REVISION_1,
+        ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW,
+        SDDL_REVISION_1,
     };
     use windows_sys::Win32::Security::{
-        EqualSid, GetTokenInformation, TokenUser, PSECURITY_DESCRIPTOR, SECURITY_ATTRIBUTES, TOKEN_QUERY,
-        TOKEN_USER,
+        EqualSid, GetTokenInformation, TokenUser, PSECURITY_DESCRIPTOR, SECURITY_ATTRIBUTES,
+        TOKEN_QUERY, TOKEN_USER,
     };
     use windows_sys::Win32::Storage::FileSystem::{
-        CreateFileW, ReadFile, WriteFile, FILE_FLAG_FIRST_PIPE_INSTANCE, FILE_FLAG_OVERLAPPED, OPEN_EXISTING,
-        PIPE_ACCESS_DUPLEX, SECURITY_IDENTIFICATION, SECURITY_SQOS_PRESENT,
+        CreateFileW, ReadFile, WriteFile, FILE_FLAG_FIRST_PIPE_INSTANCE, FILE_FLAG_OVERLAPPED,
+        OPEN_EXISTING, PIPE_ACCESS_DUPLEX, SECURITY_IDENTIFICATION, SECURITY_SQOS_PRESENT,
     };
     use windows_sys::Win32::System::Pipes::{
         ConnectNamedPipe, CreateNamedPipeW, DisconnectNamedPipe, GetNamedPipeClientProcessId,
-        GetNamedPipeServerProcessId, PIPE_READMODE_BYTE, PIPE_REJECT_REMOTE_CLIENTS, PIPE_TYPE_BYTE,
-        PIPE_UNLIMITED_INSTANCES, PIPE_WAIT,
+        GetNamedPipeServerProcessId, PIPE_READMODE_BYTE, PIPE_REJECT_REMOTE_CLIENTS,
+        PIPE_TYPE_BYTE, PIPE_UNLIMITED_INSTANCES, PIPE_WAIT,
     };
     use windows_sys::Win32::System::Threading::{
         CreateEventW, GetCurrentProcess, OpenProcess, OpenProcessToken, WaitForSingleObject,
@@ -240,7 +259,10 @@ mod windows {
         unsafe { GetTokenInformation(token.0, TokenUser, null_mut(), 0, &mut size) };
         let mut buf = vec![0u8; size as usize];
         // SAFETY: buffer of the size the system asked for.
-        if unsafe { GetTokenInformation(token.0, TokenUser, buf.as_mut_ptr().cast(), size, &mut size) } == 0 {
+        if unsafe {
+            GetTokenInformation(token.0, TokenUser, buf.as_mut_ptr().cast(), size, &mut size)
+        } == 0
+        {
             return Err(io::Error::last_os_error());
         }
         Ok(buf)
@@ -294,7 +316,12 @@ mod windows {
     }
 
     /// Wait for one overlapped operation; on timeout it is cancelled.
-    fn finish(pipe: HANDLE, overlapped: &mut OVERLAPPED, started: i32, timeout: Option<Duration>) -> io::Result<usize> {
+    fn finish(
+        pipe: HANDLE,
+        overlapped: &mut OVERLAPPED,
+        started: i32,
+        timeout: Option<Duration>,
+    ) -> io::Result<usize> {
         // SAFETY: reading the thread's last error right after the call.
         if started == 0 && unsafe { GetLastError() } != ERROR_IO_PENDING {
             return Err(io::Error::last_os_error());
@@ -344,6 +371,53 @@ mod windows {
                 unsafe { DisconnectNamedPipe(self.pipe.0) };
             }
         }
+
+        /// The pipe's DACL in SDDL (tests check who may open it).
+        #[cfg(test)]
+        pub fn dacl(&self) -> io::Result<String> {
+            use windows_sys::Win32::Security::Authorization::{
+                ConvertSecurityDescriptorToStringSecurityDescriptorW, GetSecurityInfo,
+                SE_KERNEL_OBJECT,
+            };
+            use windows_sys::Win32::Security::DACL_SECURITY_INFORMATION;
+            let mut descriptor = null_mut();
+            // SAFETY: our handle; the descriptor is freed with LocalFree.
+            let code = unsafe {
+                GetSecurityInfo(
+                    self.pipe.0,
+                    SE_KERNEL_OBJECT,
+                    DACL_SECURITY_INFORMATION,
+                    null_mut(),
+                    null_mut(),
+                    null_mut(),
+                    null_mut(),
+                    &mut descriptor,
+                )
+            };
+            if code != 0 {
+                return Err(io::Error::from_raw_os_error(code as i32));
+            }
+            let descriptor = Descriptor(descriptor);
+            let mut text = null_mut();
+            let mut len = 0;
+            // SAFETY: valid descriptor; the string is freed with LocalFree.
+            if unsafe {
+                ConvertSecurityDescriptorToStringSecurityDescriptorW(
+                    descriptor.0,
+                    SDDL_REVISION_1,
+                    DACL_SECURITY_INFORMATION,
+                    &mut text,
+                    &mut len,
+                )
+            } == 0
+            {
+                return Err(io::Error::last_os_error());
+            }
+            let sddl =
+                String::from_utf16_lossy(unsafe { std::slice::from_raw_parts(text, len as usize) });
+            unsafe { LocalFree(text.cast()) };
+            Ok(sddl.trim_end_matches('\0').to_string())
+        }
     }
 
     impl Read for Stream {
@@ -353,7 +427,15 @@ mod windows {
             overlapped.hEvent = done.0;
             let len = buf.len().min(u32::MAX as usize) as u32;
             // SAFETY: buf and overlapped outlive the operation (finish waits).
-            let started = unsafe { ReadFile(self.pipe.0, buf.as_mut_ptr(), len, null_mut(), &mut overlapped) };
+            let started = unsafe {
+                ReadFile(
+                    self.pipe.0,
+                    buf.as_mut_ptr(),
+                    len,
+                    null_mut(),
+                    &mut overlapped,
+                )
+            };
             let timeout = *self.timeout.lock().unwrap();
             match finish(self.pipe.0, &mut overlapped, started, timeout) {
                 // A closed pipe reads as end of stream.
@@ -370,7 +452,8 @@ mod windows {
             overlapped.hEvent = done.0;
             let len = buf.len().min(u32::MAX as usize) as u32;
             // SAFETY: as in read.
-            let started = unsafe { WriteFile(self.pipe.0, buf.as_ptr(), len, null_mut(), &mut overlapped) };
+            let started =
+                unsafe { WriteFile(self.pipe.0, buf.as_ptr(), len, null_mut(), &mut overlapped) };
             finish(self.pipe.0, &mut overlapped, started, None)
         }
         fn flush(&mut self) -> io::Result<()> {
@@ -402,7 +485,12 @@ mod windows {
         let mut descriptor = null_mut();
         // SAFETY: valid SDDL string, out pointer.
         if unsafe {
-            ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl.as_ptr(), SDDL_REVISION_1, &mut descriptor, null_mut())
+            ConvertStringSecurityDescriptorToSecurityDescriptorW(
+                sddl.as_ptr(),
+                SDDL_REVISION_1,
+                &mut descriptor,
+                null_mut(),
+            )
         } == 0
         {
             return Err(io::Error::last_os_error());
@@ -423,7 +511,11 @@ mod windows {
                 lpSecurityDescriptor: self.descriptor.0,
                 bInheritHandle: 0,
             };
-            let first = if self.first.swap(false, Ordering::SeqCst) { FILE_FLAG_FIRST_PIPE_INSTANCE } else { 0 };
+            let first = if self.first.swap(false, Ordering::SeqCst) {
+                FILE_FLAG_FIRST_PIPE_INSTANCE
+            } else {
+                0
+            };
             // SAFETY: valid name and attributes.
             let pipe = unsafe {
                 CreateNamedPipeW(
@@ -472,7 +564,8 @@ mod windows {
                 overlapped.hEvent = done.0;
                 // SAFETY: overlapped connect on our instance.
                 let started = unsafe { ConnectNamedPipe(pipe.0, &mut overlapped) };
-                let connected = if started == 0 && unsafe { GetLastError() } == ERROR_PIPE_CONNECTED {
+                let connected = if started == 0 && unsafe { GetLastError() } == ERROR_PIPE_CONNECTED
+                {
                     true
                 } else {
                     loop {
@@ -495,14 +588,20 @@ mod windows {
                 // SAFETY: connected pipe, out pointer.
                 let ok = unsafe { GetNamedPipeClientProcessId(pipe.0, &mut pid) } != 0;
                 if ok && same_user(pid).unwrap_or(false) {
-                    return Some(Stream { pipe: Arc::new(pipe), server: true, timeout: Default::default() });
+                    return Some(Stream {
+                        pipe: Arc::new(pipe),
+                        server: true,
+                        timeout: Default::default(),
+                    });
                 }
                 unsafe { DisconnectNamedPipe(pipe.0) };
             }
         }
 
         pub fn stopper(&self) -> Stopper {
-            Stopper { stopped: self.stopped.clone() }
+            Stopper {
+                stopped: self.stopped.clone(),
+            }
         }
     }
 
@@ -557,7 +656,11 @@ mod windows {
         if unsafe { GetNamedPipeServerProcessId(pipe.0, &mut pid) } == 0 || !same_user(pid)? {
             return Err(refused("the endpoint belongs to another user"));
         }
-        Ok(Stream { pipe: Arc::new(pipe), server: false, timeout: Default::default() })
+        Ok(Stream {
+            pipe: Arc::new(pipe),
+            server: false,
+            timeout: Default::default(),
+        })
     }
 }
 
@@ -593,7 +696,9 @@ pub struct Server {
 impl Server {
     pub fn bind(endpoint: &Endpoint) -> io::Result<Server> {
         #[cfg(unix)]
-        return Ok(Server { listener: listen(&endpoint.0)? });
+        return Ok(Server {
+            listener: listen(&endpoint.0)?,
+        });
         #[cfg(windows)]
         {
             let listener = listen(&endpoint.0)?;
@@ -625,9 +730,22 @@ mod tests {
         let path = root.path().join("run/extension.sock");
         let endpoint = Endpoint(path.clone());
         let server = Server::bind(&endpoint).unwrap();
-        assert_eq!(std::fs::metadata(&path).unwrap().permissions().mode() & 0o777, 0o600);
-        assert_eq!(std::fs::metadata(path.parent().unwrap()).unwrap().permissions().mode() & 0o777, 0o700);
-        assert_eq!(Server::bind(&endpoint).err().unwrap().kind(), io::ErrorKind::AddrInUse);
+        assert_eq!(
+            std::fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+        assert_eq!(
+            std::fs::metadata(path.parent().unwrap())
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o777,
+            0o700
+        );
+        assert_eq!(
+            Server::bind(&endpoint).err().unwrap().kind(),
+            io::ErrorKind::AddrInUse
+        );
 
         let accepting = std::thread::spawn(move || {
             // The second bind's liveness probe is queued first and sends nothing.
@@ -664,7 +782,10 @@ mod tests {
 
         let file = root.path().join("run/not-a-socket");
         std::fs::write(&file, b"").unwrap();
-        assert_eq!(listen(&file).err().unwrap().kind(), io::ErrorKind::PermissionDenied);
+        assert_eq!(
+            listen(&file).err().unwrap().kind(),
+            io::ErrorKind::PermissionDenied
+        );
     }
 
     #[test]
@@ -674,7 +795,87 @@ mod tests {
         std::fs::create_dir(&dir).unwrap();
         std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o777)).unwrap();
         let server = Server::bind(&Endpoint(dir.join("s"))).unwrap();
-        assert_eq!(std::fs::metadata(&dir).unwrap().permissions().mode() & 0o777, 0o700);
+        assert_eq!(
+            std::fs::metadata(&dir).unwrap().permissions().mode() & 0o777,
+            0o700
+        );
+        server.stopper().stop();
+    }
+}
+
+#[cfg(all(test, windows))]
+mod windows_tests {
+    use super::*;
+
+    fn name() -> String {
+        let tag = crate::wire::b64(&crate::channel::random::<8>());
+        format!(
+            r"\\.\pipe\ciphermoth-extension-test-{tag}-{}",
+            current_user_sid().unwrap()
+        )
+    }
+
+    #[test]
+    fn only_this_user_may_open_the_pipe_and_nobody_can_squat_it() {
+        let endpoint = Endpoint(name());
+        let server = Server::bind(&endpoint).unwrap();
+        // A second listener on the same name is refused (first instance).
+        assert!(Server::bind(&endpoint).is_err());
+        let accepting = std::thread::spawn(move || {
+            let mut stream = server.accept().unwrap();
+            let got = crate::framing::read_object(&mut stream).unwrap();
+            crate::framing::write_frame(&mut stream, b"{\"t\":\"hi\"}").unwrap();
+            (server, stream, got)
+        });
+        let mut client = endpoint.connect().unwrap();
+        crate::framing::write_frame(&mut client, b"{\"t\":\"ping\"}").unwrap();
+        assert_eq!(crate::framing::read_object(&mut client).unwrap()["t"], "hi");
+        let (server, stream, got) = accepting.join().unwrap();
+        assert_eq!(got["t"], "ping");
+
+        let dacl = stream.dacl().unwrap();
+        let sid = current_user_sid().unwrap();
+        assert!(
+            dacl.starts_with("D:P"),
+            "protected, nothing inherited: {dacl}"
+        );
+        assert!(dacl.contains(&sid), "{dacl}");
+        for other in [";WD)", ";AU)", ";BU)", ";AN)", ";NU)"] {
+            assert!(!dacl.contains(other), "{other} in {dacl}");
+        }
+        assert_eq!(dacl.matches("(A;").count(), 1, "one allow entry: {dacl}");
+
+        server.stopper().stop();
+        drop(stream);
+    }
+
+    #[test]
+    fn reads_and_writes_run_at_the_same_time() {
+        let endpoint = Endpoint(name());
+        let server = Server::bind(&endpoint).unwrap();
+        let accepting = std::thread::spawn(move || (server.accept().unwrap(), server));
+        let client = endpoint.connect().unwrap();
+        let (served, server) = accepting.join().unwrap();
+        // A blocked read must not hold up a write on a clone of the same pipe.
+        let mut reader = client.try_clone().unwrap();
+        let waiting = std::thread::spawn(move || crate::framing::read_object(&mut reader).unwrap());
+        std::thread::sleep(Duration::from_millis(200));
+        let mut writer = client.try_clone().unwrap();
+        crate::framing::write_frame(&mut writer, b"{\"t\":\"out\"}").unwrap();
+        let mut served_reader = served.try_clone().unwrap();
+        assert_eq!(
+            crate::framing::read_object(&mut served_reader).unwrap()["t"],
+            "out"
+        );
+        let mut served_writer = served.try_clone().unwrap();
+        crate::framing::write_frame(&mut served_writer, b"{\"t\":\"back\"}").unwrap();
+        assert_eq!(waiting.join().unwrap()["t"], "back");
+        // A read timeout ends a read that gets nothing.
+        client
+            .set_read_timeout(Some(Duration::from_millis(200)))
+            .unwrap();
+        let mut idle = client.try_clone().unwrap();
+        assert!(crate::framing::read_object(&mut idle).is_err());
         server.stopper().stop();
     }
 }

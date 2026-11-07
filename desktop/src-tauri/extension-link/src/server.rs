@@ -36,7 +36,9 @@ const FIRST_MESSAGE: Duration = Duration::from_secs(10);
 const PAIRING_STEP: Duration = Duration::from_secs(30);
 const IDLE: Duration = Duration::from_secs(10 * 60);
 
-pub const BROWSERS: &[&str] = &["Chrome", "Chromium", "Edge", "Brave", "Opera", "Vivaldi", "Firefox", "Browser"];
+pub const BROWSERS: &[&str] = &[
+    "Chrome", "Chromium", "Edge", "Brave", "Opera", "Vivaldi", "Firefox", "Browser",
+];
 pub const ROUTES: &[&str] = &["matches", "search", "credential", "totp"];
 
 #[derive(Debug, PartialEq, Eq)]
@@ -143,24 +145,29 @@ impl<D: Desktop> Link<D> {
         let server = Server::bind(endpoint)?;
         let stopper = server.stopper();
         let link = self.clone();
-        let thread = std::thread::Builder::new().name("extension-link".into()).spawn(move || {
-            while let Some(stream) = server.accept() {
-                if link.connections.fetch_add(1, Ordering::SeqCst) >= MAX_CONNECTIONS {
-                    link.connections.fetch_sub(1, Ordering::SeqCst);
-                    stream.shutdown();
-                    continue;
+        let thread = std::thread::Builder::new()
+            .name("extension-link".into())
+            .spawn(move || {
+                while let Some(stream) = server.accept() {
+                    if link.connections.fetch_add(1, Ordering::SeqCst) >= MAX_CONNECTIONS {
+                        link.connections.fetch_sub(1, Ordering::SeqCst);
+                        stream.shutdown();
+                        continue;
+                    }
+                    let worker = link.clone();
+                    let spawned = std::thread::Builder::new()
+                        .name("extension-connection".into())
+                        .spawn(move || worker.connection(stream));
+                    if spawned.is_err() {
+                        // The connection never started, so its guard never runs.
+                        link.connections.fetch_sub(1, Ordering::SeqCst);
+                    }
                 }
-                let worker = link.clone();
-                let spawned = std::thread::Builder::new()
-                    .name("extension-connection".into())
-                    .spawn(move || worker.connection(stream));
-                if spawned.is_err() {
-                    // The connection never started, so its guard never runs.
-                    link.connections.fetch_sub(1, Ordering::SeqCst);
-                }
-            }
-        })?;
-        Ok(Running { stopper, thread: Some(thread) })
+            })?;
+        Ok(Running {
+            stopper,
+            thread: Some(thread),
+        })
     }
 
     /// End every open connection (the switch was turned off).
@@ -184,7 +191,9 @@ impl<D: Desktop> Link<D> {
     fn connection(&self, stream: Stream) {
         let id = self.next_connection.fetch_add(1, Ordering::SeqCst);
         let _guard = ConnectionGuard { link: self, id };
-        let Ok(watch) = stream.try_clone() else { return };
+        let Ok(watch) = stream.try_clone() else {
+            return;
+        };
         self.live.lock().unwrap().insert(id, watch);
         let _ = self.serve(stream);
     }
@@ -220,7 +229,11 @@ impl<D: Desktop> Link<D> {
     fn pair(&self, stream: &mut Stream, writer: &mut Stream, commit: &Object) -> io::Result<Flow> {
         let browser = text(commit, "browser", 40).filter(|b| BROWSERS.contains(b));
         let committed = bytes::<32>(commit, "commit");
-        let (Some(browser), Some(committed), true) = (browser, committed, has_exactly(commit, &["browser", "commit"])) else {
+        let (Some(browser), Some(committed), true) = (
+            browser,
+            committed,
+            has_exactly(commit, &["browser", "commit"]),
+        ) else {
             return Ok(refuse(writer, "protocol"));
         };
         if !self.desktop.store().enabled() {
@@ -235,14 +248,20 @@ impl<D: Desktop> Link<D> {
         let _guard = PairingGuard(&self.pairing);
         let app = Exchange::new();
         let app_nonce = channel::random::<16>();
-        send(writer, json!({"t": "pair_key", "pub": b64(&app.public), "nonce": b64(&app_nonce)}))?;
+        send(
+            writer,
+            json!({"t": "pair_key", "pub": b64(&app.public), "nonce": b64(&app_nonce)}),
+        )?;
         stream.set_read_timeout(Some(PAIRING_STEP))?;
         let reveal = read(stream)?;
         let public = bytes::<32>(&reveal, "pub");
         let nonce = bytes::<16>(&reveal, "nonce");
-        let (Some(public), Some(nonce), true, Some("pair_reveal")) =
-            (public, nonce, has_exactly(&reveal, &["pub", "nonce"]), kind(&reveal))
-        else {
+        let (Some(public), Some(nonce), true, Some("pair_reveal")) = (
+            public,
+            nonce,
+            has_exactly(&reveal, &["pub", "nonce"]),
+            kind(&reveal),
+        ) else {
             return Ok(refuse(writer, "protocol"));
         };
         if channel::commit(&public, &nonce) != committed {
@@ -278,7 +297,10 @@ impl<D: Desktop> Link<D> {
             return Ok(());
         };
         let app_nonce = channel::random::<16>();
-        send(&mut writer, json!({"t": "hello_ok", "nonce": b64(&app_nonce)}))?;
+        send(
+            &mut writer,
+            json!({"t": "hello_ok", "nonce": b64(&app_nonce)}),
+        )?;
         let key = channel::connection_key(&key, &id_bytes, &extension_nonce.unwrap(), &app_nonce);
         let mut channel = Channel::new(key, Side::App);
         let _ = self.desktop.store().touch(&pairing.id);
@@ -287,14 +309,19 @@ impl<D: Desktop> Link<D> {
             let message = read(&mut stream)?;
             let counter = message.get("c").and_then(Value::as_u64);
             let sealed = text(&message, "d", 96 * 1024).and_then(unb64);
-            let (Some("msg"), true, Some(counter), Some(sealed)) =
-                (kind(&message), has_exactly(&message, &["c", "d"]), counter, sealed)
-            else {
+            let (Some("msg"), true, Some(counter), Some(sealed)) = (
+                kind(&message),
+                has_exactly(&message, &["c", "d"]),
+                counter,
+                sealed,
+            ) else {
                 return Ok(());
             };
             // A message that is not the next authentic one ends the connection
             // without an answer.
-            let Ok(plain) = channel.open(counter, &sealed) else { return Ok(()) };
+            let Ok(plain) = channel.open(counter, &sealed) else {
+                return Ok(());
+            };
             let answer = match serde_json::from_slice::<Value>(&plain) {
                 Ok(Value::Object(request)) => self.answer(&pairing, &request),
                 _ => return Ok(()),
@@ -302,10 +329,16 @@ impl<D: Desktop> Link<D> {
             let mut encoded = serde_json::to_vec(&answer)?;
             if encoded.len() > MAX_PLAINTEXT {
                 let id = answer["id"].as_u64().unwrap_or(0);
-                encoded = serde_json::to_vec(&failure(id, "too_large", "The answer is too large."))?;
+                encoded =
+                    serde_json::to_vec(&failure(id, "too_large", "The answer is too large."))?;
             }
-            let Ok((counter, sealed)) = channel.seal(&encoded) else { return Ok(()) };
-            send(&mut writer, json!({"t": "msg", "c": counter, "d": b64(&sealed)}))?;
+            let Ok((counter, sealed)) = channel.seal(&encoded) else {
+                return Ok(());
+            };
+            send(
+                &mut writer,
+                json!({"t": "msg", "c": counter, "d": b64(&sealed)}),
+            )?;
         }
     }
 
@@ -313,10 +346,16 @@ impl<D: Desktop> Link<D> {
         let Some(id) = request.get("id").and_then(Value::as_u64) else {
             return failure(0, "protocol", "No request id.");
         };
-        let exact = |fields: &[&str]| request.len() == fields.len() + 2 && fields.iter().all(|f| request.contains_key(*f));
+        let exact = |fields: &[&str]| {
+            request.len() == fields.len() + 2 && fields.iter().all(|f| request.contains_key(*f))
+        };
         match request.get("op").and_then(Value::as_str) {
             Some("status") if exact(&[]) => {
-                let state = if self.desktop.unlocked() { "unlocked" } else { "locked" };
+                let state = if self.desktop.unlocked() {
+                    "unlocked"
+                } else {
+                    "locked"
+                };
                 json!({"id": id, "ok": true, "value": {"state": state}})
             }
             Some("show") if exact(&[]) => {
@@ -359,7 +398,9 @@ impl<D: Desktop> Link<D> {
             let token = match self.token(pairing) {
                 Ok(token) => token,
                 Err(Refusal::Locked) => return failure(id, "locked", "CipherMoth is locked."),
-                Err(Refusal::Failed) => return failure(id, "unavailable", "CipherMoth did not answer."),
+                Err(Refusal::Failed) => {
+                    return failure(id, "unavailable", "CipherMoth did not answer.")
+                }
             };
             match self.desktop.api(&token, route, body) {
                 Ok((401, _)) => {
@@ -368,7 +409,9 @@ impl<D: Desktop> Link<D> {
                         tokens.remove(&pairing.id);
                     }
                 }
-                Ok((status, body)) if status < 300 => return json!({"id": id, "ok": true, "value": body}),
+                Ok((status, body)) if status < 300 => {
+                    return json!({"id": id, "ok": true, "value": body})
+                }
                 Ok((status, body)) => {
                     let code = body.get("code").and_then(Value::as_str).unwrap_or("error");
                     let detail: String = body
@@ -381,7 +424,9 @@ impl<D: Desktop> Link<D> {
                     return json!({"id": id, "ok": false, "status": status, "code": code, "detail": detail});
                 }
                 Err(Refusal::Locked) => return failure(id, "locked", "CipherMoth is locked."),
-                Err(Refusal::Failed) => return failure(id, "unavailable", "CipherMoth did not answer."),
+                Err(Refusal::Failed) => {
+                    return failure(id, "unavailable", "CipherMoth did not answer.")
+                }
             }
         }
         failure(id, "locked", "CipherMoth is locked.")

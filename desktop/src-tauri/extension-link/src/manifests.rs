@@ -43,7 +43,11 @@ pub struct Roots {
 
 impl Roots {
     pub fn of_user() -> io::Result<Roots> {
-        let var = |name: &str| std::env::var_os(name).map(PathBuf::from).filter(|p| p.is_absolute());
+        let var = |name: &str| {
+            std::env::var_os(name)
+                .map(PathBuf::from)
+                .filter(|p| p.is_absolute())
+        };
         #[cfg(windows)]
         {
             let missing = || io::Error::new(io::ErrorKind::NotFound, "no user profile folders");
@@ -55,8 +59,13 @@ impl Roots {
         }
         #[cfg(unix)]
         {
-            let home = var("HOME").ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "no HOME"))?;
-            Ok(Roots { local: home.clone(), roaming: home.clone(), home })
+            let home =
+                var("HOME").ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "no HOME"))?;
+            Ok(Roots {
+                local: home.clone(),
+                roaming: home.clone(),
+                home,
+            })
         }
     }
 }
@@ -119,11 +128,31 @@ pub fn locations(roots: &Roots) -> Vec<Location> {
     #[cfg(windows)]
     {
         for (browser, folder, key) in [
-            ("Chrome", r"Google\Chrome\User Data", r"Software\Google\Chrome\NativeMessagingHosts"),
-            ("Brave", r"BraveSoftware\Brave-Browser\User Data", r"Software\BraveSoftware\Brave-Browser\NativeMessagingHosts"),
-            ("Edge", r"Microsoft\Edge\User Data", r"Software\Microsoft\Edge\NativeMessagingHosts"),
-            ("Chromium", r"Chromium\User Data", r"Software\Chromium\NativeMessagingHosts"),
-            ("Vivaldi", r"Vivaldi\User Data", r"Software\Vivaldi\NativeMessagingHosts"),
+            (
+                "Chrome",
+                r"Google\Chrome\User Data",
+                r"Software\Google\Chrome\NativeMessagingHosts",
+            ),
+            (
+                "Brave",
+                r"BraveSoftware\Brave-Browser\User Data",
+                r"Software\BraveSoftware\Brave-Browser\NativeMessagingHosts",
+            ),
+            (
+                "Edge",
+                r"Microsoft\Edge\User Data",
+                r"Software\Microsoft\Edge\NativeMessagingHosts",
+            ),
+            (
+                "Chromium",
+                r"Chromium\User Data",
+                r"Software\Chromium\NativeMessagingHosts",
+            ),
+            (
+                "Vivaldi",
+                r"Vivaldi\User Data",
+                r"Software\Vivaldi\NativeMessagingHosts",
+            ),
         ] {
             out.push(Location {
                 browser,
@@ -156,7 +185,10 @@ pub fn manifest(family: Family, name: &str, host: &Path) -> serde_json::Value {
     });
     match family {
         Family::Chromium => {
-            value["allowed_origins"] = json!(CHROMIUM_IDS.iter().map(|id| format!("chrome-extension://{id}/")).collect::<Vec<_>>())
+            value["allowed_origins"] = json!(CHROMIUM_IDS
+                .iter()
+                .map(|id| format!("chrome-extension://{id}/"))
+                .collect::<Vec<_>>())
         }
         Family::Firefox => value["allowed_extensions"] = json!(FIREFOX_IDS),
     }
@@ -197,8 +229,14 @@ impl Installer {
 
     #[cfg(windows)]
     fn windows_manifest(&self, family: Family) -> PathBuf {
-        let suffix = if family == Family::Firefox { "firefox" } else { "chromium" };
-        self.link_dir.join("native-messaging").join(format!("{}.{suffix}.json", self.name))
+        let suffix = if family == Family::Firefox {
+            "firefox"
+        } else {
+            "chromium"
+        };
+        self.link_dir
+            .join("native-messaging")
+            .join(format!("{}.{suffix}.json", self.name))
     }
 
     /// Write the manifests; returns the browsers they were written for.
@@ -227,7 +265,10 @@ impl Installer {
         }
         #[cfg(windows)]
         if chromium_seen {
-            registry::set(&format!(r"{CHROME_KEY}\{}", self.name), &self.windows_manifest(Family::Chromium))?;
+            registry::set(
+                &format!(r"{CHROME_KEY}\{}", self.name),
+                &self.windows_manifest(Family::Chromium),
+            )?;
         }
         Ok(done)
     }
@@ -284,8 +325,8 @@ pub mod registry {
     use std::path::Path;
     use std::ptr::{null, null_mut};
     use windows_sys::Win32::System::Registry::{
-        RegCloseKey, RegCreateKeyExW, RegDeleteKeyW, RegGetValueW, RegSetValueExW, HKEY, HKEY_CURRENT_USER,
-        KEY_WRITE, REG_OPTION_NON_VOLATILE, REG_SZ, RRF_RT_REG_SZ,
+        RegCloseKey, RegCreateKeyExW, RegDeleteKeyW, RegGetValueW, RegSetValueExW, HKEY,
+        HKEY_CURRENT_USER, KEY_WRITE, REG_OPTION_NON_VOLATILE, REG_SZ, RRF_RT_REG_SZ,
     };
 
     fn wide(text: &str) -> Vec<u16> {
@@ -306,12 +347,29 @@ pub mod registry {
         let mut handle: HKEY = null_mut();
         // SAFETY: valid strings and out pointer.
         check(unsafe {
-            RegCreateKeyExW(HKEY_CURRENT_USER, key.as_ptr(), 0, null(), REG_OPTION_NON_VOLATILE, KEY_WRITE, null(), &mut handle, null_mut())
+            RegCreateKeyExW(
+                HKEY_CURRENT_USER,
+                key.as_ptr(),
+                0,
+                null(),
+                REG_OPTION_NON_VOLATILE,
+                KEY_WRITE,
+                null(),
+                &mut handle,
+                null_mut(),
+            )
         })?;
         let value = wide(&path.to_string_lossy());
         // SAFETY: REG_SZ of the stated byte length, including the NUL.
         let result = check(unsafe {
-            RegSetValueExW(handle, null(), 0, REG_SZ, value.as_ptr().cast(), (value.len() * 2) as u32)
+            RegSetValueExW(
+                handle,
+                null(),
+                0,
+                REG_SZ,
+                value.as_ptr().cast(),
+                (value.len() * 2) as u32,
+            )
         });
         unsafe { RegCloseKey(handle) };
         result
@@ -323,7 +381,15 @@ pub mod registry {
         let mut size = (buf.len() * 2) as u32;
         // SAFETY: buffer of the stated size.
         let code = unsafe {
-            RegGetValueW(HKEY_CURRENT_USER, key.as_ptr(), null(), RRF_RT_REG_SZ, null_mut(), buf.as_mut_ptr().cast(), &mut size)
+            RegGetValueW(
+                HKEY_CURRENT_USER,
+                key.as_ptr(),
+                null(),
+                RRF_RT_REG_SZ,
+                null_mut(),
+                buf.as_mut_ptr().cast(),
+                &mut size,
+            )
         };
         if code != 0 {
             return None;
@@ -352,17 +418,35 @@ mod tests {
             name: format!("com.ciphermoth.desktop.test{}", std::process::id()),
             host: dir.join("bin/ciphermoth-native-host"),
             link_dir: dir.join("link"),
-            roots: Roots { home: dir.join("home"), local: dir.join("local"), roaming: dir.join("roaming") },
+            roots: Roots {
+                home: dir.join("home"),
+                local: dir.join("local"),
+                roaming: dir.join("roaming"),
+            },
         }
     }
 
     #[test]
     fn manifests_name_only_our_extensions() {
-        let chromium = manifest(Family::Chromium, "com.ciphermoth.desktop", Path::new("/a/host"));
-        assert_eq!(chromium["allowed_origins"], json!(["chrome-extension://emeejhcdcdnlhejcpeohdafdnkmbaddn/"]));
+        let chromium = manifest(
+            Family::Chromium,
+            "com.ciphermoth.desktop",
+            Path::new("/a/host"),
+        );
+        assert_eq!(
+            chromium["allowed_origins"],
+            json!(["chrome-extension://emeejhcdcdnlhejcpeohdafdnkmbaddn/"])
+        );
         assert!(chromium.get("allowed_extensions").is_none());
-        let firefox = manifest(Family::Firefox, "com.ciphermoth.desktop", Path::new("/a/host"));
-        assert_eq!(firefox["allowed_extensions"], json!(["ciphermoth@mr-grj.github.io"]));
+        let firefox = manifest(
+            Family::Firefox,
+            "com.ciphermoth.desktop",
+            Path::new("/a/host"),
+        );
+        assert_eq!(
+            firefox["allowed_extensions"],
+            json!(["ciphermoth@mr-grj.github.io"])
+        );
         assert_eq!(firefox["type"], "stdio");
     }
 
@@ -370,7 +454,10 @@ mod tests {
     fn only_present_browsers_get_a_manifest_and_off_removes_all() {
         let dir = tempfile::tempdir().unwrap();
         let installer = installer(dir.path());
-        assert!(installer.install().unwrap().is_empty(), "no browser profile, no manifest");
+        assert!(
+            installer.install().unwrap().is_empty(),
+            "no browser profile, no manifest"
+        );
         let all = locations(&installer.roots);
         let chrome = all.iter().find(|l| l.browser == "Chrome").unwrap();
         let firefox = all.iter().find(|l| l.browser == "Firefox").unwrap();
@@ -384,10 +471,17 @@ mod tests {
         assert_eq!(found, ["Chrome", "Firefox"]);
         #[cfg(unix)]
         if let Target::Folder(hosts) = &chrome.hosts {
-            let written: serde_json::Value =
-                serde_json::from_slice(&std::fs::read(hosts.join(format!("{}.json", installer.name))).unwrap()).unwrap();
+            let written: serde_json::Value = serde_json::from_slice(
+                &std::fs::read(hosts.join(format!("{}.json", installer.name))).unwrap(),
+            )
+            .unwrap();
             assert_eq!(written["path"], json!(installer.host.to_string_lossy()));
-            assert!(!all.iter().find(|l| l.browser == "Brave").unwrap().profile.exists());
+            assert!(!all
+                .iter()
+                .find(|l| l.browser == "Brave")
+                .unwrap()
+                .profile
+                .exists());
         }
         installer.install().unwrap(); // idempotent
         installer.uninstall().unwrap();

@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
+import { buildDesktopBinaries } from "./desktop";
 import { E2E_DIR, EXTENSION_ROOT, FRONTEND_DIST } from "./paths";
 
 // The web app is served by the fixture server for the handoff tests, built
@@ -24,5 +25,8 @@ export default function globalSetup(): void {
       }
     );
   }
+  // Desktop mode: the native host and the app stand-in (quick when built
+  // already, and outside any test's timeout when they are not).
+  buildDesktopBinaries();
   void E2E_DIR;
 }

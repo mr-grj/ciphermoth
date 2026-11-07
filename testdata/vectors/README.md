@@ -16,6 +16,7 @@ Every JSON file has `format` (`ciphermoth-test-vectors/1`), `name` and `descript
 | `vault-v2.json` | Vault format 2: key derivation, password commitment, wrapped vault key, derived keys, name index, sealed entries and attachments with their associated data, and sealed values that must be refused |
 | `backup-v2.json` + `backup-v2.cmbackup` | Backup format 2: a real file with fixed salt and nonces, its keys, header, envelope, entry frames and attachment frame |
 | `totp.json` | RFC 6238 TOTP for stored secrets |
+| `extension-channel.json` | The browser extension's desktop channel: X25519 pairing with a commitment, the six-digit code, the pairing and connection keys, AES-256-GCM messages with counter nonces, and messages that must be refused. Used by the Rust app and host, the extension's TypeScript and the desktop QA harness |
 | `backup_zip.json` + `backup-v1.zip` | Backup format 1 (the ZIP of 2.0 and earlier), still importable: a real archive, its password and its JSON |
 
 ## The constructions

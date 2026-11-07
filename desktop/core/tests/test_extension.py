@@ -3,8 +3,7 @@
 import json
 
 import pytest
-
-from core_client import Core, frame, REQUEST
+from core_client import REQUEST, Core, frame
 from test_desktop import PASSWORD, api, create, entry
 
 CLIENT = "AAAAAAAAAAAAAAAAAAAAAA"
@@ -33,9 +32,7 @@ def extension(core, operation, **fields):
 
 def test_a_paired_browser_gets_an_extension_session_only_while_unlocked(core):
     assert extension(core, "extension_status") == (200, {"unlocked": False})
-    status, body = extension(
-        core, "extension_open", browser="Chrome", client=CLIENT
-    )
+    status, body = extension(core, "extension_open", browser="Chrome", client=CLIENT)
     assert (status, body["code"]) == (401, "locked")
     token = create(core)
     entry(core, token, url="https://github.com", username="moth")
@@ -43,7 +40,9 @@ def test_a_paired_browser_gets_an_extension_session_only_while_unlocked(core):
     status, body = extension(core, "extension_open", browser="Chrome", client=CLIENT)
     assert status == 200 and len(body["session_token"]) == 43
     ext = body["session_token"]
-    found = api(core, "POST", "/extension/matches", {"origin": "https://github.com"}, ext)
+    found = api(
+        core, "POST", "/extension/matches", {"origin": "https://github.com"}, ext
+    )
     assert found[0] == 200 and found[1]["logins"][0]["username"] == "moth"
     # It is an extension session: the vault itself refuses it.
     assert api(core, "GET", "/passwords", token=ext)[0] == 403
@@ -59,7 +58,10 @@ def test_a_paired_browser_gets_an_extension_session_only_while_unlocked(core):
     assert api(core, "POST", "/master_password/lock", token=token)[0] == 200
     assert extension(core, "extension_status") == (200, {"unlocked": False})
     assert extension(core, "extension_open", browser="Chrome", client=CLIENT)[0] == 401
-    assert api(core, "POST", "/master_password/unlock", {"master_password": PASSWORD})[0] == 200
+    assert (
+        api(core, "POST", "/master_password/unlock", {"master_password": PASSWORD})[0]
+        == 200
+    )
 
 
 @pytest.mark.parametrize(

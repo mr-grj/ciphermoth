@@ -393,12 +393,26 @@ export interface Browser {
 
 export const launch = async (
   stack: Stack,
-  { profile, otherExtension = false }: { profile?: string; otherExtension?: boolean } = {}
+  {
+    profile,
+    otherExtension = false,
+    env,
+    before,
+  }: {
+    profile?: string;
+    otherExtension?: boolean;
+    // Desktop mode: the browser passes its environment to the native host.
+    env?: Record<string, string>;
+    // Runs with the profile folder before the browser starts.
+    before?: (profile: string) => void;
+  } = {}
 ): Promise<Browser> => {
   const dir = profile ?? mkdtempSync(join(tmpdir(), "cm-ext-profile-"));
+  before?.(dir);
   const extensions = otherExtension ? `${TEST_BUILD},${OTHER_EXTENSION}` : TEST_BUILD;
   const context = await chromium.launchPersistentContext(dir, {
     channel: "chromium",
+    ...(env ? { env: { ...process.env, ...env } as Record<string, string> } : {}),
     headless: !process.env.HEADED,
     viewport: { width: 1100, height: 760 },
     args: [

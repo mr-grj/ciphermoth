@@ -89,6 +89,35 @@ def main():
         assert struct.unpack_from("<H", shell.read_bytes(), 18)[0] == (
             183 if native.endswith("aarch64") else 62
         )
+    # The browser extension's native host ships next to the shell (externalBin)
+    # and, started for anyone but the pinned extensions, refuses.
+    host = shell.parent / (
+        "ciphermoth-native-host.exe"
+        if sys.platform == "win32"
+        else "ciphermoth-native-host"
+    )
+    assert host.is_file(), f"native host missing: {host}"
+    if sys.platform == "darwin":
+        assert subprocess.check_output(
+            ["lipo", "-archs", str(host)], text=True
+        ).strip() == ("arm64" if native.endswith("aarch64") else "x86_64")
+    refused = subprocess.run(
+        [str(host), "chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/"],
+        input=b"",
+        capture_output=True,
+        timeout=30,
+    )
+    assert (refused.returncode, refused.stdout) == (2, b""), refused
+    hello = json.dumps({"t": "hello", "id": "x", "nonce": "y"}).encode()
+    probe = subprocess.run(
+        [str(host), "chrome-extension://emeejhcdcdnlhejcpeohdafdnkmbaddn/"],
+        input=struct.pack("=I", len(hello)) + hello,
+        capture_output=True,
+        timeout=30,
+    )
+    # No production app runs on the runner: the production host says so.
+    answer = probe.stdout[4:]
+    assert json.loads(answer) == {"t": "error", "code": "app_not_running"}, probe
     raw = shell.read_bytes()
     for forbidden in (
         b"qa_update_step",
@@ -140,6 +169,7 @@ def main():
         "native_architecture": True,
         "no_qa_hooks": True,
         "installed_core_tests": True,
+        "native_host_refuses_strangers": True,
         "signature_scope": "macOS ad-hoc bundle integrity; Tauri updater authorization checked separately",
     }
     (out / "results.json").write_text(json.dumps(result, indent=2) + "\n")

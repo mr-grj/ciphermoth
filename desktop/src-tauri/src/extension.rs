@@ -31,20 +31,32 @@ use crate::sidecar::Supervisor;
 
 const APPROVAL_TIMEOUT: Duration = Duration::from_secs(120);
 const CORE_TIMEOUT: Duration = Duration::from_secs(15);
-const HOST: &str = if cfg!(windows) { "ciphermoth-native-host.exe" } else { "ciphermoth-native-host" };
+const HOST: &str = if cfg!(windows) {
+    "ciphermoth-native-host.exe"
+} else {
+    "ciphermoth-native-host"
+};
 
 fn identity() -> io::Result<Identity> {
     #[cfg(feature = "gui-test")]
     return Identity::qa_from_env();
     #[cfg(not(feature = "gui-test"))]
-    Ok(if cfg!(debug_assertions) { Identity::Development } else { Identity::Production })
+    Ok(if cfg!(debug_assertions) {
+        Identity::Development
+    } else {
+        Identity::Production
+    })
 }
 
 /// QA builds find browsers below their own root (the harness creates the
 /// profile folders), so they never write into the runner's real profiles.
 fn roots(identity: &Identity) -> io::Result<Roots> {
     match identity {
-        Identity::Qa(root) => Ok(Roots { home: root.join("home"), local: root.join("local"), roaming: root.join("roaming") }),
+        Identity::Qa(root) => Ok(Roots {
+            home: root.join("home"),
+            local: root.join("local"),
+            roaming: root.join("roaming"),
+        }),
         _ => Roots::of_user(),
     }
 }
@@ -101,11 +113,19 @@ impl Desktop for AppDesktop {
     fn approve(&self, browser: &str, code: &str) -> bool {
         let id = self.next_approval.fetch_add(1, Ordering::SeqCst) + 1;
         let (tx, rx) = mpsc::channel();
-        if let Some(previous) = self.pending.lock().unwrap().replace(Pending { id, answer: tx }) {
+        if let Some(previous) = self
+            .pending
+            .lock()
+            .unwrap()
+            .replace(Pending { id, answer: tx })
+        {
             let _ = previous.answer.send(false);
         }
         self.show();
-        let _ = self.app.emit("extension-pairing", json!({"id": id, "browser": browser, "code": code}));
+        let _ = self.app.emit(
+            "extension-pairing",
+            json!({"id": id, "browser": browser, "code": code}),
+        );
         let allowed = rx.recv_timeout(APPROVAL_TIMEOUT).unwrap_or(false);
         let mut pending = self.pending.lock().unwrap();
         if pending.as_ref().is_some_and(|p| p.id == id) {
@@ -119,7 +139,10 @@ impl Desktop for AppDesktop {
     fn open_session(&self, browser: &str, client: &str) -> Result<String, Refusal> {
         let header = json!({"native": "extension_open", "browser": browser, "client": client});
         match self.core(header, Vec::new())? {
-            (200, body) => body["session_token"].as_str().map(str::to_string).ok_or(Refusal::Failed),
+            (200, body) => body["session_token"]
+                .as_str()
+                .map(str::to_string)
+                .ok_or(Refusal::Failed),
             (401, _) => Err(Refusal::Locked),
             _ => Err(Refusal::Failed),
         }
@@ -132,7 +155,10 @@ impl Desktop for AppDesktop {
             "query": "",
             "headers": [["content-type", "application/json"], ["x-ciphermoth-session", token]],
         });
-        self.core(header, serde_json::to_vec(body).map_err(|_| Refusal::Failed)?)
+        self.core(
+            header,
+            serde_json::to_vec(body).map_err(|_| Refusal::Failed)?,
+        )
     }
 
     fn show(&self) {
@@ -157,7 +183,9 @@ pub struct Extension {
 
 fn message(error: io::Error) -> String {
     match error.kind() {
-        io::ErrorKind::AddrInUse => "Another CipherMoth window already answers browser extensions.".into(),
+        io::ErrorKind::AddrInUse => {
+            "Another CipherMoth window already answers browser extensions.".into()
+        }
         _ => format!("Browser extensions could not be set up ({}).", error.kind()),
     }
 }
@@ -166,8 +194,12 @@ impl Extension {
     pub fn start(app: &tauri::AppHandle) -> io::Result<Arc<Extension>> {
         let identity = identity()?;
         let store = Store::open(&identity.link_dir()?)?;
-        let desktop =
-            AppDesktop { store, app: app.clone(), next_approval: AtomicU64::new(0), pending: Mutex::new(None) };
+        let desktop = AppDesktop {
+            store,
+            app: app.clone(),
+            next_approval: AtomicU64::new(0),
+            pending: Mutex::new(None),
+        };
         let extension = Arc::new(Extension {
             identity,
             link: Link::new(desktop),
@@ -200,7 +232,10 @@ impl Extension {
             .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "no app folder"))?
             .join(HOST);
         if !bundled.is_file() {
-            return Err(io::Error::new(io::ErrorKind::NotFound, "the native host is missing"));
+            return Err(io::Error::new(
+                io::ErrorKind::NotFound,
+                "the native host is missing",
+            ));
         }
         #[cfg(target_os = "linux")]
         if std::env::var_os("APPIMAGE").is_some() {
@@ -230,7 +265,10 @@ impl Extension {
         let dir = self.identity.link_dir()?;
         private_dir(&dir)?;
         let partial = dir.join(".launch.json.partial");
-        std::fs::write(&partial, serde_json::to_vec(&json!({"program": program, "args": args}))?)?;
+        std::fs::write(
+            &partial,
+            serde_json::to_vec(&json!({"program": program, "args": args}))?,
+        )?;
         std::fs::rename(&partial, dir.join("launch.json"))
     }
 
@@ -251,7 +289,10 @@ impl Extension {
         self.link.close_connections();
         self.link.forget_sessions();
         self.link.desktop().cancel_approval();
-        let _ = self.link.desktop().core(json!({"native": "extension_end"}), Vec::new());
+        let _ = self
+            .link
+            .desktop()
+            .core(json!({"native": "extension_end"}), Vec::new());
         self.installer()?.uninstall()
     }
 
@@ -287,7 +328,10 @@ pub fn extension_status(extension: State<'_, Arc<Extension>>) -> Value {
 }
 
 #[tauri::command]
-pub async fn extension_set_enabled(enabled: bool, extension: State<'_, Arc<Extension>>) -> Result<Value, String> {
+pub async fn extension_set_enabled(
+    enabled: bool,
+    extension: State<'_, Arc<Extension>>,
+) -> Result<Value, String> {
     let extension = extension.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         let store = &extension.link.desktop().store;
@@ -306,7 +350,10 @@ pub async fn extension_set_enabled(enabled: bool, extension: State<'_, Arc<Exten
 #[tauri::command]
 pub fn extension_unpair(id: String, extension: State<'_, Arc<Extension>>) -> Result<Value, String> {
     let desktop = extension.link.desktop();
-    desktop.store.remove(&id).map_err(|_| "The browser could not be removed.".to_string())?;
+    desktop
+        .store
+        .remove(&id)
+        .map_err(|_| "The browser could not be removed.".to_string())?;
     extension.link.forget_pairing(&id);
     // Its open connection still holds the pairing: close them all (the others
     // reconnect on their next request) and end its session in the core.

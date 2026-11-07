@@ -4,18 +4,29 @@
 /// build never does.
 fn native_host() {
     let target = std::env::var("TARGET").unwrap();
-    let suffix = if target.contains("windows") { ".exe" } else { "" };
-    let path = std::path::PathBuf::from(format!("binaries/ciphermoth-native-host-{target}{suffix}"));
+    let suffix = if target.contains("windows") {
+        ".exe"
+    } else {
+        ""
+    };
+    let path =
+        std::path::PathBuf::from(format!("binaries/ciphermoth-native-host-{target}{suffix}"));
     const STAND_IN: &[u8] = b"#!/bin/sh\n# ciphermoth-native-host stand-in\nexit 3\n";
     println!("cargo:rerun-if-changed={}", path.display());
     let release = std::env::var("PROFILE").as_deref() == Ok("release");
     match std::fs::read(&path) {
         Ok(content) if content == STAND_IN && release => {
-            panic!("{} is a stand-in: run `node build-native-host.mjs` in desktop/ first", path.display())
+            panic!(
+                "{} is a stand-in: run `node build-native-host.mjs` in desktop/ first",
+                path.display()
+            )
         }
         Ok(_) => return,
         Err(_) if release => {
-            panic!("{} is missing: run `node build-native-host.mjs` in desktop/ first", path.display())
+            panic!(
+                "{} is missing: run `node build-native-host.mjs` in desktop/ first",
+                path.display()
+            )
         }
         Err(_) => {}
     }

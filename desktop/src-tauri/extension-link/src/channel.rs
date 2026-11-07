@@ -105,9 +105,19 @@ impl Exchange {
             return Err(ChannelError::WeakKey);
         }
         let mut sas = [0u8; 4];
-        hkdf(shared.as_bytes(), transcript, &format!("{LABEL}/sas"), &mut sas);
+        hkdf(
+            shared.as_bytes(),
+            transcript,
+            &format!("{LABEL}/sas"),
+            &mut sas,
+        );
         let mut key = Zeroizing::new([0u8; 32]);
-        hkdf(shared.as_bytes(), transcript, &format!("{LABEL}/channel"), &mut key[..]);
+        hkdf(
+            shared.as_bytes(),
+            transcript,
+            &format!("{LABEL}/channel"),
+            &mut key[..],
+        );
         Ok(Paired {
             sas: format!("{:06}", u32::from_be_bytes(sas) % 1_000_000),
             key,
@@ -138,7 +148,12 @@ pub fn connection_key(
     salt.extend_from_slice(extension_nonce);
     salt.extend_from_slice(app_nonce);
     let mut key = Zeroizing::new([0u8; 32]);
-    hkdf(pairing_key, &sha256(&salt), &format!("{LABEL}/connection"), &mut key[..]);
+    hkdf(
+        pairing_key,
+        &sha256(&salt),
+        &format!("{LABEL}/connection"),
+        &mut key[..],
+    );
     key
 }
 
@@ -155,14 +170,31 @@ fn nonce_and_ad(direction: u8, counter: u64) -> ([u8; 12], [u8; 9]) {
 pub fn seal(key: &[u8; 32], direction: u8, counter: u64, plaintext: &[u8]) -> Vec<u8> {
     let (nonce, ad) = nonce_and_ad(direction, counter);
     Aes256Gcm::new(key.into())
-        .encrypt(Nonce::from_slice(&nonce), Payload { msg: plaintext, aad: &ad })
+        .encrypt(
+            Nonce::from_slice(&nonce),
+            Payload {
+                msg: plaintext,
+                aad: &ad,
+            },
+        )
         .expect("AES-GCM encryption of a bounded message")
 }
 
-pub fn open(key: &[u8; 32], direction: u8, counter: u64, ciphertext: &[u8]) -> Result<Vec<u8>, ChannelError> {
+pub fn open(
+    key: &[u8; 32],
+    direction: u8,
+    counter: u64,
+    ciphertext: &[u8],
+) -> Result<Vec<u8>, ChannelError> {
     let (nonce, ad) = nonce_and_ad(direction, counter);
     Aes256Gcm::new(key.into())
-        .decrypt(Nonce::from_slice(&nonce), Payload { msg: ciphertext, aad: &ad })
+        .decrypt(
+            Nonce::from_slice(&nonce),
+            Payload {
+                msg: ciphertext,
+                aad: &ad,
+            },
+        )
         .map_err(|_| ChannelError::Refused)
 }
 
@@ -189,7 +221,13 @@ impl Channel {
             Side::App => (TO_EXTENSION, TO_APP),
             Side::Extension => (TO_APP, TO_EXTENSION),
         };
-        Self { key, sends, receives, sent: 0, received: 0 }
+        Self {
+            key,
+            sends,
+            receives,
+            sent: 0,
+            received: 0,
+        }
     }
 
     pub fn seal(&mut self, plaintext: &[u8]) -> Result<(u64, Vec<u8>), ChannelError> {
@@ -218,7 +256,10 @@ mod tests {
     use serde_json::Value;
 
     fn vectors() -> Value {
-        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../../testdata/vectors/extension-channel.json");
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../../testdata/vectors/extension-channel.json"
+        );
         serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap()
     }
 
@@ -243,7 +284,10 @@ mod tests {
             let app = Exchange::from_private(Zeroizing::new(hex32(&case["app_private_hex"])));
             assert_eq!(b64(&ext.public), case["extension_public"]);
             assert_eq!(b64(&app.public), case["app_public"]);
-            let (n_x, n_a) = (fixed::<16>(&case["extension_nonce"]), fixed::<16>(&case["app_nonce"]));
+            let (n_x, n_a) = (
+                fixed::<16>(&case["extension_nonce"]),
+                fixed::<16>(&case["app_nonce"]),
+            );
             assert_eq!(b64(&commit(&ext.public, &n_x)), case["commit"]);
             let browser = case["browser"].as_str().unwrap();
             let t = transcript(browser, &ext.public, &n_x, &app.public, &n_a);
@@ -286,12 +330,20 @@ mod tests {
             let sealed = unb64(refused["ciphertext"].as_str().unwrap()).unwrap();
             let direction = refused["direction"].as_u64().unwrap() as u8;
             let counter = refused["counter"].as_u64().unwrap();
-            assert_eq!(open(&key, direction, counter, &sealed), Err(ChannelError::Refused), "{}", refused["reason"]);
+            assert_eq!(
+                open(&key, direction, counter, &sealed),
+                Err(ChannelError::Refused),
+                "{}",
+                refused["reason"]
+            );
         }
         let app = Exchange::new();
         for point in doc["low_order_points"].as_array().unwrap() {
             let point = fixed::<32>(point);
-            assert!(matches!(app.finish(&point, &[0; 32]), Err(ChannelError::WeakKey)));
+            assert!(matches!(
+                app.finish(&point, &[0; 32]),
+                Err(ChannelError::WeakKey)
+            ));
         }
     }
 
@@ -312,7 +364,10 @@ mod tests {
         assert_eq!(app.open(c, &m), Err(ChannelError::Refused));
         let mut tampered = ext.seal(b"two").unwrap();
         tampered.1[3] ^= 0x80;
-        assert_eq!(app.open(tampered.0, &tampered.1), Err(ChannelError::Refused));
+        assert_eq!(
+            app.open(tampered.0, &tampered.1),
+            Err(ChannelError::Refused)
+        );
     }
 
     #[test]

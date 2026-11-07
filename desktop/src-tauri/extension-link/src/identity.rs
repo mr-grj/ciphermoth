@@ -19,7 +19,9 @@ pub enum Identity {
 }
 
 fn env_path(name: &str) -> Option<PathBuf> {
-    std::env::var_os(name).map(PathBuf::from).filter(|p| p.is_absolute())
+    std::env::var_os(name)
+        .map(PathBuf::from)
+        .filter(|p| p.is_absolute())
 }
 
 #[cfg(unix)]
@@ -60,7 +62,12 @@ impl Identity {
     pub fn qa_from_env() -> io::Result<Identity> {
         env_path("CIPHERMOTH_QA_ROOT")
             .map(Identity::Qa)
-            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "CIPHERMOTH_QA_ROOT must be absolute"))
+            .ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::NotFound,
+                    "CIPHERMOTH_QA_ROOT must be absolute",
+                )
+            })
     }
 
     pub fn host_name(&self) -> &'static str {
@@ -108,7 +115,10 @@ impl Identity {
         let tag = match self {
             Identity::Production => String::new(),
             Identity::Development => "-dev".into(),
-            Identity::Qa(root) => format!("-qa-{}", short_hash(root.as_os_str().to_string_lossy().as_bytes())),
+            Identity::Qa(root) => format!(
+                "-qa-{}",
+                short_hash(root.as_os_str().to_string_lossy().as_bytes())
+            ),
         };
         Ok(format!(r"\\.\pipe\ciphermoth-extension{tag}-{sid}"))
     }
@@ -116,7 +126,10 @@ impl Identity {
 
 pub fn short_hash(data: &[u8]) -> String {
     use sha2::{Digest, Sha256};
-    Sha256::digest(data)[..8].iter().map(|b| format!("{b:02x}")).collect()
+    Sha256::digest(data)[..8]
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
 }
 
 /// `$XDG_RUNTIME_DIR` (or `/run/user/<uid>`) when it is ours and private.
@@ -127,7 +140,8 @@ fn runtime_dir() -> Option<PathBuf> {
     }
     // SAFETY: getuid cannot fail.
     let uid = unsafe { libc::getuid() };
-    let dir = env_path("XDG_RUNTIME_DIR").unwrap_or_else(|| PathBuf::from(format!("/run/user/{uid}")));
+    let dir =
+        env_path("XDG_RUNTIME_DIR").unwrap_or_else(|| PathBuf::from(format!("/run/user/{uid}")));
     use std::os::unix::fs::MetadataExt;
     let meta = std::fs::symlink_metadata(&dir).ok()?;
     (meta.is_dir() && meta.uid() == uid && meta.mode() & 0o077 == 0).then_some(dir)
@@ -143,7 +157,10 @@ fn short_enough(primary: PathBuf) -> PathBuf {
         return primary;
     }
     temp_dir()
-        .join(format!("ciphermoth-{}", short_hash(primary.as_os_str().as_bytes())))
+        .join(format!(
+            "ciphermoth-{}",
+            short_hash(primary.as_os_str().as_bytes())
+        ))
         .join("s")
 }
 
@@ -153,7 +170,13 @@ fn temp_dir() -> PathBuf {
     // browser may have changed for the processes it starts.
     let mut buf = vec![0u8; 1024];
     // SAFETY: confstr writes at most buf.len() bytes, NUL-terminated.
-    let n = unsafe { libc::confstr(libc::_CS_DARWIN_USER_TEMP_DIR, buf.as_mut_ptr().cast(), buf.len()) };
+    let n = unsafe {
+        libc::confstr(
+            libc::_CS_DARWIN_USER_TEMP_DIR,
+            buf.as_mut_ptr().cast(),
+            buf.len(),
+        )
+    };
     if n > 0 && n <= buf.len() {
         buf.truncate(n - 1);
         use std::os::unix::ffi::OsStringExt;
@@ -172,12 +195,18 @@ fn temp_dir() -> PathBuf {
 #[cfg(unix)]
 pub fn private_dir(dir: &Path) -> io::Result<()> {
     use std::os::unix::fs::{DirBuilderExt, MetadataExt, PermissionsExt};
-    std::fs::DirBuilder::new().recursive(true).mode(0o700).create(dir)?;
+    std::fs::DirBuilder::new()
+        .recursive(true)
+        .mode(0o700)
+        .create(dir)?;
     let meta = std::fs::symlink_metadata(dir)?;
     // SAFETY: getuid cannot fail.
     let uid = unsafe { libc::getuid() };
     if !meta.is_dir() || meta.uid() != uid {
-        return Err(io::Error::new(io::ErrorKind::PermissionDenied, "folder is not ours"));
+        return Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            "folder is not ours",
+        ));
     }
     if meta.mode() & 0o077 != 0 {
         std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700))?;
@@ -198,14 +227,29 @@ mod tests {
     #[test]
     fn identities_never_share_names_or_folders() {
         let qa = Identity::Qa(PathBuf::from("/tmp/qa-root"));
-        let names = [Identity::Production.host_name(), Identity::Development.host_name(), qa.host_name()];
-        assert_eq!(names.iter().collect::<std::collections::HashSet<_>>().len(), 3);
+        let names = [
+            Identity::Production.host_name(),
+            Identity::Development.host_name(),
+            qa.host_name(),
+        ];
+        assert_eq!(
+            names.iter().collect::<std::collections::HashSet<_>>().len(),
+            3
+        );
         for name in names {
             // Native-messaging host names: lowercase alphanumerics, dots, underscores.
-            assert!(name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '.' || c == '_'));
+            assert!(name
+                .chars()
+                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '.' || c == '_'));
         }
-        assert_eq!(qa.link_dir().unwrap(), PathBuf::from("/tmp/qa-root/browser-extension"));
-        assert_ne!(Identity::Production.base().unwrap(), Identity::Development.base().unwrap());
+        assert_eq!(
+            qa.link_dir().unwrap(),
+            PathBuf::from("/tmp/qa-root/browser-extension")
+        );
+        assert_ne!(
+            Identity::Production.base().unwrap(),
+            Identity::Development.base().unwrap()
+        );
     }
 
     #[cfg(unix)]
@@ -215,9 +259,16 @@ mod tests {
         let path = long.socket_path().unwrap();
         use std::os::unix::ffi::OsStrExt;
         assert!(path.as_os_str().as_bytes().len() < 100, "{path:?}");
-        assert_eq!(path, long.socket_path().unwrap(), "both sides compute the same path");
+        assert_eq!(
+            path,
+            long.socket_path().unwrap(),
+            "both sides compute the same path"
+        );
         let short = Identity::Qa(PathBuf::from("/tmp/q"));
-        assert_eq!(short.socket_path().unwrap(), PathBuf::from("/tmp/q/run/extension.sock"));
+        assert_eq!(
+            short.socket_path().unwrap(),
+            PathBuf::from("/tmp/q/run/extension.sock")
+        );
     }
 
     #[cfg(unix)]
@@ -227,10 +278,16 @@ mod tests {
         let root = tempfile::tempdir().unwrap();
         let dir = root.path().join("a/b");
         private_dir(&dir).unwrap();
-        assert_eq!(std::fs::metadata(&dir).unwrap().permissions().mode() & 0o777, 0o700);
+        assert_eq!(
+            std::fs::metadata(&dir).unwrap().permissions().mode() & 0o777,
+            0o700
+        );
         std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o755)).unwrap();
         private_dir(&dir).unwrap();
-        assert_eq!(std::fs::metadata(&dir).unwrap().permissions().mode() & 0o777, 0o700);
+        assert_eq!(
+            std::fs::metadata(&dir).unwrap().permissions().mode() & 0o777,
+            0o700
+        );
         let file = root.path().join("file");
         std::fs::write(&file, b"").unwrap();
         assert!(private_dir(&file).is_err());

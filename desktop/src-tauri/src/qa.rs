@@ -135,9 +135,15 @@ pub async fn qa_backup(
 pub async fn qa_report(mut result: serde_json::Value) -> Result<(), String> {
     let root = std::env::var("CIPHERMOTH_QA_ROOT").map_err(|_| "QA root missing")?;
     let root = std::path::Path::new(&root);
-    let ack = if cfg!(target_os = "macos")
-        && [Some("clipboard_timeout"), Some("clipboard_replaced")]
-            .contains(&result["stage"].as_str())
+    // The browser-extension stages wait for the host on every platform: it
+    // plays the browser and checks what the app wrote (harness/extension.py).
+    let extension = result["stage"]
+        .as_str()
+        .is_some_and(|s| s.starts_with("extension"));
+    let ack = if extension
+        || cfg!(target_os = "macos")
+            && [Some("clipboard_timeout"), Some("clipboard_replaced")]
+                .contains(&result["stage"].as_str())
     {
         let nonce = uuid::Uuid::new_v4().to_string();
         result["ack"] = serde_json::json!(nonce);
@@ -145,15 +151,27 @@ pub async fn qa_report(mut result: serde_json::Value) -> Result<(), String> {
     } else {
         None
     };
-    std::fs::write(
-        root.join("webview.partial"),
-        serde_json::to_vec_pretty(&result).unwrap(),
-    )
-    .map_err(|_| "Could not write QA report")?;
-    std::fs::rename(root.join("webview.partial"), root.join("webview.json"))
-        .map_err(|_| "Could not publish QA report")?;
+    // Two reports can be in flight (the extension pairing reports while its
+    // stage waits), so each writes its own partial file. Windows refuses the
+    // rename while the harness reads the report: retry briefly.
+    let partial = root.join(format!("webview-{}.partial", uuid::Uuid::new_v4()));
+    std::fs::write(&partial, serde_json::to_vec_pretty(&result).unwrap())
+        .map_err(|_| "Could not write QA report")?;
+    let mut published = false;
+    for _ in 0..100 {
+        if std::fs::rename(&partial, root.join("webview.json")).is_ok() {
+            published = true;
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    }
+    if !published {
+        let _ = std::fs::remove_file(&partial);
+        return Err("Could not publish QA report".into());
+    }
     if let Some(ack) = ack {
-        for _ in 0..600 {
+        let tries = if extension { 2400 } else { 600 };
+        for _ in 0..tries {
             if ack.exists() {
                 std::fs::remove_file(ack).map_err(|_| "Could not consume QA acknowledgement")?;
                 return Ok(());

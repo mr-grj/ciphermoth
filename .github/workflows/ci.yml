@@ -214,6 +214,16 @@ jobs:
         working-directory: extension
         run: npx playwright install --with-deps chromium
 
+      # Desktop mode: the real native host (QA identity) and the app stand-in
+      # (rust-toolchain.toml pins the toolchain; rustup is on the runner).
+      - name: Build the native host and the desktop app stand-in
+        working-directory: desktop/src-tauri
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/extension/.e2e/cargo
+        run: |
+          cargo build --locked -p ciphermoth-native-host --features qa
+          cargo build --locked -p ciphermoth-extension-link --example app_stub
+
       - name: Flows and attack lab against a live backend
         working-directory: extension
         run: npm run test:e2e

@@ -12,7 +12,12 @@ import threading
 import time
 from pathlib import Path
 
+import extension
 import psutil
+
+# The desktop-mode stages (harness/extension.py) run on every platform.
+EXTENSION_STAGES = ("extension", "extension_off", "extension_pairing")
+EXTENSION = {"app": None, "host": None, "results": {}}
 
 
 class MemorySampler:
@@ -80,6 +85,17 @@ def wait_report(path, process, timeout=240, dialogs=False, started=None):
                 interactive = round(time.monotonic() - started, 3)
                 initial_core = report.get("core")
             stage_key = report.get("ack", stage)
+            if stage in ("extension", "extension_off") and stage_key not in stages:
+                stages.add(stage_key)
+                if stage == "extension":
+                    on = extension.check_on(path.parent, report, path, EXTENSION["app"])
+                    EXTENSION["host"] = on["host"]
+                    EXTENSION["results"]["on"] = on
+                else:
+                    EXTENSION["results"]["off"] = extension.check_off(path.parent)
+                    extension.check_not_running(EXTENSION["host"], path.parent)
+                    EXTENSION["results"]["off"]["host_says_not_running"] = True
+                (path.parent / (report["ack"] + ".done")).touch()
             if stage == "native_idle" and stage not in stages:
                 stages.add(stage)
                 pid = report["core"]["info"]["pid"]
@@ -97,6 +113,7 @@ def wait_report(path, process, timeout=240, dialogs=False, started=None):
                     )
             if (
                 stage
+                and stage not in EXTENSION_STAGES
                 and stage_key not in stages
                 and __import__("sys").platform == "darwin"
             ):
@@ -190,6 +207,8 @@ def main():
     args.root.mkdir(parents=True, exist_ok=True)
     report_path = args.root / "webview.json"
     report_path.unlink(missing_ok=True)
+    extension.prepare(args.root)
+    EXTENSION["app"] = args.app
     env = {**os.environ, "CIPHERMOTH_QA_ROOT": str(args.root)}
     listeners = (
         {
@@ -266,7 +285,11 @@ def main():
                     "owned clipboard survived quit"
                 )
                 reopened["clipboard_cleared_on_quit"] = True
+            assert EXTENSION["results"].get("on") and EXTENSION["results"].get("off"), (
+                "the browser-extension stages did not run"
+            )
             result = {
+                "extension": EXTENSION["results"],
                 "first": first,
                 "crash_restart": restarted,
                 "reopen": reopened,

@@ -60,12 +60,17 @@ fn relay_from_app(mut app: Stream, out: Out) {
 }
 
 fn connect(identity: &Identity, caller: &Caller, out: &Out) -> Option<Stream> {
-    let mut app = ipc::endpoint(identity).and_then(|endpoint| endpoint.connect()).ok()?;
+    let mut app = ipc::endpoint(identity)
+        .and_then(|endpoint| endpoint.connect())
+        .ok()?;
     let hello = json!({"t": "host", "caller": caller.origin(), "version": "1"});
     framing::write_object(&mut app, &hello).ok()?;
     let reader = app.try_clone().ok()?;
     let out = out.clone();
-    std::thread::Builder::new().name("from-app".into()).spawn(move || relay_from_app(reader, out)).ok()?;
+    std::thread::Builder::new()
+        .name("from-app".into())
+        .spawn(move || relay_from_app(reader, out))
+        .ok()?;
     Some(app)
 }
 
@@ -95,7 +100,12 @@ fn run(caller: Caller, identity: Identity, mut input: impl Read) -> io::Result<(
                     None => reply(&out, json!({"t": "error", "code": "app_not_running"}))?,
                 }
             }
-            _ => return Err(io::Error::new(io::ErrorKind::InvalidData, "unknown message")),
+            _ => {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "unknown message",
+                ))
+            }
         }
     }
 }

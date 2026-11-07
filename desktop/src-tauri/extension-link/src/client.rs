@@ -38,8 +38,15 @@ pub fn pair_commit<W: Write>(writer: &mut W, browser: &str) -> io::Result<Pairin
     let exchange = Exchange::new();
     let nonce = channel::random::<16>();
     let commit = channel::commit(&exchange.public, &nonce);
-    send(writer, json!({"t": "pair_commit", "browser": browser, "commit": b64(&commit)}))?;
-    Ok(PairingStart { exchange, nonce, browser: browser.to_string() })
+    send(
+        writer,
+        json!({"t": "pair_commit", "browser": browser, "commit": b64(&commit)}),
+    )?;
+    Ok(PairingStart {
+        exchange,
+        nonce,
+        browser: browser.to_string(),
+    })
 }
 
 pub struct Revealed {
@@ -48,18 +55,38 @@ pub struct Revealed {
 }
 
 /// Steps 2 and 3: read the app's key, reveal ours, compute the code to show.
-pub fn pair_reveal<S: Read + Write>(stream: &mut S, start: PairingStart) -> io::Result<Result<Revealed, String>> {
+pub fn pair_reveal<S: Read + Write>(
+    stream: &mut S,
+    start: PairingStart,
+) -> io::Result<Result<Revealed, String>> {
     let answer = receive(stream)?;
     if let Some(code) = refusal(&answer) {
         return Ok(Err(code));
     }
-    let (Some(public), Some(app_nonce)) = (bytes::<32>(&answer, "pub"), bytes::<16>(&answer, "nonce")) else {
+    let (Some(public), Some(app_nonce)) =
+        (bytes::<32>(&answer, "pub"), bytes::<16>(&answer, "nonce"))
+    else {
         return Err(invalid("no pair_key"));
     };
-    send(stream, json!({"t": "pair_reveal", "pub": b64(&start.exchange.public), "nonce": b64(&start.nonce)}))?;
-    let transcript = channel::transcript(&start.browser, &start.exchange.public, &start.nonce, &public, &app_nonce);
-    let paired = start.exchange.finish(&public, &transcript).map_err(|_| invalid("weak key"))?;
-    Ok(Ok(Revealed { sas: paired.sas, key: paired.key }))
+    send(
+        stream,
+        json!({"t": "pair_reveal", "pub": b64(&start.exchange.public), "nonce": b64(&start.nonce)}),
+    )?;
+    let transcript = channel::transcript(
+        &start.browser,
+        &start.exchange.public,
+        &start.nonce,
+        &public,
+        &app_nonce,
+    );
+    let paired = start
+        .exchange
+        .finish(&public, &transcript)
+        .map_err(|_| invalid("weak key"))?;
+    Ok(Ok(Revealed {
+        sas: paired.sas,
+        key: paired.key,
+    }))
 }
 
 /// Step 4: wait for the user's answer in the app.
@@ -79,17 +106,29 @@ pub struct Session {
     next_id: u64,
 }
 
-pub fn hello<S: Read + Write>(stream: &mut S, id: &str, pairing_key: &[u8; 32]) -> io::Result<Result<Session, String>> {
+pub fn hello<S: Read + Write>(
+    stream: &mut S,
+    id: &str,
+    pairing_key: &[u8; 32],
+) -> io::Result<Result<Session, String>> {
     let nonce = channel::random::<16>();
-    send(stream, json!({"t": "hello", "id": id, "nonce": b64(&nonce)}))?;
+    send(
+        stream,
+        json!({"t": "hello", "id": id, "nonce": b64(&nonce)}),
+    )?;
     let answer = receive(stream)?;
     if let Some(code) = refusal(&answer) {
         return Ok(Err(code));
     }
     let app_nonce = bytes::<16>(&answer, "nonce").ok_or_else(|| invalid("no hello_ok"))?;
-    let id_bytes: [u8; 16] = unb64(id).and_then(|b| b.try_into().ok()).ok_or_else(|| invalid("bad id"))?;
+    let id_bytes: [u8; 16] = unb64(id)
+        .and_then(|b| b.try_into().ok())
+        .ok_or_else(|| invalid("bad id"))?;
     let key = channel::connection_key(pairing_key, &id_bytes, &nonce, &app_nonce);
-    Ok(Ok(Session { channel: Channel::new(key, Side::Extension), next_id: 1 }))
+    Ok(Ok(Session {
+        channel: Channel::new(key, Side::Extension),
+        next_id: 1,
+    }))
 }
 
 impl Session {
@@ -97,18 +136,35 @@ impl Session {
     pub fn seal(&mut self, mut request: Value) -> Value {
         request["id"] = json!(self.next_id);
         self.next_id += 1;
-        let (counter, sealed) = self.channel.seal(&serde_json::to_vec(&request).unwrap()).unwrap();
+        let (counter, sealed) = self
+            .channel
+            .seal(&serde_json::to_vec(&request).unwrap())
+            .unwrap();
         json!({"t": "msg", "c": counter, "d": b64(&sealed)})
     }
 
     pub fn open(&mut self, frame: &Object) -> io::Result<Value> {
-        let counter = frame.get("c").and_then(Value::as_u64).ok_or_else(|| invalid("no counter"))?;
-        let sealed = frame.get("d").and_then(Value::as_str).and_then(unb64).ok_or_else(|| invalid("no data"))?;
-        let plain = self.channel.open(counter, &sealed).map_err(|_| invalid("not authentic"))?;
+        let counter = frame
+            .get("c")
+            .and_then(Value::as_u64)
+            .ok_or_else(|| invalid("no counter"))?;
+        let sealed = frame
+            .get("d")
+            .and_then(Value::as_str)
+            .and_then(unb64)
+            .ok_or_else(|| invalid("no data"))?;
+        let plain = self
+            .channel
+            .open(counter, &sealed)
+            .map_err(|_| invalid("not authentic"))?;
         serde_json::from_slice(&plain).map_err(|_| invalid("not JSON"))
     }
 
-    pub fn request<S: Read + Write>(&mut self, stream: &mut S, request: Value) -> io::Result<Value> {
+    pub fn request<S: Read + Write>(
+        &mut self,
+        stream: &mut S,
+        request: Value,
+    ) -> io::Result<Value> {
         let frame = self.seal(request);
         send(stream, frame)?;
         let answer = receive(stream)?;

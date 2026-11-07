@@ -6,15 +6,18 @@ shows up inside web pages by itself, nothing is filled when a page loads, and th
 extension never asks to save logins.
 
 > **No CipherMoth account, ever.** The extension comes from your browser's store, which
-> sees the install like any extension. It only ever talks to your own CipherMoth server,
-> and only when you ask it to fill. Only the page's origin (scheme, host, port) is sent
+> sees the install like any extension. It only ever talks to your own CipherMoth, on
+> this computer or on your server, and only when you ask it to fill. Only the page's origin (scheme, host, port) is sent
 > to find matches, never its path, title or contents. No favicons, no analytics, no
 > remote configuration.
 
 Tested on every release with Chrome and Brave (Chromium 120 or newer) and Firefox 128 or
-newer; Edge, Opera and Vivaldi run the same Chromium build and should work too. It needs
-a CipherMoth server (Docker edition) that lists the `browser-extension`
-feature (3.6.0 and later). Connecting it to the desktop app is planned (phase 2).
+newer; Edge, Opera and Vivaldi run the same Chromium build and should work too. It fills
+from one of two places, chosen in its settings:
+
+- **The CipherMoth app on this computer** (3.7.0 and later): through your browser's
+  native messaging, never over the network. See [Desktop mode](#desktop-mode).
+- **Your CipherMoth server** (Docker edition, 3.6.0 and later).
 
 ## Install
 
@@ -55,11 +58,66 @@ The unsigned `ciphermoth-extension-firefox-X.Y.Z.zip` (the package sent to Mozil
 loads as a temporary add-on (`about:debugging`) or in Developer Edition, Nightly and ESR
 with signing turned off.
 
-## Connect and unlock
+## Desktop mode
 
-1. On first install the extension opens its settings. Enter the address you open
-   CipherMoth at, for example `https://vault.example.com`, and click **Connect**. The
-   browser asks to let the extension access **that one host name** (and the API's, if it
+Fill from the CipherMoth desktop app on the same computer. Nothing listens on the
+network: the browser starts CipherMoth's small native-messaging host, which passes
+messages to the running app over a local channel only your user account can open.
+
+1. In the CipherMoth app, open **Settings → Browser extension** and turn on **Allow
+   browser extensions** (off until you do). The app sets itself up for the browsers it
+   finds (Chrome, Brave and Firefox; Edge, Chromium and Vivaldi too). A browser you
+   install later is picked up the next time CipherMoth starts.
+2. In the extension's settings, choose **CipherMoth app on this computer**. The browser
+   asks to let the extension "communicate with cooperating native applications".
+3. With CipherMoth unlocked, click the toolbar button and **Pair**. The app asks
+   **Allow <browser> to fill logins?** and shows a six-digit code; the popup shows one
+   too. Allow only if both codes are the same. Each browser profile pairs once.
+
+After that the extension fills whenever the app is unlocked:
+
+- **CipherMoth is locked**: the popup offers **Unlock CipherMoth**, which brings the app
+  forward. Unlock there (master password, security key or Touch ID), then open the
+  popup again. The extension never sees your master password.
+- **CipherMoth isn't running**: **Open CipherMoth** starts it.
+- **Lock** in the popup locks the app. Locking the app (or its inactivity timeout)
+  ends what the extension can do until you unlock it again.
+- Settings → **Browser extension** in the app lists the paired browsers; **Remove**
+  one to unpair it. Turning **Allow browser extensions** off disconnects every browser
+  and removes what the app set up for them; the pairings stay for when you turn it on.
+
+### How desktop mode works
+
+- **Pairing.** The extension and the app run an X25519 key exchange through the host.
+  The extension commits to its key before it sees the app's, so something in between
+  cannot pick keys that make both sides show the same code: it would get one guess in a
+  million, and you would see a pairing dialog you did not ask for. Both derive the code
+  and a pairing key from the exchange (HKDF-SHA256). The app keeps the pairing key in
+  its own settings folder (not in the vault); the extension keeps it as a WebCrypto key
+  that cannot be read back, even by the extension.
+- **Every message is encrypted.** Each connection derives a fresh AES-256-GCM key from
+  the pairing key and new random values of both sides. Every message carries the next
+  counter of its direction in its nonce and authenticated data, so a recorded, reordered,
+  replayed or reflected message is refused, and the connection closes. The host only
+  relays; it sees no login.
+- **No token in the browser.** The app opens the extension session for the pairing
+  from its unlocked vault and keeps its token. The extension holds no session token in
+  desktop mode, so there is nothing to steal from the browser's storage. The session is
+  limited to the same fill-only routes as in server mode.
+- **Local only, same user only.** macOS and Linux: a socket readable only by you
+  (`0600`) in a folder only you can enter (`0700`), and the app checks the connecting
+  process runs as you. Windows: a named pipe that only your account may open and that
+  refuses remote clients; the app checks the client runs as you. The browser starts the
+  host only for the CipherMoth extension (pinned extension ids), and the app checks again.
+- **What it cannot stop.** Malware running as your user can read the browser's and the
+  app's memory; same-user isolation is the operating system's job. The protocol is
+  specified with test vectors in `testdata/vectors/extension-channel.json`.
+
+## Connect to your server and unlock
+
+1. On first install the extension opens its settings. Choose **Your CipherMoth server**,
+   enter the address you open CipherMoth at, for example `https://vault.example.com`,
+   and click **Connect**. The browser asks to let the extension access **that one host name** (and the API's, if it
    runs elsewhere; the permission covers all ports of that host, because Firefox cannot
    grant a single port). Plain `http://` is accepted only for `localhost`, `127.0.0.1` and
    `[::1]`.
@@ -115,9 +173,9 @@ notes, history, custom fields or attachments, export, back up, change settings o
 anything. Each browser profile has one extension session: unlocking again (also after a
 browser restart, which drops the old token) replaces it, using a random installation id the
 extension keeps; it is not a secret and opens nothing. At most 8 extension sessions exist at
-a time, separate from web sessions. The
+a time, separate from web sessions. In server mode the
 token lives in the browser's memory-only session storage, readable only by the
-extension's own pages.
+extension's own pages; in desktop mode the app keeps it and the extension has none.
 
 **What it guarantees** (and the test suite checks, including an attack lab of hostile
 pages, see "Testing" below):
@@ -158,6 +216,9 @@ pages, see "Testing" below):
 - A stolen extension token is still limited to the five routes above, the inactivity
   timeout and 12 hours, and can be disconnected in Settings; but within those it can read
   login passwords one by one (rate-limited to 300 per hour).
+- Desktop mode: anything that can use the extension's pairing key (the extension
+  itself, or software running as you) can ask the unlocked app for logins the same way.
+  Remove a browser in the app's Settings to end that.
 
 ## Check a download
 
@@ -206,8 +267,16 @@ browser profile with `extension/dist/chromium` after the build.
   **Unlock in CipherMoth** again; a request expires after 5 minutes and works once.
 - **Nothing was filled**: the popup says why (no fields, hidden fields, a frame, a
   sign-up form). Copy the password instead.
-- **Desktop app**: not supported yet; it has no network listener for the extension to
-  reach. Desktop mode (native messaging) is planned.
+- **"Turn on browser extensions in CipherMoth"**: the app's **Allow browser
+  extensions** is off, or the app is not installed for this user. Turn it on, then
+  **Try again**. A browser installed after the app started needs a CipherMoth restart.
+- **"This browser is too old for the CipherMoth app"**: desktop mode needs WebCrypto
+  X25519 (Chrome 133, Firefox 130 or newer).
+- **"Pairing wasn't allowed"** or the codes differ: pair again from the popup. Codes
+  that differ mean something answered for the app: do not allow it.
+- **Snap or Flatpak browsers on Linux**: their sandbox does not let them start the
+  native host. Use a browser from your distribution's packages, or server mode.
+- **Opera**: not tested in desktop mode; it may not read the native-host manifest.
 
 ## Development
 
@@ -218,7 +287,8 @@ npm run package          # + dist/packages/*.zip and SHA256SUMS
 npm test                 # Vitest: URL vectors, message schemas, manifests, clipboard, zips
 npm run typecheck && npm run lint && npm run format:check
 npm run lint:firefox     # web-ext lint on dist/firefox
-npm run test:e2e         # Playwright Chromium: flows + attack lab (needs uv for the backend)
+npm run test:e2e         # Playwright Chromium: flows, attack lab, desktop mode
+                         # (needs uv for the backend and cargo for the native host)
 SCREENSHOTS=1 npx playwright test screenshots   # every popup state, light and dark
 ```
 

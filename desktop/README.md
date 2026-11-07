@@ -69,6 +69,15 @@ An abrupt OS kill can leave a hidden `.ciphermoth-*.partial` file containing cip
 
 Atomic backup publication requires a filesystem that supports hard links (for example APFS, NTFS or ext4). Export fails safely on filesystems without this support; choose a local supported folder and then copy the completed encrypted backup elsewhere. A full 1 GiB file has not been exercised locally; the regression test exceeds 25 MiB.
 
+## Browser extensions
+
+**Settings → Browser extension → Allow browser extensions** (off by default, stored in `browser-extension/config.json` in the app's data folder, not the vault) lets the CipherMoth extension fill from this app ([docs/EXTENSION.md](../docs/EXTENSION.md#desktop-mode)). On: the app records how to start it (`launch.json`), writes native-messaging manifests for the browsers whose profile folders exist (Chrome, Brave, Edge, Chromium, Vivaldi, Firefox; files on macOS/Linux, `HKCU` keys on Windows, rewritten on every start) and listens on a same-user endpoint: `<data>/run/extension.sock` on macOS, `$XDG_RUNTIME_DIR/com.ciphermoth.desktop/extension.sock` on Linux (both `0600` in `0700`, peer uid checked), `\\.\pipe\ciphermoth-extension-<SID>` on Windows (current-user DACL, remote clients refused, client user checked). Off: it stops listening, closes connections, ends every extension session in the core and removes the manifests.
+
+- `extension-link/` (Rust crate): framing, the paired channel (X25519 pairing with a commitment and a six-digit code, per-connection AES-256-GCM, vectors in `testdata/vectors/extension-channel.json`), IPC, manifests, pairings and the app's connection state machine, generic over the app (`src/extension.rs` implements it with the window and the core).
+- `native-host/`: the binary the browser starts; it relays frames (64 KiB) and message types only, checks its caller against the pinned extension ids, answers `app_not_running` and starts the app on "Open CipherMoth".
+- The core opens an extension session from the window's one unlocked session (a native-only operation, `desktop_core/extension.py`); its token stays in Rust and is forgotten when the vault locks (which stops the core and so ends the session anyway). Pairing needs an unlocked vault and the user's approval in a dialog.
+- Debug builds use `com.ciphermoth.desktop.dev`, QA builds `com.ciphermoth.desktop.qa` (manifests and endpoint below the QA root), so neither reaches a production app.
+
 ## Native security limits
 
 The clipboard timer runs in Rust while other apps are focused and compares ownership/content before clearing. macOS uses pasteboard change count and the concealed-content history hint; Windows uses its sequence number and monitoring exclusion hint. Linux compares the copied value, and clipboard history/compositor behavior varies. Clipboard managers can ignore hints, and clipboard APIs do not provide a cross-application atomic compare-and-clear guarantee on every OS.

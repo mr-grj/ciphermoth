@@ -37,7 +37,10 @@ pub fn bytes<const N: usize>(object: &Map<String, Value>, field: &str) -> Option
 }
 
 pub fn text<'a>(object: &'a Map<String, Value>, field: &str, max: usize) -> Option<&'a str> {
-    object.get(field)?.as_str().filter(|value| value.len() <= max)
+    object
+        .get(field)?
+        .as_str()
+        .filter(|value| value.len() <= max)
 }
 
 pub fn counter(object: &Map<String, Value>) -> Option<u64> {

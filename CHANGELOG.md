@@ -1,5 +1,28 @@
 # Changelog
 
+## [Unreleased]
+
+The browser extension now fills from the desktop app too.
+
+### Added
+
+- **Desktop mode for the browser extension** ([docs/EXTENSION.md](docs/EXTENSION.md#desktop-mode)). In the desktop app, turn on **Settings → Browser extension → Allow browser extensions** (off by default); in the extension's settings choose **CipherMoth app on this computer**. Pair each browser once: the app asks "Allow <browser> to fill logins?" and shows a six-digit code that must match the one in the extension's popup. After that the extension fills, copies and shows 2FA codes whenever the app is unlocked; the popup offers **Unlock CipherMoth** (brings the app forward: master password, security key or Touch ID) and **Open CipherMoth** when it isn't running, and its lock button locks the app. Chrome, Brave and Firefox on macOS, Windows and Linux; Edge, Chromium and Vivaldi should work too. Needs Chrome 133 or Firefox 130 (WebCrypto X25519).
+- The desktop app lists paired browsers in **Settings → Browser extension**, with **Remove**. Turning the switch off disconnects every browser and removes the native-host manifests it wrote (files on macOS and Linux, `HKCU` registry keys on Windows); the pairings stay.
+- Every desktop package ships `ciphermoth-native-host` next to the app (an AppImage copies it into the app's data folder, since its mount path changes).
+
+### Security
+
+- Desktop mode uses no network. The browser starts the native host only for the CipherMoth extension; the host relays to the app over a same-user local socket or named pipe (permissions and peer checks on both ends). Pairing is an X25519 exchange with a commitment and a short authentication string; every later message is end-to-end AES-256-GCM between the extension and the app with per-connection keys and counter nonces, so the host sees no login and replayed or tampered messages end the connection. The app keeps the extension session's token; the extension holds only a non-extractable pairing key. Specified with frozen vectors (`testdata/vectors/extension-channel.json`) used by Rust, TypeScript and Python; tested end to end with the real host in Chromium and on the six desktop CI runners.
+
+### Fixed
+
+- The desktop core no longer leaves a request unanswered when it carries an extension session's token (the native session-deadline lookup refused the token's scope instead of ignoring it).
+
+### Changed
+
+- The extension's settings start with **Fill from**: the desktop app or your server (one at a time; switching keeps a desktop pairing). Existing server setups are unchanged.
+- The CLI is unchanged.
+
 ## [3.6.0] - 2026-11-06
 
 A browser extension that fills a login only when you ask, and can do nothing else.

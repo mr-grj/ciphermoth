@@ -2,7 +2,9 @@ name: Desktop
 
 on:
   pull_request:
-    paths: ["desktop/**", "backend/**", "frontend/**", ".github/workflows/desktop.yml"]
+    # The native host's tests also read the channel vectors and the
+    # extension's Chromium key (the pinned id).
+    paths: ["desktop/**", "backend/**", "frontend/**", "testdata/vectors/**", "extension/manifest/**", ".github/workflows/desktop.yml"]
   workflow_dispatch:
     inputs:
       release:
@@ -165,7 +167,7 @@ jobs:
         run: |
           cd frontend && npm ci && npm test && cd ..
           cd desktop && npm run tauri build -- --bundles "${{ matrix.bundles }}" --ci
-          cd src-tauri && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test
+          cd src-tauri && cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace
           cargo build --release --example verify_update
           cd "$GITHUB_WORKSPACE"
           python desktop/release/artifacts.py --out desktop-results/packages --version "$(node -p 'require("./desktop/package.json").version')"
