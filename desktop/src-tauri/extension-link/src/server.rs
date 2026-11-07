@@ -35,6 +35,9 @@ pub const MAX_PLAINTEXT: usize = 40 * 1024;
 const FIRST_MESSAGE: Duration = Duration::from_secs(10);
 const PAIRING_STEP: Duration = Duration::from_secs(30);
 const IDLE: Duration = Duration::from_secs(10 * 60);
+/// Pairing attempts per minute: each one can put a dialog in front of the
+/// user, so a local process cannot flood them with requests to approve.
+pub const PAIRINGS_PER_MINUTE: usize = 5;
 
 pub const BROWSERS: &[&str] = &[
     "Chrome", "Chromium", "Edge", "Brave", "Opera", "Vivaldi", "Firefox", "Browser",
@@ -68,6 +71,7 @@ pub struct Link<D: Desktop> {
     tokens: Mutex<HashMap<String, String>>,
     generation: AtomicU64,
     pairing: AtomicBool,
+    attempts: Mutex<std::collections::VecDeque<std::time::Instant>>,
     live: Mutex<HashMap<u64, Stream>>,
     next_connection: AtomicU64,
     connections: AtomicUsize,
@@ -130,6 +134,7 @@ impl<D: Desktop> Link<D> {
             tokens: Mutex::new(HashMap::new()),
             generation: AtomicU64::new(0),
             pairing: AtomicBool::new(false),
+            attempts: Mutex::new(std::collections::VecDeque::new()),
             live: Mutex::new(HashMap::new()),
             next_connection: AtomicU64::new(0),
             connections: AtomicUsize::new(0),
@@ -242,6 +247,9 @@ impl<D: Desktop> Link<D> {
         if !self.desktop.unlocked() {
             return Ok(refuse(writer, "locked"));
         }
+        if !self.may_pair() {
+            return Ok(refuse(writer, "busy"));
+        }
         if self.pairing.swap(true, Ordering::SeqCst) {
             return Ok(refuse(writer, "busy"));
         }
@@ -281,6 +289,22 @@ impl<D: Desktop> Link<D> {
         send(writer, json!({"t": "paired", "id": id}))?;
         stream.set_read_timeout(Some(FIRST_MESSAGE))?;
         Ok(Flow::Continue)
+    }
+
+    fn may_pair(&self) -> bool {
+        let now = std::time::Instant::now();
+        let mut attempts = self.attempts.lock().unwrap();
+        while attempts
+            .front()
+            .is_some_and(|t| now.duration_since(*t) > Duration::from_secs(60))
+        {
+            attempts.pop_front();
+        }
+        if attempts.len() >= PAIRINGS_PER_MINUTE {
+            return false;
+        }
+        attempts.push_back(now);
+        true
     }
 
     fn session(&self, mut stream: Stream, mut writer: Stream, hello: &Object) -> io::Result<()> {

@@ -343,6 +343,10 @@ def check_on(root: Path, report: dict, report_path: Path, app_executable: Path) 
         if sys.platform.startswith("linux"):
             result["strangers"] = linux_strangers(path)
 
+    import extension_attacks as attacks
+
+    hostile = attacks.before_pairing(root, report_path, host)
+
     seen: set = set()
     browser = Host(host, root)
     try:
@@ -427,6 +431,10 @@ def check_on(root: Path, report: dict, report_path: Path, app_executable: Path) 
         result["paired_and_filled"] = True
     finally:
         browser.close()
+    hostile += attacks.on_the_channel(root, host, pairing_id, pairing_key)
+    hostile.append(attacks.the_wire(root, host, pairing_id, pairing_key))
+    hostile += attacks.files_and_logs(root, pairing_key)
+    result["hostile_probes_refused"] = hostile
     return result
 
 

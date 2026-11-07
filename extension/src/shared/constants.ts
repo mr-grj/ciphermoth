@@ -4,10 +4,13 @@
 declare const __E2E__: boolean;
 declare const __TARGET__: "chromium" | "firefox";
 declare const __VERSION__: string;
+declare const __NATIVE_HOST__: string;
 
 export const E2E = __E2E__;
 export const TARGET = __TARGET__;
 export const VERSION = __VERSION__;
+// Desktop mode's native-messaging host (scripts/build.mjs nativeHost).
+export const NATIVE_HOST = __NATIVE_HOST__;
 
 export const FEATURE = "browser-extension";
 export const SESSION_HEADER = "x-ciphermoth-session";

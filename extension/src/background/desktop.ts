@@ -25,10 +25,11 @@ import {
   toBase64Url,
   transcript,
 } from "../shared/channel";
-import { E2E } from "../shared/constants";
+import { NATIVE_HOST } from "../shared/constants";
 
-// The test build talks to the QA app's host, never the real app's.
-export const HOST = E2E ? "com.ciphermoth.desktop.qa" : "com.ciphermoth.desktop";
+// The test build talks to the QA app's host and a --desktop-dev build to the
+// development app's; a real build only ever to the real app's.
+export const HOST = NATIVE_HOST;
 
 const STEP_MS = 10_000;
 const REQUEST_MS = 20_000;

@@ -161,3 +161,47 @@ fn the_launch_target_is_started() {
     drop(child.stdin.take());
     assert_eq!(finished(&mut child), Some(0));
 }
+
+mod fuzz {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        #![proptest_config(ProptestConfig { cases: 64, ..ProptestConfig::default() })]
+
+        /// Whatever the browser side sends, the host never crashes (exit 0, 1
+        /// or 2, never a signal or a panic's 101) and writes only well-formed
+        /// frames of the types it may send.
+        #[test]
+        fn arbitrary_input_never_crashes_the_host(
+            frames in proptest::collection::vec(proptest::collection::vec(any::<u8>(), 0..200), 0..4),
+            tail in proptest::collection::vec(any::<u8>(), 0..64),
+        ) {
+            let root = tempfile::tempdir().unwrap();
+            let mut child = host(root.path(), &[CHROME]);
+            let mut input = Vec::new();
+            for frame in &frames {
+                input.extend_from_slice(&(frame.len() as u32).to_ne_bytes());
+                input.extend_from_slice(frame);
+            }
+            input.extend_from_slice(&tail);
+            let _ = child.stdin.as_mut().unwrap().write_all(&input);
+            drop(child.stdin.take());
+            let mut out = Vec::new();
+            child.stdout.take().unwrap().read_to_end(&mut out).unwrap();
+            let code = finished(&mut child);
+            prop_assert!(matches!(code, Some(0) | Some(1)), "{code:?}");
+            let mut cursor = std::io::Cursor::new(out);
+            loop {
+                match framing::read_object(&mut cursor) {
+                    Ok(message) => prop_assert!(
+                        matches!(message["t"].as_str(), Some("error" | "launched")),
+                        "{message:?}"
+                    ),
+                    Err(framing::FrameError::Eof) => break,
+                    Err(e) => prop_assert!(false, "malformed output: {e}"),
+                }
+            }
+        }
+    }
+}

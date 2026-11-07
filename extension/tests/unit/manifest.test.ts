@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 // @ts-expect-error -- plain ESM build script without types
-import { manifestFor, zipDirectory } from "../../scripts/build.mjs";
+import { manifestFor, nativeHost, zipDirectory } from "../../scripts/build.mjs";
 
 const ROOT = join(import.meta.dirname, "../..");
 
@@ -107,6 +107,17 @@ describe("the shipped manifests", () => {
     expect(test.permissions).toContain("nativeMessaging");
     expect(manifestFor("chromium").permissions).not.toContain("nativeMessaging");
     expect(test.name).toContain("test build");
+  });
+
+  it("real builds talk to the real app's native host only", () => {
+    expect(nativeHost()).toBe("com.ciphermoth.desktop");
+    expect(nativeHost({ test: true })).toBe("com.ciphermoth.desktop.qa");
+    expect(nativeHost({ dev: true })).toBe("com.ciphermoth.desktop.dev");
+    for (const target of ["chromium", "firefox"]) {
+      const code = readFileSync(join(ROOT, "dist", target, "background.js"), "utf8");
+      expect(code).toContain('"com.ciphermoth.desktop"');
+      expect(code).not.toMatch(/com\.ciphermoth\.desktop\.(qa|dev)/);
+    }
   });
 
   it("matches the version in package.json", () => {

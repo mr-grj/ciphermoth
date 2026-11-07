@@ -1,6 +1,7 @@
 node_modules/
 dist/
 dist-test/
+dist-dev/
 test-results/
 playwright-report/
 .e2e/

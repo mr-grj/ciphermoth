@@ -18,6 +18,7 @@ default = []
 qa = []
 
 [dev-dependencies]
+proptest = "1"
 tempfile = "3"
 
 # Not "ciphermoth-native-host": Tauri copies the bundled sidecar to

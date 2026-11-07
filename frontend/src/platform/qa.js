@@ -88,10 +88,12 @@ try {
   setSearch("");
   checks.push("search filters and restores the native vault rows");
   if (fresh) {
-    const { workflows } = await import("./qaWorkflows");
-    await workflows(checks);
+    // First, while the new session has its whole idle time: the large backup
+    // steps of the other workflows can take long on a slow runner.
     const { extensionWorkflow } = await import("./qaExtension");
     await extensionWorkflow(checks);
+    const { workflows } = await import("./qaWorkflows");
+    await workflows(checks);
   }
   if (import.meta.env.VITE_DESKTOP_DIALOG_QA === "1" && !sessionStorage.getItem("qa-files")) {
     const { getSessionToken } = await import("../utils");

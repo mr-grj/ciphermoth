@@ -480,3 +480,137 @@ fn closing_connections_and_stopping() {
     rig.running.take().unwrap().stop();
     assert!(rig.endpoint.connect().is_err());
 }
+
+// --- adversarial ---------------------------------------------------------------
+
+#[test]
+fn pairing_attempts_are_throttled() {
+    let rig = Rig::new();
+    rig.fake().approve.store(false, Ordering::SeqCst);
+    for _ in 0..PAIRINGS_PER_MINUTE {
+        let mut stream = rig.connect();
+        let start = client::pair_commit(&mut stream, "Chrome").unwrap();
+        client::pair_reveal(&mut stream, start).unwrap().unwrap();
+        assert_eq!(
+            client::pair_result(&mut stream).unwrap(),
+            Err("denied".to_string())
+        );
+    }
+    let mut stream = rig.connect();
+    let start = client::pair_commit(&mut stream, "Chrome").unwrap();
+    assert_eq!(
+        client::pair_reveal(&mut stream, start)
+            .unwrap()
+            .err()
+            .as_deref(),
+        Some("busy")
+    );
+    assert_eq!(rig.fake().codes.lock().unwrap().len(), PAIRINGS_PER_MINUTE);
+}
+
+mod fuzz {
+    use super::*;
+    use proptest::prelude::*;
+
+    fn field() -> impl Strategy<Value = Value> {
+        prop_oneof![
+            any::<u64>().prop_map(|n| json!(n)),
+            "[ -~]{0,40}".prop_map(|s| json!(s)),
+            proptest::collection::vec(any::<u8>(), 0..48).prop_map(|b| json!(b64(&b))),
+            Just(json!(null)),
+            Just(json!({"nested": [1, 2]})),
+        ]
+    }
+
+    fn envelope() -> impl Strategy<Value = Value> {
+        let kinds = prop_oneof![
+            Just("host".to_string()),
+            Just("pair_commit".to_string()),
+            Just("pair_reveal".to_string()),
+            Just("hello".to_string()),
+            Just("msg".to_string()),
+            Just("paired".to_string()),
+            Just("refused".to_string()),
+            Just("launch".to_string()),
+            "[a-z_]{1,12}",
+        ];
+        let names = prop_oneof![
+            Just("caller".to_string()),
+            Just("version".to_string()),
+            Just("browser".to_string()),
+            Just("commit".to_string()),
+            Just("pub".to_string()),
+            Just("nonce".to_string()),
+            Just("id".to_string()),
+            Just("c".to_string()),
+            Just("d".to_string()),
+            "[a-z]{1,6}",
+        ];
+        (kinds, proptest::collection::btree_map(names, field(), 0..5)).prop_map(|(kind, fields)| {
+            let mut object = serde_json::Map::new();
+            object.insert("t".into(), json!(kind));
+            object.extend(fields);
+            Value::Object(object)
+        })
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig { cases: 300, ..ProptestConfig::default() })]
+
+        /// Whatever a local process sends, nothing is paired, no dialog is
+        /// shown, no session is opened, no vault call is made, and the app
+        /// still serves a real client afterwards.
+        #[test]
+        fn hostile_message_sequences_reach_nothing(
+            host_first in any::<bool>(),
+            messages in proptest::collection::vec(envelope(), 0..6),
+            raw in proptest::collection::vec(any::<u8>(), 0..64),
+        ) {
+            let rig = Rig::new();
+            let mut stream = rig.endpoint.connect().unwrap();
+            stream.set_read_timeout(Some(Duration::from_millis(500))).unwrap();
+            if host_first {
+                send(&mut stream, json!({"t": "host", "caller": CHROME, "version": "1"})).unwrap();
+            }
+            for message in &messages {
+                if send(&mut stream, message.clone()).is_err() {
+                    break;
+                }
+                let _ = receive(&mut stream);
+            }
+            use std::io::Write;
+            let _ = stream.write_all(&raw);
+            drop(stream);
+            let fake = rig.fake();
+            prop_assert!(fake.store.list().is_empty());
+            prop_assert!(fake.codes.lock().unwrap().is_empty() || messages.iter().any(|m| m["t"] == "pair_reveal"));
+            prop_assert_eq!(fake.sessions.load(Ordering::SeqCst), 0);
+            prop_assert!(fake.calls.lock().unwrap().is_empty());
+            // Still alive for a real browser.
+            let (id, key, _) = rig.pair();
+            let (mut stream, mut session) = rig.session(&id, &key);
+            prop_assert_eq!(&session.request(&mut stream, json!({"op": "status"})).unwrap()["ok"], &json!(true));
+        }
+
+        /// A paired connection that receives forged or random sealed frames
+        /// closes without acting on them.
+        #[test]
+        fn forged_frames_on_a_paired_connection_do_nothing(
+            frames in proptest::collection::vec((any::<u64>(), proptest::collection::vec(any::<u8>(), 0..80)), 1..4),
+        ) {
+            let rig = Rig::new();
+            let (id, key, _) = rig.pair();
+            let (mut stream, _session) = rig.session(&id, &key);
+            stream.set_read_timeout(Some(Duration::from_millis(500))).unwrap();
+            for (counter, data) in frames {
+                if send(&mut stream, json!({"t": "msg", "c": counter, "d": b64(&data)})).is_err() {
+                    break;
+                }
+            }
+            prop_assert!(receive(&mut stream).is_err());
+            prop_assert_eq!(rig.fake().shown.load(Ordering::SeqCst), 0);
+            prop_assert_eq!(rig.fake().locked.load(Ordering::SeqCst), 0);
+            prop_assert!(rig.fake().calls.lock().unwrap().is_empty());
+        }
+    }
+}

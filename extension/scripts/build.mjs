@@ -3,6 +3,9 @@
 //   node scripts/build.mjs             dist/chromium, dist/firefox
 //   node scripts/build.mjs --package   ... plus dist/packages/*.zip and SHA256SUMS
 //   node scripts/build.mjs --test      dist-test/chromium (Playwright build, see below)
+//   node scripts/build.mjs --desktop-dev  dist-dev/{chromium,firefox}: a real build
+//                                         that talks to the development desktop app
+//                                         (`make desktop-dev`, or a debug bundle)
 //
 // Reproducible: pinned toolchain (package-lock.json), no minification, no
 // source maps, no timestamps or paths in the output, zip entries sorted with a
@@ -27,9 +30,19 @@ import * as esbuild from "esbuild";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const args = new Set(process.argv.slice(2));
 const TEST = args.has("--test");
+const DESKTOP_DEV = args.has("--desktop-dev");
 const PACKAGE = args.has("--package");
+if (DESKTOP_DEV && (TEST || PACKAGE)) throw new Error("--desktop-dev builds are never packaged");
 const targets = TEST ? ["chromium"] : ["chromium", "firefox"];
-const outRoot = join(root, TEST ? "dist-test" : "dist");
+const outRoot = join(root, TEST ? "dist-test" : DESKTOP_DEV ? "dist-dev" : "dist");
+// The native host the extension talks to in desktop mode: the real app's, the
+// QA app's (test build) or the development app's (never shipped).
+export const nativeHost = ({ test = false, dev = false } = {}) =>
+  test
+    ? "com.ciphermoth.desktop.qa"
+    : dev
+      ? "com.ciphermoth.desktop.dev"
+      : "com.ciphermoth.desktop";
 const { version } = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
 const BUDGET_BYTES = 60 * 1024;
 
@@ -116,6 +129,7 @@ const buildTarget = async (target) => {
     jsxImportSource: "preact",
     define: {
       __E2E__: JSON.stringify(TEST),
+      __NATIVE_HOST__: JSON.stringify(nativeHost({ test: TEST, dev: DESKTOP_DEV })),
       __TARGET__: JSON.stringify(target),
       __VERSION__: JSON.stringify(version),
     },
