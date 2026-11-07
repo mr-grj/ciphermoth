@@ -61,6 +61,8 @@ pub trait Desktop: Send + Sync + 'static {
     fn open_session(&self, browser: &str, client: &str) -> Result<String, Refusal>;
     /// `POST /api/extension/<route>` with the session token.
     fn api(&self, token: &str, route: &str, body: &Value) -> Result<(u16, Value), Refusal>;
+    /// End the extension sessions opened for this pairing (`client`).
+    fn end_sessions(&self, client: &str);
     /// Bring the window forward (to unlock, or to answer a pairing).
     fn show(&self);
     fn lock(&self);
@@ -159,12 +161,20 @@ impl<D: Desktop> Link<D> {
                         stream.shutdown();
                         continue;
                     }
+                    // Registered before its thread starts, so close_connections
+                    // always reaches it.
+                    let Some(id) = link.register(&stream) else {
+                        link.connections.fetch_sub(1, Ordering::SeqCst);
+                        stream.shutdown();
+                        continue;
+                    };
                     let worker = link.clone();
                     let spawned = std::thread::Builder::new()
                         .name("extension-connection".into())
-                        .spawn(move || worker.connection(stream));
+                        .spawn(move || worker.connection(id, stream));
                     if spawned.is_err() {
                         // The connection never started, so its guard never runs.
+                        link.live.lock().unwrap().remove(&id);
                         link.connections.fetch_sub(1, Ordering::SeqCst);
                     }
                 }
@@ -189,18 +199,31 @@ impl<D: Desktop> Link<D> {
         self.tokens.lock().unwrap().clear();
     }
 
+    /// Forget a pairing's token (removed or evicted); a session being opened
+    /// for it right now is not kept either.
     pub fn forget_pairing(&self, id: &str) {
+        self.generation.fetch_add(1, Ordering::SeqCst);
         self.tokens.lock().unwrap().remove(id);
     }
 
-    fn connection(&self, stream: Stream) {
+    fn register(&self, stream: &Stream) -> Option<u64> {
+        let watch = stream.try_clone().ok()?;
         let id = self.next_connection.fetch_add(1, Ordering::SeqCst);
-        let _guard = ConnectionGuard { link: self, id };
-        let Ok(watch) = stream.try_clone() else {
-            return;
-        };
         self.live.lock().unwrap().insert(id, watch);
+        Some(id)
+    }
+
+    fn connection(&self, id: u64, stream: Stream) {
+        let _guard = ConnectionGuard { link: self, id };
         let _ = self.serve(stream);
+    }
+
+    /// Remove pairings from the store and end everything they hold.
+    fn drop_pairings(&self, ids: &[String]) {
+        for id in ids {
+            self.forget_pairing(id);
+            self.desktop.end_sessions(id);
+        }
     }
 
     fn serve(&self, mut stream: Stream) -> io::Result<()> {
@@ -282,11 +305,21 @@ impl<D: Desktop> Link<D> {
         if !self.desktop.approve(browser, &paired.sas) {
             return Ok(refuse(writer, "denied"));
         }
+        if !self.desktop.store().enabled() {
+            return Ok(refuse(writer, "disabled"));
+        }
         if !self.desktop.unlocked() {
             return Ok(refuse(writer, "locked"));
         }
-        let id = self.desktop.store().add(browser, &paired.key)?;
+        // The browser hears first: one that cancelled or went away meanwhile
+        // leaves no pairing behind.
+        let id = crate::wire::b64(&channel::random::<16>());
         send(writer, json!({"t": "paired", "id": id}))?;
+        let evicted = self
+            .desktop
+            .store()
+            .add_with_id(&id, browser, &paired.key)?;
+        self.drop_pairings(&evicted);
         stream.set_read_timeout(Some(FIRST_MESSAGE))?;
         Ok(Flow::Continue)
     }
@@ -327,7 +360,7 @@ impl<D: Desktop> Link<D> {
         )?;
         let key = channel::connection_key(&key, &id_bytes, &extension_nonce.unwrap(), &app_nonce);
         let mut channel = Channel::new(key, Side::App);
-        let _ = self.desktop.store().touch(&pairing.id);
+        let mut touched = false;
         stream.set_read_timeout(Some(IDLE))?;
         loop {
             let message = read(&mut stream)?;
@@ -349,8 +382,13 @@ impl<D: Desktop> Link<D> {
             // The switch may have been turned off while this connection was
             // being accepted (before close_connections could see it): it ends
             // here instead of opening a session after extension_end.
-            if !self.desktop.store().enabled() {
+            if !self.desktop.store().enabled() || self.desktop.store().find(&pairing.id).is_none() {
                 return Ok(());
+            }
+            // Use is recorded once the peer proved it holds the pairing key.
+            if !touched {
+                touched = true;
+                let _ = self.desktop.store().touch(&pairing.id);
             }
             let answer = match serde_json::from_slice::<Value>(&plain) {
                 Ok(Value::Object(request)) => self.answer(&pairing, &request),
@@ -392,6 +430,11 @@ impl<D: Desktop> Link<D> {
                 self.desktop.show();
                 json!({"id": id, "ok": true, "value": {}})
             }
+            Some("unpair") if exact(&[]) => {
+                let _ = self.desktop.store().remove(&pairing.id);
+                self.drop_pairings(std::slice::from_ref(&pairing.id));
+                json!({"id": id, "ok": true, "value": {}})
+            }
             Some("lock") if exact(&[]) => {
                 self.forget_sessions();
                 self.desktop.lock();
@@ -418,9 +461,17 @@ impl<D: Desktop> Link<D> {
         let generation = self.generation.load(Ordering::SeqCst);
         let token = self.desktop.open_session(&pairing.browser, &pairing.id)?;
         let mut tokens = self.tokens.lock().unwrap();
-        if self.generation.load(Ordering::SeqCst) == generation {
-            tokens.insert(pairing.id.clone(), token.clone());
+        // The vault locked, the switch turned off or the pairing went while the
+        // core opened it: end it instead of using it once.
+        if self.generation.load(Ordering::SeqCst) != generation
+            || !self.desktop.store().enabled()
+            || self.desktop.store().find(&pairing.id).is_none()
+        {
+            drop(tokens);
+            self.desktop.end_sessions(&pairing.id);
+            return Err(Refusal::Locked);
         }
+        tokens.insert(pairing.id.clone(), token.clone());
         Ok(token)
     }
 

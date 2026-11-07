@@ -147,23 +147,31 @@ impl Store {
     /// longest ago is dropped.
     pub fn add(&self, browser: &str, key: &[u8; 32]) -> io::Result<String> {
         let id = b64(&crate::channel::random::<16>());
+        self.add_with_id(&id, browser, key)?;
+        Ok(id)
+    }
+
+    /// Store a pairing under `id`; returns the ids of pairings dropped to make
+    /// room (their holders must be disconnected).
+    pub fn add_with_id(&self, id: &str, browser: &str, key: &[u8; 32]) -> io::Result<Vec<String>> {
         let pairing = Pairing {
-            id: id.clone(),
+            id: id.to_string(),
             browser: browser.to_string(),
             key: b64(key),
             created: now(),
             last_used: None,
         };
         self.change(|c| {
+            let mut evicted = Vec::new();
             while c.pairings.len() >= MAX_PAIRINGS {
                 let oldest = (0..c.pairings.len())
                     .min_by_key(|&i| c.pairings[i].last_used.unwrap_or(c.pairings[i].created))
                     .unwrap();
-                c.pairings.remove(oldest);
+                evicted.push(c.pairings.remove(oldest).id);
             }
             c.pairings.push(pairing);
-        })?;
-        Ok(id)
+            evicted
+        })
     }
 
     pub fn find(&self, id: &str) -> Option<Pairing> {
@@ -176,11 +184,15 @@ impl Store {
             .cloned()
     }
 
+    /// Record use; written at most once a minute per pairing (every
+    /// connection calls it).
     pub fn touch(&self, id: &str) -> io::Result<()> {
         let at = now();
         self.change(|c| {
             if let Some(p) = c.pairings.iter_mut().find(|p| p.id == id) {
-                p.last_used = Some(at);
+                if p.last_used.is_none_or(|last| at.saturating_sub(last) >= 60) {
+                    p.last_used = Some(at);
+                }
             }
         })
     }

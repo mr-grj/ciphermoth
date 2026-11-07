@@ -862,9 +862,15 @@ const Unlocked = ({
 
 // --- root ------------------------------------------------------------------------
 
-// Desktop states that change without this popup doing anything (the app is
-// unlocked, started, or the pairing answered) are refreshed every second.
-const WAITING: ReadonlySet<Status["phase"]> = new Set(["pairing", "no-app", "no-host", "locked"]);
+// Desktop states that change without this popup doing anything are refreshed:
+// every second while a pairing or an unlock is awaited, every 3 s while the
+// app is not running or not set up (each check starts the native host).
+const WAITING: Partial<Record<Status["phase"], number>> = {
+  pairing: 1000,
+  locked: 1000,
+  "no-app": 3000,
+  "no-host": 3000,
+};
 
 const App = () => {
   const [status, setStatus] = useState<Status | null>(null);
@@ -895,12 +901,12 @@ const App = () => {
   useEffect(load, [load]);
 
   const desktop = status?.mode === "desktop";
-  const waiting = desktop && status !== null && WAITING.has(status.phase);
+  const every = desktop && status !== null ? WAITING[status.phase] : undefined;
   useEffect(() => {
-    if (!waiting) return;
-    const timer = setInterval(() => void fetchStatus().then(setStatus), 1000);
+    if (!every) return;
+    const timer = setInterval(() => void fetchStatus().then(setStatus), every);
     return () => clearInterval(timer);
-  }, [waiting, fetchStatus]);
+  }, [every, fetchStatus]);
 
   if (!status) {
     return (

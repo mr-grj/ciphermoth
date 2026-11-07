@@ -21,6 +21,10 @@ struct Fake {
     accepted: Mutex<Option<String>>,
     shown: AtomicU32,
     locked: AtomicU32,
+    ended: Mutex<Vec<String>>,
+    /// Turn the switch off while a session is being opened (the race).
+    disable_during_open: AtomicBool,
+    approve_delay_ms: AtomicU32,
 }
 
 impl Desktop for Fake {
@@ -31,12 +35,18 @@ impl Desktop for Fake {
         self.unlocked.load(Ordering::SeqCst)
     }
     fn approve(&self, _browser: &str, code: &str) -> bool {
+        std::thread::sleep(Duration::from_millis(
+            self.approve_delay_ms.load(Ordering::SeqCst) as u64,
+        ));
         self.codes.lock().unwrap().push(code.to_string());
         self.approve.load(Ordering::SeqCst)
     }
     fn open_session(&self, _browser: &str, client: &str) -> Result<String, Refusal> {
         if !self.unlocked() {
             return Err(Refusal::Locked);
+        }
+        if self.disable_during_open.load(Ordering::SeqCst) {
+            self.store.set_enabled(false).unwrap();
         }
         let n = self.sessions.fetch_add(1, Ordering::SeqCst);
         let token = format!("token-{client}-{n}");
@@ -64,6 +74,16 @@ impl Desktop for Fake {
             200,
             json!({"logins": [], "truncated": false, "route": route}),
         ))
+    }
+    fn end_sessions(&self, client: &str) {
+        self.ended.lock().unwrap().push(client.to_string());
+        let mut accepted = self.accepted.lock().unwrap();
+        if accepted
+            .as_deref()
+            .is_some_and(|t| t.starts_with(&format!("token-{client}-")))
+        {
+            *accepted = None;
+        }
     }
     fn show(&self) {
         self.shown.fetch_add(1, Ordering::SeqCst);
@@ -96,6 +116,9 @@ impl Rig {
             accepted: Mutex::new(None),
             shown: AtomicU32::new(0),
             locked: AtomicU32::new(0),
+            ended: Mutex::new(Vec::new()),
+            disable_during_open: AtomicBool::new(false),
+            approve_delay_ms: AtomicU32::new(0),
         });
         let endpoint = Endpoint(dir.path().join("run/s"));
         let running = link.start(&endpoint).unwrap();
@@ -634,4 +657,120 @@ fn a_connection_that_survives_the_switch_turning_off_gets_nothing() {
     assert!(closed(&mut stream));
     assert_eq!(rig.fake().sessions.load(Ordering::SeqCst), 0);
     assert!(rig.fake().calls.lock().unwrap().is_empty());
+}
+
+#[test]
+fn a_session_opened_while_the_switch_turns_off_is_ended_not_used() {
+    let rig = Rig::new();
+    let (id, key, _) = rig.pair();
+    let (mut stream, mut session) = rig.session(&id, &key);
+    rig.fake().disable_during_open.store(true, Ordering::SeqCst);
+    let reply = session
+        .request(
+            &mut stream,
+            json!({"op": "api", "route": "credential", "body": {"id": 1}}),
+        )
+        .unwrap();
+    assert_eq!(reply["code"], "locked");
+    assert!(
+        rig.fake().calls.lock().unwrap().is_empty(),
+        "the token was never used"
+    );
+    assert_eq!(
+        rig.fake().ended.lock().unwrap().as_slice(),
+        std::slice::from_ref(&id)
+    );
+    assert!(rig.link.tokens.lock().unwrap().is_empty());
+}
+
+#[test]
+fn a_pairing_removed_in_the_app_loses_its_open_connection() {
+    let rig = Rig::new();
+    let (id, key, _) = rig.pair();
+    let (mut stream, mut session) = rig.session(&id, &key);
+    session
+        .request(&mut stream, json!({"op": "status"}))
+        .unwrap();
+    // Removed (Settings, or evicted by a 17th pairing) without closing this.
+    rig.fake().store.remove(&id).unwrap();
+    send(
+        &mut stream,
+        session.seal(json!({"op": "api", "route": "matches", "body": {}})),
+    )
+    .unwrap();
+    assert!(closed(&mut stream));
+    assert!(rig.fake().calls.lock().unwrap().is_empty());
+}
+
+#[test]
+fn an_approval_after_the_browser_left_stores_nothing() {
+    let rig = Rig::new();
+    rig.fake().approve_delay_ms.store(400, Ordering::SeqCst);
+    let mut stream = rig.connect();
+    let start = client::pair_commit(&mut stream, "Chrome").unwrap();
+    client::pair_reveal(&mut stream, start).unwrap().unwrap();
+    stream.shutdown(); // the user cancelled in the popup
+    drop(stream);
+    std::thread::sleep(Duration::from_millis(800));
+    assert_eq!(
+        rig.fake().codes.lock().unwrap().len(),
+        1,
+        "the dialog was shown"
+    );
+    assert!(rig.fake().store.list().is_empty(), "but nothing was paired");
+}
+
+#[test]
+fn unpairing_from_the_extension_removes_it_in_the_app() {
+    let rig = Rig::new();
+    let (id, key, _) = rig.pair();
+    let (mut stream, mut session) = rig.session(&id, &key);
+    session
+        .request(
+            &mut stream,
+            json!({"op": "api", "route": "matches", "body": {}}),
+        )
+        .unwrap();
+    assert_eq!(
+        session
+            .request(&mut stream, json!({"op": "unpair"}))
+            .unwrap()["ok"],
+        true
+    );
+    assert!(rig.fake().store.list().is_empty());
+    assert!(rig.fake().ended.lock().unwrap().contains(&id));
+    assert!(rig.link.tokens.lock().unwrap().is_empty());
+    send(&mut stream, session.seal(json!({"op": "status"}))).unwrap();
+    assert!(closed(&mut stream));
+    let mut again = rig.connect();
+    assert_eq!(
+        client::hello(&mut again, &id, &key)
+            .unwrap()
+            .err()
+            .as_deref(),
+        Some("unknown_pairing")
+    );
+}
+
+#[test]
+fn use_is_recorded_at_most_once_a_minute() {
+    let rig = Rig::new();
+    let (id, key, _) = rig.pair();
+    let (mut stream, mut session) = rig.session(&id, &key);
+    session
+        .request(&mut stream, json!({"op": "status"}))
+        .unwrap();
+    let first = rig.fake().store.find(&id).unwrap().last_used;
+    assert!(first.is_some());
+    let config = rig._dir.path().join("link/config.json");
+    let written = std::fs::metadata(&config).unwrap().modified().unwrap();
+    std::thread::sleep(Duration::from_millis(1100));
+    let (mut stream, mut session) = rig.session(&id, &key);
+    session
+        .request(&mut stream, json!({"op": "status"}))
+        .unwrap();
+    assert_eq!(
+        std::fs::metadata(&config).unwrap().modified().unwrap(),
+        written
+    );
 }

@@ -308,6 +308,7 @@ const awaitApproval = async (state: PairingState, port: Port, pairingKey: Crypto
     await savePairing(record);
     drop();
     live = link;
+    idleTimer = setTimeout(drop, IDLE_MS);
     if (pairing === state) pairing = null;
   } catch (error) {
     if (pairing === state) pairingFailed(state, error);
@@ -349,8 +350,11 @@ export const startPairing = async (browser: string): Promise<void> => {
   }
 };
 
+// Unpair on both sides: the app forgets this browser (and ends its session)
+// when it can be reached; this side forgets the pairing either way.
 export const unpair = async (): Promise<void> => {
   cancelPairing();
+  if (await loadPairing()) await call("unpair").catch(() => undefined);
   drop();
   await deletePairing();
 };

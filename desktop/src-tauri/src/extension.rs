@@ -161,6 +161,13 @@ impl Desktop for AppDesktop {
         )
     }
 
+    fn end_sessions(&self, client: &str) {
+        let _ = self.core(
+            json!({"native": "extension_end", "client": client}),
+            Vec::new(),
+        );
+    }
+
     fn show(&self) {
         if let Some(window) = self.app.get_webview_window("main") {
             let _ = window.unminimize();
@@ -179,6 +186,9 @@ pub struct Extension {
     link: Arc<Link<AppDesktop>>,
     running: Mutex<Option<Running>>,
     error: Mutex<Option<String>>,
+    /// The browsers with a manifest, as of the last enable/disable (Settings
+    /// polls the status; the locations are not scanned each time).
+    browsers: Mutex<Vec<&'static str>>,
 }
 
 fn message(error: io::Error) -> String {
@@ -204,6 +214,7 @@ impl Extension {
             identity,
             link: Link::new(desktop),
             running: Mutex::new(None),
+            browsers: Mutex::new(Vec::new()),
             error: Mutex::new(None),
         });
         if extension.link.desktop().store.enabled() {
@@ -274,7 +285,7 @@ impl Extension {
 
     fn enable(&self) -> io::Result<()> {
         self.write_launch()?;
-        self.installer()?.install()?;
+        *self.browsers.lock().unwrap() = self.installer()?.install()?;
         let mut running = self.running.lock().unwrap();
         if running.is_none() {
             *running = Some(self.link.start(&ipc::endpoint(&self.identity)?)?);
@@ -293,7 +304,9 @@ impl Extension {
             .link
             .desktop()
             .core(json!({"native": "extension_end"}), Vec::new());
-        self.installer()?.uninstall()
+        let removed = self.installer()?.uninstall();
+        *self.browsers.lock().unwrap() = self.installer()?.installed();
+        removed
     }
 
     /// The vault locked (or the core stopped): every token is dead already.
@@ -315,7 +328,7 @@ impl Extension {
         json!({
             "enabled": store.enabled(),
             "listening": self.running.lock().unwrap().is_some(),
-            "browsers": self.installer().map(|i| i.installed()).unwrap_or_default(),
+            "browsers": *self.browsers.lock().unwrap(),
             "pairings": store.list(),
             "error": *self.error.lock().unwrap(),
         })

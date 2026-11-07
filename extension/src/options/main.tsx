@@ -202,8 +202,11 @@ const DesktopConnection = ({ status, reload }: { status: Status; reload: () => v
   };
 
   const disconnect = async () => {
-    await send({ type: "forget" }).catch(() => {});
-    setMessage({ text: "Unpaired. Nothing of your vault is left in this browser.", bad: false });
+    await send({ type: "unpair" }).catch(() => {});
+    setMessage({
+      text: "Unpaired in this browser and in the app. Nothing of your vault is left in this browser.",
+      bad: false,
+    });
     reload();
   };
 
@@ -344,6 +347,13 @@ const Mode = ({ status, reload }: { status: Status; reload: () => void }) => {
       )}
       {chosen === "desktop" && status.mode === "desktop" && (
         <DesktopConnection status={status} reload={reload} />
+      )}
+      {chosen === "desktop" && status.mode !== "desktop" && (
+        <div class="buttons">
+          <button class="button primary" onClick={() => void choose("desktop")}>
+            Use the CipherMoth app
+          </button>
+        </div>
       )}
       {chosen === "server" && <Connection status={status} reload={reload} />}
     </section>

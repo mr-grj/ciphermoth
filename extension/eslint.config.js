@@ -41,6 +41,7 @@ export default tseslint.config(
       ".e2e/**",
       "dist/**",
       "dist-test/**",
+      "dist-dev/**",
       "node_modules/**",
       "test-results/**",
       "playwright-report/**",

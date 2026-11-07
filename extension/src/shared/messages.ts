@@ -28,6 +28,7 @@ const SHAPES = {
   "use-desktop": {},
   pair: {},
   "cancel-pair": {},
+  unpair: {},
   "open-app": {},
   "show-app": {},
 } as const satisfies Record<string, Shape>;

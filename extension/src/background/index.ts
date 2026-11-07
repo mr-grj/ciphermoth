@@ -7,7 +7,7 @@ import { ApiError } from "./api";
 import { CLIPBOARD_ALARM, runClear, scheduleClear } from "./clipboard";
 import { credential, fill, pageInfo, totp } from "./fill";
 import { HANDOFF_ALARM, cancelHandoff, receiveToken, startHandoff } from "./handoff";
-import { cancelPairing, launchApp, showApp, startPairing } from "./desktop";
+import { cancelPairing, launchApp, showApp, startPairing, unpair } from "./desktop";
 import {
   SESSION_ALARM,
   browserName,
@@ -99,6 +99,10 @@ const handle = async (
     case "cancel-pair":
       cancelPairing();
       return ok(null);
+    case "unpair":
+      // Stays in desktop mode, ready to pair again.
+      await unpair();
+      return ok(await currentStatus());
     case "open-app":
       await launchApp();
       return ok(null);

@@ -104,6 +104,9 @@ impl Desktop for Stub {
         }
         post(&self.api, &format!("/extension/{route}"), Some(token), body)
     }
+    fn end_sessions(&self, _client: &str) {
+        // The test backend ends them at idle; the stub keeps no token itself.
+    }
     fn show(&self) {
         say("show");
     }

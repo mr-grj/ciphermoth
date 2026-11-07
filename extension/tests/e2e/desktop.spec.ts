@@ -229,6 +229,22 @@ test("switching to a server ends desktop mode but keeps the pairing", async () =
   await expect(page.getByText("Paired · CipherMoth is unlocked")).toBeVisible();
 });
 
+test("Unpair in the extension removes the browser in the app too", async () => {
+  const pairings = () =>
+    (
+      JSON.parse(readFileSync(join(qaRoot, "browser-extension/config.json"), "utf8")) as {
+        pairings: unknown[];
+      }
+    ).pairings.length;
+  expect(pairings()).toBe(1);
+  const page = await options();
+  await page.getByRole("button", { name: "Unpair" }).click();
+  await expect(page.getByRole("status")).toContainText("Unpaired");
+  await expect.poll(pairings).toBe(0);
+  // Still in desktop mode, ready to pair again.
+  await expect(page.getByRole("button", { name: "Pair" })).toBeVisible();
+});
+
 test("the profile holds no secret from the vault or the channel", async () => {
   await browser.close();
   const canaries = [GITHUB_PASSWORD, "moth@example.com"];
