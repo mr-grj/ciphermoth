@@ -277,6 +277,10 @@ browser profile with `extension/dist/chromium` after the build.
 - **Snap or Flatpak browsers on Linux**: their sandbox does not let them start the
   native host. Use a browser from your distribution's packages, or server mode.
 - **Opera**: not tested in desktop mode; it may not read the native-host manifest.
+- **Uninstalling the desktop app**: turn **Allow browser extensions** off first, so it
+  removes the manifests it wrote for your browsers (an uninstaller cannot reach every
+  browser profile). Left behind, they only make the extension say the app can't be
+  reached.
 
 ## Development
 

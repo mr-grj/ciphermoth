@@ -378,11 +378,14 @@ export const desktopPhase = async (): Promise<{
   const none = { code: null, error: null };
   if (!(await hasNativePermission())) return { phase: "setup", ...none };
   if (!(await supportsX25519())) return { phase: "unsupported", ...none };
-  if (pairing) {
-    return pairing.error
-      ? { phase: "unpaired", code: null, error: pairing.error }
-      : { phase: "pairing", code: pairing.code, error: null };
+  if (pairing?.error) {
+    // A failed pairing is reported once; the next look starts fresh (the app
+    // may be unlocked by then).
+    const error = pairing.error;
+    pairing = null;
+    return { phase: "unpaired", code: null, error };
   }
+  if (pairing) return { phase: "pairing", code: pairing.code, error: null };
   if (!(await loadPairing())) return { phase: "unpaired", ...none };
   try {
     const value = (await call("status")) as { state?: unknown } | null;

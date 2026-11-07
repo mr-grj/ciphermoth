@@ -41,6 +41,48 @@ For each browser:
       page host, the search field, the list as a listbox with each login's name and
       username, every button by its purpose ("Copy password for GitHub"), and prompts.
 
+## 1b. Desktop mode (each release browser; macOS at least, Windows and Linux when you can)
+
+Setup: the desktop app built from the release commit (quit any other CipherMoth window
+first: it uses the same vault folder), a vault with a few logins (one with 2FA), a
+security key (YubiKey) registered and Touch ID enrolled for the Touch ID checks.
+
+In the desktop app:
+
+- [ ] **Off by default**: Settings → Browser extension shows "Allow browser extensions"
+      off, and no manifest exists (macOS:
+      `~/Library/Application Support/{Google/Chrome,BraveSoftware/Brave-Browser,Mozilla}/NativeMessagingHosts/com.ciphermoth.desktop.json`;
+      Linux: `~/.config/{google-chrome,BraveSoftware/Brave-Browser}/NativeMessagingHosts/`,
+      `~/.mozilla/native-messaging-hosts/`; Windows: `HKCU\Software\{Google\Chrome,BraveSoftware\Brave-Browser,Mozilla}\NativeMessagingHosts\com.ciphermoth.desktop`).
+- [ ] **Turn it on**: "Set up for Chrome, Brave and Firefox" (the installed ones); the
+      manifests exist and name only the CipherMoth extension ids and the host inside the
+      app.
+
+In each browser:
+
+- [ ] **Choose "CipherMoth app on this computer"** in the extension's settings: the browser
+      asks to "communicate with cooperating native applications" (Firefox: "Exchange
+      messages with programs other than Firefox"). Nothing else is asked.
+- [ ] **Pair**: the popup and the app's dialog show the **same six digits**. **Don't
+      allow** → the popup says pairing wasn't allowed and nothing is paired. Pair again,
+      **Allow** → the popup lists logins; the app's Settings lists the browser.
+- [ ] **Fill, copy, 2FA and the shortcut** work as in server mode (section 1).
+- [ ] **App locked** (Log out, ⌘/Ctrl+Shift+L in the app, or its inactivity timeout): the
+      popup says "CipherMoth is locked". **Unlock CipherMoth** brings the app forward;
+      unlock with the master password, then (on separate tries) the **YubiKey** and
+      **Touch ID**; the popup works again when reopened, without pairing again.
+- [ ] **Lock CipherMoth** (🔒 in the popup) locks the app.
+- [ ] **Quit the app**: the popup says "CipherMoth isn't running"; **Open CipherMoth**
+      starts it.
+- [ ] **Turn the switch off**: the popup says to turn browser extensions on; the manifests
+      are gone. Turn it on again: the browser works without pairing again.
+- [ ] **Remove** the browser in the app's Settings: the popup asks to pair again.
+- [ ] **Switch the extension to your server and back**: server mode works, and back in
+      desktop mode the pairing is still there.
+- [ ] **No token in the browser**: in the extension's background console,
+      `chrome.storage.session.get()` (Firefox: `browser.storage.session.get()`) holds no
+      `session`, and `chrome.storage.local.get()` only `config`.
+
 ## 2. Real sites
 
 - [ ] GitHub, GitLab: username and password filled, sign-in works.
@@ -71,6 +113,8 @@ For each browser:
 - [ ] `/security-review` and `/code-review` at high effort on the full diff since the last
       extension release.
 - [ ] Read the whole release diff of `extension/src` and `backend/api/endpoints/extension.py`,
-      `backend/crud/extension.py`, `backend/url_match.py`.
+      `backend/crud/extension.py`, `backend/url_match.py`, and for desktop mode
+      `desktop/src-tauri/extension-link`, `desktop/src-tauri/native-host`,
+      `desktop/src-tauri/src/extension.rs` and `desktop/core/desktop_core/extension.py`.
 - [ ] `npm audit` clean beyond the accepted advisories (`node scripts/npm_audit.mjs extension`).
 - [ ] Before the first store release: consider an external review.

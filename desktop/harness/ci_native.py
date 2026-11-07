@@ -27,9 +27,9 @@ elif sys.platform == "win32":
     installer = next((bundle / "nsis").glob("*QA*.exe"))
     subprocess.run([str(installer), "/S"], check=True)
     folder = Path(os.environ["LOCALAPPDATA"]) / "CipherMoth QA"
-    executable = next(
-        p for p in folder.glob("*.exe") if "uninstall" not in p.name.lower()
-    )
+    # By name: the folder also holds the uninstaller and ciphermoth-native-host.exe.
+    executable = folder / "ciphermoth-desktop.exe"
+    assert executable.is_file(), sorted(p.name for p in folder.glob("*.exe"))
 else:
     packages = list((bundle / "deb").glob("*.deb"))
     package = max(packages, key=lambda p: p.stat().st_mtime)

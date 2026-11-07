@@ -348,18 +348,27 @@ pub async fn extension_set_enabled(
 }
 
 #[tauri::command]
-pub fn extension_unpair(id: String, extension: State<'_, Arc<Extension>>) -> Result<Value, String> {
-    let desktop = extension.link.desktop();
-    desktop
-        .store
-        .remove(&id)
-        .map_err(|_| "The browser could not be removed.".to_string())?;
-    extension.link.forget_pairing(&id);
-    // Its open connection still holds the pairing: close them all (the others
-    // reconnect on their next request) and end its session in the core.
-    extension.link.close_connections();
-    let _ = desktop.core(json!({"native": "extension_end", "client": id}), Vec::new());
-    Ok(extension.status())
+pub async fn extension_unpair(
+    id: String,
+    extension: State<'_, Arc<Extension>>,
+) -> Result<Value, String> {
+    let extension = extension.inner().clone();
+    // Off the main thread: it waits for the core.
+    tauri::async_runtime::spawn_blocking(move || {
+        let desktop = extension.link.desktop();
+        desktop
+            .store
+            .remove(&id)
+            .map_err(|_| "The browser could not be removed.".to_string())?;
+        extension.link.forget_pairing(&id);
+        // Its open connection still holds the pairing: close them all (the
+        // others reconnect on their next request) and end its session.
+        extension.link.close_connections();
+        let _ = desktop.core(json!({"native": "extension_end", "client": id}), Vec::new());
+        Ok(extension.status())
+    })
+    .await
+    .map_err(|_| "The browser could not be removed.".to_string())?
 }
 
 #[tauri::command]

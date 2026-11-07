@@ -686,7 +686,8 @@ def extension_channel_vectors() -> dict:
             "ciphertext": first["ciphertext"],
         },
         {
-            "reason": "a reflection: sealed toward the app, read as toward the extension",
+            "reason": "a reflection: sealed toward the app, "
+            "read as toward the extension",
             "direction": TO_EXTENSION,
             "counter": 0,
             "ciphertext": first["ciphertext"],
