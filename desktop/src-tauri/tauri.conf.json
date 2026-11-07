@@ -6,8 +6,8 @@
   "build": {
     "frontendDist": "../../frontend/dist",
     "devUrl": "http://127.0.0.1:3000",
-    "beforeDevCommand": "npm --prefix ../frontend run dev -- --host 127.0.0.1 --mode desktop",
-    "beforeBuildCommand": "npm --prefix ../frontend run build:desktop"
+    "beforeDevCommand": "node build-native-host.mjs --debug && npm --prefix ../frontend run dev -- --host 127.0.0.1 --mode desktop",
+    "beforeBuildCommand": "node build-native-host.mjs && npm --prefix ../frontend run build:desktop"
   },
   "app": {
     "withGlobalTauri": false,
@@ -73,7 +73,10 @@
         "installMode": "currentUser"
       }
     },
-    "createUpdaterArtifacts": true
+    "createUpdaterArtifacts": true,
+    "externalBin": [
+      "binaries/ciphermoth-native-host"
+    ]
   },
   "plugins": {
     "updater": {

@@ -17,7 +17,16 @@ import {
   asUnlock,
   request,
 } from "./api";
-import { type Config, getConfig, getSession, installId, setConfig, setSession } from "./storage";
+import { api as desktopApi, desktopPhase, forgetDesktop, lockApp, unpair } from "./desktop";
+import {
+  type Config,
+  getConfig,
+  getServer,
+  getSession,
+  installId,
+  setConfig,
+  setSession,
+} from "./storage";
 import { ext } from "../shared/browser";
 import { type BrowserName, FEATURE, HANDOFF_CHECK_TIMEOUT_MS, TARGET } from "../shared/constants";
 import type { Logins } from "./api";
@@ -46,8 +55,10 @@ export const browserName = (): BrowserName => {
 
 const status = (config: Config | null, patch: Partial<Status>): Status => ({
   phase: "setup",
-  vault: config?.vault ?? null,
-  api: config?.api ?? null,
+  mode: config?.mode ?? null,
+  vault: config?.mode === "server" ? config.vault : null,
+  api: config?.mode === "server" ? config.api : null,
+  pairingCode: null,
   serverVersion: null,
   idleTimeoutMs: null,
   subdomains: config?.subdomains ?? false,
@@ -71,7 +82,7 @@ export const forgetSession = async (): Promise<void> => {
 // A call with the session token. A session the server no longer accepts is
 // forgotten; every accepted call is activity and moves the deadline.
 export const authed = async (path: string, body?: unknown): Promise<unknown> => {
-  const config = await getConfig();
+  const config = await getServer();
   const session = await getSession();
   if (!config || !session) throw new ApiError("CipherMoth is locked.", 401, "invalid_session");
   try {
@@ -88,9 +99,27 @@ export const authed = async (path: string, body?: unknown): Promise<unknown> => 
   }
 };
 
+// A request to whichever CipherMoth this installation uses: the server's
+// /api/extension/<route> with the session token, or the desktop app over the
+// paired channel (which holds the session itself).
+export const vaultCall = async (
+  route: "matches" | "search" | "credential" | "totp",
+  body: unknown
+): Promise<unknown> => {
+  const config = await getConfig();
+  if (config?.mode === "desktop") return desktopApi(route, body);
+  return authed(`/extension/${route}`, body);
+};
+
+const desktopStatus = async (config: Config): Promise<Status> => {
+  const { phase, code, error } = await desktopPhase();
+  return status(config, { phase, pairingCode: code, error });
+};
+
 export const currentStatus = async (): Promise<Status> => {
   const config = await getConfig();
   if (!config) return status(null, { phase: "setup" });
+  if (config.mode === "desktop") return desktopStatus(config);
   const session = await getSession();
   if (!session) return status(config, { phase: "locked" });
   try {
@@ -140,8 +169,16 @@ export const configure = async (target: Target): Promise<Status> => {
     });
   }
   const previous = await getConfig();
-  if (previous && (previous.vault !== target.vault || previous.api !== target.api)) await lock();
+  if (previous?.mode === "desktop") {
+    // Leaving desktop mode ends its connection (the app stays unlocked) and
+    // drops the permission; the pairing is kept for switching back.
+    forgetDesktop();
+    await ext.permissions.remove({ permissions: ["nativeMessaging"] }).catch(() => false);
+  } else if (previous && (previous.vault !== target.vault || previous.api !== target.api)) {
+    await lock();
+  }
   const config: Config = {
+    mode: "server",
     vault: target.vault,
     api: target.api,
     subdomains: previous?.subdomains ?? false,
@@ -152,7 +189,7 @@ export const configure = async (target: Target): Promise<Status> => {
 };
 
 export const unlock = async (password: string): Promise<Status> => {
-  const config = await getConfig();
+  const config = await getServer();
   if (!config) return status(null, { phase: "setup" });
   let result;
   try {
@@ -182,7 +219,7 @@ export const unlock = async (password: string): Promise<Status> => {
 // Adopt a token the web app handed over. It is checked with the server before
 // it is kept.
 export const adoptToken = async (token: string): Promise<boolean> => {
-  const config = await getConfig();
+  const config = await getServer();
   if (!config) return false;
   try {
     const live = asSessionStatus(
@@ -199,7 +236,8 @@ export const adoptToken = async (token: string): Promise<boolean> => {
 };
 
 export const lock = async (): Promise<void> => {
-  const config = await getConfig();
+  if ((await getConfig())?.mode === "desktop") return lockApp();
+  const config = await getServer();
   const session = await getSession();
   await forgetSession();
   if (config && session) {
@@ -207,8 +245,35 @@ export const lock = async (): Promise<void> => {
   }
 };
 
+// Switch to the CipherMoth app on this computer: the server's session ends and
+// its site access is removed (design decision 39). A pairing made before is
+// kept, so switching back needs no new code.
+export const useDesktop = async (): Promise<Status> => {
+  const previous = await getConfig();
+  const server = await getServer();
+  if (server) {
+    await lock();
+    await ext.permissions.remove({ origins: permissionOrigins(server) }).catch(() => false);
+  }
+  const config: Config = {
+    mode: "desktop",
+    vault: "",
+    api: "",
+    subdomains: previous?.subdomains ?? false,
+    strictClipboard: previous?.strictClipboard ?? false,
+  };
+  await setConfig(config);
+  return desktopStatus(config);
+};
+
 export const forget = async (): Promise<void> => {
   const config = await getConfig();
+  if (config?.mode === "desktop") {
+    await unpair();
+    await setConfig(null);
+    await ext.permissions.remove({ permissions: ["nativeMessaging"] }).catch(() => false);
+    return;
+  }
   await lock();
   await setConfig(null);
   if (config) {
@@ -219,10 +284,8 @@ export const forget = async (): Promise<void> => {
 
 export const matches = async (origin: string): Promise<Logins> => {
   const config = await getConfig();
-  return asLogins(
-    await authed("/extension/matches", { origin, subdomains: config?.subdomains ?? false })
-  );
+  return asLogins(await vaultCall("matches", { origin, subdomains: config?.subdomains ?? false }));
 };
 
 export const search = async (query: string): Promise<Logins> =>
-  asLogins(await authed("/extension/search", { query: query.slice(0, 200) }));
+  asLogins(await vaultCall("search", { query: query.slice(0, 200) }));

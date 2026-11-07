@@ -8,7 +8,12 @@
 
 import { ext, randomToken } from "../shared/browser";
 
+// One connection per installation (design decision 39): the user's server
+// (vault and API addresses) or the desktop app on this computer (no address;
+// vault and api are empty). A configuration saved before desktop mode existed
+// has no mode and is a server.
 export interface Config {
+  mode: "server" | "desktop";
   vault: string;
   api: string;
   subdomains: boolean;
@@ -50,14 +55,22 @@ export const restrictSessionStorage = async (): Promise<void> => {
 };
 
 export const getConfig = async (): Promise<Config | null> => {
-  const { config } = (await local().get("config")) as { config?: Config };
-  if (!config || typeof config.vault !== "string" || typeof config.api !== "string") return null;
-  return {
-    vault: config.vault,
-    api: config.api,
+  const { config } = (await local().get("config")) as { config?: Partial<Config> };
+  if (!config) return null;
+  const preferences = {
     subdomains: config.subdomains === true,
     strictClipboard: config.strictClipboard === true,
   };
+  if (config.mode === "desktop") return { mode: "desktop", vault: "", api: "", ...preferences };
+  if (typeof config.vault !== "string" || typeof config.api !== "string" || !config.vault)
+    return null;
+  return { mode: "server", vault: config.vault, api: config.api, ...preferences };
+};
+
+// The server connection, or null in desktop mode (or when not set up).
+export const getServer = async (): Promise<Config | null> => {
+  const config = await getConfig();
+  return config?.mode === "server" ? config : null;
 };
 
 export const setConfig = (config: Config | null): Promise<void> =>

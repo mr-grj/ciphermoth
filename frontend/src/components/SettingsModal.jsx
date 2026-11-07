@@ -20,6 +20,7 @@ import HelpOutlineIcon from "@mui/icons-material/HelpOutlined";
 import { useStoreActions, useStoreState } from "easy-peasy";
 import { useSnackbar } from "notistack";
 
+import DesktopExtensionSettings from "./extension/DesktopExtensionSettings";
 import ExtensionSettings from "./extension/ExtensionSettings";
 import SecuritySettings from "./security/SecuritySettings";
 import { IS_DESKTOP } from "../platform";
@@ -157,7 +158,7 @@ const SettingsModal = ({ open, onClose, initialTab = "general" }) => {
       >
         <Tab label="General" value="general" />
         <Tab label="Security" value="security" />
-        {!IS_DESKTOP && <Tab label="Browser extension" value="extension" />}
+        <Tab label="Browser extension" value="extension" />
       </Tabs>
       <DialogContent
         ref={contentRef}
@@ -170,7 +171,12 @@ const SettingsModal = ({ open, onClose, initialTab = "general" }) => {
         }}
       >
         {tab === "security" && <SecuritySettings open={open} />}
-        {tab === "extension" && <ExtensionSettings open={open} />}
+        {tab === "extension" &&
+          (IS_DESKTOP ? (
+            <DesktopExtensionSettings open={open} />
+          ) : (
+            <ExtensionSettings open={open} />
+          ))}
         <Stack spacing={1.5} sx={{ mt: 1, display: tab === "general" ? "flex" : "none" }}>
           {FIELDS.map(({ key, label, tooltip, min, max }) => (
             <TextField

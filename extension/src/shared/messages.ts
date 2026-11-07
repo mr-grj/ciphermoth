@@ -24,6 +24,12 @@ const SHAPES = {
   copied: { digest: "string" },
   settings: { subdomains: "boolean", strictClipboard: "boolean" },
   "handoff-token": { request: "string", token: "string" },
+  // Desktop mode.
+  "use-desktop": {},
+  pair: {},
+  "cancel-pair": {},
+  "open-app": {},
+  "show-app": {},
 } as const satisfies Record<string, Shape>;
 
 export type MessageType = keyof typeof SHAPES;
@@ -102,10 +108,24 @@ export interface Login {
   has_totp: boolean;
 }
 
-export type Phase = "setup" | "locked" | "unlocked" | "too-old" | "offline";
+// Desktop mode adds: unsupported (no X25519 in this browser), unpaired,
+// pairing (a code is shown), no-host (the app's switch is off or the app is
+// not installed), no-app (installed, not running).
+export type Phase =
+  | "setup"
+  | "locked"
+  | "unlocked"
+  | "too-old"
+  | "offline"
+  | "unsupported"
+  | "unpaired"
+  | "pairing"
+  | "no-host"
+  | "no-app";
 
 export interface Status {
   phase: Phase;
+  mode: "server" | "desktop" | null;
   vault: string | null;
   api: string | null;
   serverVersion: string | null;
@@ -113,6 +133,8 @@ export interface Status {
   subdomains: boolean;
   strictClipboard: boolean;
   handoffPending: boolean;
+  // Desktop mode: the six digits to compare with the app's dialog.
+  pairingCode: string | null;
   error: string | null;
 }
 

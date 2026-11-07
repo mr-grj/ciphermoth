@@ -29,6 +29,10 @@
     "allow-menu-state",
     "allow-update-check",
     "allow-update-install",
-    "allow-update-cancel"
+    "allow-update-cancel",
+    "allow-extension-status",
+    "allow-extension-set-enabled",
+    "allow-extension-unpair",
+    "allow-extension-pairing-answer"
   ]
 }

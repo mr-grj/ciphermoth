@@ -31,7 +31,8 @@
     "clipboardWrite"
   ],
   "optional_permissions": [
-    "clipboardRead"
+    "clipboardRead",
+    "nativeMessaging"
   ],
   "optional_host_permissions": [
     "https://*/*",

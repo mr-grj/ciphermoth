@@ -13,7 +13,7 @@
 //    confirms it is a live extension session.
 
 import { adoptToken, browserName } from "./session";
-import { getConfig, getHandoff, installId, setHandoff } from "./storage";
+import { getHandoff, getServer, installId, setHandoff } from "./storage";
 import { ext, randomToken, sameSecret } from "../shared/browser";
 import { BRIDGE_SCRIPT_ID, HANDOFF_TTL_MS } from "../shared/constants";
 import type { MessageOf } from "../shared/messages";
@@ -33,7 +33,7 @@ export const cancelHandoff = async (): Promise<void> => {
 };
 
 export const startHandoff = async (): Promise<void> => {
-  const config = await getConfig();
+  const config = await getServer();
   if (!config) throw new Error("Connect to your CipherMoth first.");
   await cancelHandoff();
   const request = randomToken(32);
@@ -90,7 +90,7 @@ export const receiveToken = async (
     return false;
   // Single use: consumed before anything else happens, success or not.
   await cancelHandoff();
-  const config = await getConfig();
+  const config = await getServer();
   if (!config || config.vault !== pending.vault) return false;
   const adopted = await adoptToken(message.token);
   if (adopted) {

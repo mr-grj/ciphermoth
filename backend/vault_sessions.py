@@ -295,6 +295,36 @@ class VaultSessions:
                     return True
             return False
 
+    def sole_full_key(self) -> VaultKey:
+        """
+        The key of the one live full session, without refreshing it. The
+        desktop core allows a single full session (the app's window); this lets
+        the app open extension sessions for paired browsers without ever
+        holding that session's token. No live full session, or more than one,
+        is ``SessionRequired``.
+        """
+        now = self._clock()
+        with self._lock:
+            self._drop_expired(now)
+            full = [s for s in self._sessions.values() if s.scope is Scope.FULL]
+            if len(full) != 1:
+                raise SessionRequired(_ENDED)
+            return full[0].key
+
+    def revoke_extensions(self, client: str | None = None) -> int:
+        """End every extension session (the desktop switch was turned off), or
+        only those of one installation (a browser was unpaired)."""
+        with self._lock:
+            ended = [
+                digest
+                for digest, session in self._sessions.items()
+                if session.scope is Scope.EXTENSION
+                and (client is None or session.client == client)
+            ]
+            for digest in ended:
+                del self._sessions[digest]
+            return len(ended)
+
     def drop_expired(self) -> int:
         with self._lock:
             return self._drop_expired(self._clock())

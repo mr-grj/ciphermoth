@@ -251,7 +251,15 @@ class CoreServer:
 
     async def _handle(self, request_id: int, request, body: bytes) -> None:
         try:
-            if isinstance(request, dict):
+            if isinstance(request, dict) and str(request.get("native")).startswith(
+                "extension_"
+            ):
+                from . import extension
+
+                status, response_headers, response_body = await extension.call(
+                    self.app, request
+                )
+            elif isinstance(request, dict):
                 from . import native_files
 
                 status, response_headers, response_body = await native_files.call(
@@ -309,10 +317,13 @@ class CoreServer:
                 token = json.loads(body).get("session_token")
         if not token:
             return None
-        from errors import SessionRequired
+        from errors import SessionRequired, WrongScope
 
         try:
             info = self.app.state.vault_sessions.info(token)
+        except WrongScope:
+            # A paired browser's extension session: not the window's deadline.
+            return None
         except SessionRequired:
             return {"expires_in_ms": 0}
         return {"expires_in_ms": info.expires_in_ms}

@@ -19,3 +19,9 @@ qa = []
 
 [dev-dependencies]
 tempfile = "3"
+
+# Not "ciphermoth-native-host": Tauri copies the bundled sidecar to
+# target/<profile>/ciphermoth-native-host, which would overwrite this build.
+[[bin]]
+name = "native-host"
+path = "src/main.rs"

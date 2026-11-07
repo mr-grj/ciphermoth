@@ -52,7 +52,7 @@ export const manifestFor = (target, { test = false } = {}) => {
   manifest.version = version;
   if (test) {
     manifest = merge(manifest, {
-      permissions: ["clipboardRead"],
+      permissions: ["clipboardRead", "nativeMessaging"],
       host_permissions: ["https://*/*", "http://*/*"],
     });
     manifest.name = "CipherMoth (test build)";

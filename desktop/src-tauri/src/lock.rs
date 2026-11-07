@@ -116,6 +116,9 @@ pub fn reset_renderer(app: &tauri::AppHandle) {
     if let Some(files) = app.try_state::<crate::native::Files>() {
         files.invalidate();
     }
+    if let Some(extension) = app.try_state::<Arc<crate::extension::Extension>>() {
+        extension.on_lock();
+    }
     if let Some(window) = app.get_webview_window("main") {
         // Hide stale decrypted DOM before asking the webview to load a fresh
         // document. No JavaScript callback is needed to remove it from view.

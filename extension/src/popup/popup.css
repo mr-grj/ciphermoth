@@ -295,3 +295,16 @@ body {
     animation: none;
   }
 }
+
+/* Desktop mode: the code to compare with the app's pairing dialog. */
+.pairing-code {
+  font-family: var(--mono);
+  font-size: 30px;
+  letter-spacing: 4px;
+  color: var(--text);
+  margin: 6px 0;
+  padding: 10px 18px;
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  background: var(--selected);
+}

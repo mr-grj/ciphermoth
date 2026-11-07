@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -40,7 +41,8 @@ describe("the shipped manifests", () => {
         ? ["activeTab", "scripting", "storage", "alarms", "clipboardWrite", "offscreen"]
         : ["activeTab", "scripting", "storage", "alarms", "clipboardWrite"]
     );
-    expect(manifest.optional_permissions).toEqual(["clipboardRead"]);
+    // nativeMessaging only when the user picks the desktop app (decision 41).
+    expect(manifest.optional_permissions).toEqual(["clipboardRead", "nativeMessaging"]);
     expect(manifest.optional_host_permissions).toEqual([
       "https://*/*",
       "http://localhost/*",
@@ -76,6 +78,18 @@ describe("the shipped manifests", () => {
     expect(manifest.minimum_chrome_version).toBe("120");
   });
 
+  it("chromium pins its id with the public key the native host trusts", () => {
+    const manifest = manifestFor("chromium");
+    const der = Buffer.from(manifest.key, "base64");
+    const id = [...createHash("sha256").update(der).digest().subarray(0, 16)]
+      .flatMap((b) => [b >> 4, b & 15])
+      .map((n) => String.fromCharCode(97 + n))
+      .join("");
+    const ids = readFileSync(join(ROOT, "../desktop/src-tauri/extension-link/src/ids.rs"), "utf8");
+    expect(ids).toContain(`CHROMIUM_IDS: &[&str] = &["${id}"]`);
+    expect(manifestFor("firefox").key).toBeUndefined();
+  });
+
   it("firefox has a fixed id and declares it collects nothing", () => {
     const manifest = manifestFor("firefox");
     expect(manifest.browser_specific_settings.gecko).toEqual({
@@ -89,6 +103,9 @@ describe("the shipped manifests", () => {
   it("only the test build has host permissions", () => {
     const test = manifestFor("chromium", { test: true });
     expect(test.host_permissions).toEqual(["https://*/*", "http://*/*"]);
+    // Playwright cannot answer a permission prompt.
+    expect(test.permissions).toContain("nativeMessaging");
+    expect(manifestFor("chromium").permissions).not.toContain("nativeMessaging");
     expect(test.name).toContain("test build");
   });
 

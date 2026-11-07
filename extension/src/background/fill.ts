@@ -3,7 +3,7 @@
 // are dropped right after.
 
 import { asCredential, asTotp, type Credential, type Totp } from "./api";
-import { authed } from "./session";
+import { vaultCall } from "./session";
 import { getConfig } from "./storage";
 import { ext } from "../shared/browser";
 import { BADGE_MS } from "../shared/constants";
@@ -44,10 +44,10 @@ export const credential = async (
   origin: string,
   confirmed: boolean
 ): Promise<Credential> =>
-  asCredential(await authed("/extension/credential", await loginBody(id, origin, confirmed)));
+  asCredential(await vaultCall("credential", await loginBody(id, origin, confirmed)));
 
 export const totp = async (id: number, origin: string, confirmed: boolean): Promise<Totp> =>
-  asTotp(await authed("/extension/totp", await loginBody(id, origin, confirmed)));
+  asTotp(await vaultCall("totp", await loginBody(id, origin, confirmed)));
 
 const REASONS: ReadonlySet<string> = new Set<FillReason>([
   "filled",

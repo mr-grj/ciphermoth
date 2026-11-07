@@ -17,7 +17,7 @@ const CHROME: &str = "chrome-extension://emeejhcdcdnlhejcpeohdafdnkmbaddn/";
 const FIREFOX: &str = "ciphermoth@mr-grj.github.io";
 
 fn host(root: &Path, args: &[&str]) -> Child {
-    Command::new(env!("CARGO_BIN_EXE_ciphermoth-native-host"))
+    Command::new(env!("CARGO_BIN_EXE_native-host"))
         .args(args)
         .env("CIPHERMOTH_QA_ROOT", root)
         .stdin(Stdio::piped())

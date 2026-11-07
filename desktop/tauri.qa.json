@@ -2,7 +2,7 @@
   "identifier": "com.ciphermoth.desktop.qa",
   "productName": "CipherMoth QA",
   "build": {
-    "beforeBuildCommand": "npm --prefix ../frontend run build:desktop:qa"
+    "beforeBuildCommand": "node build-native-host.mjs --qa && npm --prefix ../frontend run build:desktop:qa"
   },
   "bundle": {
     "createUpdaterArtifacts": false

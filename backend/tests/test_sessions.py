@@ -46,6 +46,7 @@ from vault_sessions import (
     MAX_LIFETIME_MS,
     TOKEN_BYTES,
     Instant,
+    Scope,
     VaultSessions,
 )
 
@@ -244,6 +245,46 @@ def test_a_single_session_store_replaces_the_previous_unlock(clock: FakeClock) -
     with pytest.raises(SessionRequired):
         desktop.resolve(first)
     assert desktop.resolve(second) == KEY
+
+
+def test_the_desktop_opens_extension_sessions_from_its_one_full_session(
+    clock: FakeClock,
+) -> None:
+    desktop = VaultSessions(
+        idle_timeout_ms=IDLE_MS, tolerance_ms=0, max_sessions=1, clock=clock
+    )
+    with pytest.raises(SessionRequired):
+        desktop.sole_full_key()
+    window = desktop.open(KEY)
+    clock.advance(IDLE_MS / 2)
+    assert desktop.sole_full_key() == KEY
+    token, _ = desktop.open_extension(desktop.sole_full_key(), "Chrome", "c" * 22)
+    # Reading the key is not activity: the window still expires on time.
+    clock.advance(IDLE_MS / 2)
+    with pytest.raises(SessionRequired):
+        desktop.sole_full_key()
+    with pytest.raises(SessionRequired):
+        desktop.resolve(window)
+    # A store with two full sessions (the server) never picks one.
+    server = VaultSessions(idle_timeout_ms=IDLE_MS, clock=clock)
+    server.open(KEY)
+    server.open(KEY)
+    with pytest.raises(SessionRequired):
+        server.sole_full_key()
+    del token
+
+
+def test_revoke_extensions_ends_only_extension_sessions(clock: FakeClock) -> None:
+    store = VaultSessions(idle_timeout_ms=IDLE_MS, clock=clock)
+    full = store.open(KEY)
+    first, _ = store.open_extension(KEY, "Chrome")
+    second, _ = store.open_extension(KEY, "Firefox")
+    assert store.revoke_extensions() == 2
+    assert store.resolve(full) == KEY
+    for token in (first, second):
+        with pytest.raises(SessionRequired):
+            store.resolve(token, scope=Scope.EXTENSION)
+    assert store.revoke_extensions() == 0
 
 
 def test_the_configured_timeout_is_enforced_within_the_tolerance(

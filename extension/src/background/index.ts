@@ -7,8 +7,10 @@ import { ApiError } from "./api";
 import { CLIPBOARD_ALARM, runClear, scheduleClear } from "./clipboard";
 import { credential, fill, pageInfo, totp } from "./fill";
 import { HANDOFF_ALARM, cancelHandoff, receiveToken, startHandoff } from "./handoff";
+import { cancelPairing, launchApp, showApp, startPairing } from "./desktop";
 import {
   SESSION_ALARM,
+  browserName,
   configure,
   currentStatus,
   forget,
@@ -19,6 +21,7 @@ import {
   search,
   targetFor,
   unlock,
+  useDesktop,
 } from "./session";
 import { getConfig, getHandoff, restrictSessionStorage, setConfig } from "./storage";
 import { ext } from "../shared/browser";
@@ -87,6 +90,20 @@ const handle = async (
       return ok(await totp(message.id, message.origin, message.confirmed));
     case "copied":
       await scheduleClear(message.digest);
+      return ok(null);
+    case "use-desktop":
+      return ok(await useDesktop());
+    case "pair":
+      await startPairing(browserName());
+      return ok(await currentStatus());
+    case "cancel-pair":
+      cancelPairing();
+      return ok(null);
+    case "open-app":
+      await launchApp();
+      return ok(null);
+    case "show-app":
+      await showApp();
       return ok(null);
     case "settings": {
       const config = await getConfig();

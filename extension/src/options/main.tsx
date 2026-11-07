@@ -88,7 +88,7 @@ const Connection = ({ status, reload }: { status: Status; reload: () => void }) 
     reload();
   };
 
-  const connected = status.phase !== "setup";
+  const connected = status.mode === "server" && status.phase !== "setup";
   return (
     <section aria-labelledby="connection">
       <h2 id="connection">Connection</h2>
@@ -164,6 +164,192 @@ const Connection = ({ status, reload }: { status: Status; reload: () => void }) 
   );
 };
 
+const DESKTOP_STATES: Partial<Record<Status["phase"], string>> = {
+  unlocked: "Paired · CipherMoth is unlocked",
+  locked: "Paired · CipherMoth is locked",
+  "no-app": "Paired · the CipherMoth app isn't running",
+  "no-host": "Browser extensions are turned off in the CipherMoth app",
+  offline: "Can't reach the CipherMoth app",
+};
+
+// "482913" -> "482 913", as the app's dialog shows it.
+const spacedCode = (code: string | null): string =>
+  code && /^\d{6}$/.test(code) ? `${code.slice(0, 3)} ${code.slice(3)}` : "";
+
+const DesktopConnection = ({ status, reload }: { status: Status; reload: () => void }) => {
+  const [message, setMessage] = useState<{ text: string; bad: boolean } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const pairing = status.phase === "pairing";
+
+  // The pairing is answered in the app; follow it here.
+  useEffect(() => {
+    if (!pairing) return;
+    const timer = setInterval(reload, 1000);
+    return () => clearInterval(timer);
+  }, [pairing, reload]);
+
+  const pair = async () => {
+    setBusy(true);
+    setMessage(null);
+    try {
+      await send<Status>({ type: "pair" });
+    } catch (err) {
+      setMessage({ text: err instanceof Error ? err.message : "Could not pair.", bad: true });
+    } finally {
+      setBusy(false);
+      reload();
+    }
+  };
+
+  const disconnect = async () => {
+    await send({ type: "forget" }).catch(() => {});
+    setMessage({ text: "Unpaired. Nothing of your vault is left in this browser.", bad: false });
+    reload();
+  };
+
+  const state = DESKTOP_STATES[status.phase];
+  return (
+    <section aria-labelledby="desktop">
+      <h2 id="desktop">CipherMoth app</h2>
+      {status.phase === "unsupported" && (
+        <p class="error" role="alert">
+          This browser can't pair with the CipherMoth app. Update to Chrome 133, Firefox 130 or
+          newer.
+        </p>
+      )}
+      {state && (
+        <div class="row">
+          <span class={`status ${status.phase === "unlocked" ? "on" : ""}`}>{state}</span>
+        </div>
+      )}
+      {status.phase === "unpaired" && (
+        <>
+          <p>
+            Pair this browser with CipherMoth on this computer. The app shows a code; check that it
+            is the one shown here, then allow it. CipherMoth must be unlocked.
+          </p>
+          {status.error && (
+            <p class="error" role="alert">
+              {status.error}
+            </p>
+          )}
+          <div class="buttons">
+            <button class="button primary" onClick={pair} disabled={busy}>
+              {busy ? "Pairing…" : "Pair"}
+            </button>
+          </div>
+        </>
+      )}
+      {pairing && (
+        <>
+          <p>Check that CipherMoth shows this code, then choose Allow there:</p>
+          <p class="pairing-code" aria-label={`Pairing code ${spacedCode(status.pairingCode)}`}>
+            {spacedCode(status.pairingCode)}
+          </p>
+          <div class="buttons">
+            <button
+              class="button"
+              onClick={() => {
+                void send({ type: "cancel-pair" }).finally(reload);
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </>
+      )}
+      {status.phase !== "unpaired" && !pairing && status.phase !== "unsupported" && (
+        <div class="buttons">
+          <button class="button danger" type="button" onClick={disconnect}>
+            Unpair
+          </button>
+        </div>
+      )}
+      {message && (
+        <p
+          class={message.bad ? "error" : ""}
+          role={message.bad ? "alert" : "status"}
+          style={{ marginTop: "12px" }}
+        >
+          {message.text}
+        </p>
+      )}
+      <p style={{ marginTop: "12px", fontSize: "12px" }}>
+        The extension talks to the app through your browser's native messaging, never over the
+        network. In the app, turn on Settings → Browser extension → Allow browser extensions.
+      </p>
+    </section>
+  );
+};
+
+// Where this browser fills from (design decision 39): one at a time.
+const Mode = ({ status, reload }: { status: Status; reload: () => void }) => {
+  const [chosen, setChosen] = useState<"server" | "desktop">(status.mode ?? "server");
+  const [error, setError] = useState("");
+
+  const choose = async (mode: "server" | "desktop") => {
+    setError("");
+    setChosen(mode);
+    if (mode !== "desktop" || status.mode === "desktop") return;
+    // Asked here, in the click, so the browser can show its prompt.
+    const granted = await ext.permissions
+      .request({ permissions: ["nativeMessaging"] })
+      .catch(() => false);
+    if (!granted) {
+      setChosen(status.mode ?? "server");
+      setError("CipherMoth needs your permission to talk to the app on this computer.");
+      return;
+    }
+    try {
+      await send<Status>({ type: "use-desktop" });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not switch.");
+    }
+    reload();
+  };
+
+  return (
+    <section aria-labelledby="mode">
+      <h2 id="mode">Fill from</h2>
+      <div class="choices" role="radiogroup" aria-labelledby="mode">
+        <label class="choice">
+          <input
+            type="radio"
+            name="mode"
+            checked={chosen === "desktop"}
+            onChange={() => void choose("desktop")}
+          />
+          <span>
+            CipherMoth app on this computer
+            <small>Unlock with the app (master password, security key or Touch ID).</small>
+          </span>
+        </label>
+        <label class="choice">
+          <input
+            type="radio"
+            name="mode"
+            checked={chosen === "server"}
+            onChange={() => void choose("server")}
+          />
+          <span>
+            Your CipherMoth server
+            <small>A vault you host, over HTTPS.</small>
+          </span>
+        </label>
+      </div>
+      {error && (
+        <p class="error" role="alert">
+          {error}
+        </p>
+      )}
+      {chosen === "desktop" && status.mode === "desktop" && (
+        <DesktopConnection status={status} reload={reload} />
+      )}
+      {chosen === "server" && <Connection status={status} reload={reload} />}
+    </section>
+  );
+};
+
 const Preferences = ({ status, reload }: { status: Status; reload: () => void }) => {
   const save = async (patch: Partial<Pick<Status, "subdomains" | "strictClipboard">>) => {
     await send({
@@ -226,10 +412,14 @@ const Preferences = ({ status, reload }: { status: Status; reload: () => void })
           onChange={(e) => void toggleStrict((e.target as HTMLInputElement).checked)}
         />
       </div>
-      <p>
-        Locks after {formatTimeout(status.idleTimeoutMs)}, the same as your vault (change it in
-        CipherMoth's Settings), and when the browser closes.
-      </p>
+      {status.mode === "desktop" ? (
+        <p>Fills only while the CipherMoth app is unlocked. Locking the app locks this too.</p>
+      ) : (
+        <p>
+          Locks after {formatTimeout(status.idleTimeoutMs)}, the same as your vault (change it in
+          CipherMoth's Settings), and when the browser closes.
+        </p>
+      )}
       <h2 style={{ marginTop: "18px" }}>Keyboard shortcuts</h2>
       <p>
         Open CipherMoth: <code>Alt+Shift+M</code>. Fill this page:{" "}
@@ -286,7 +476,7 @@ const App = () => {
       <p class="tagline">Your secrets stay in the dark.</p>
       {status ? (
         <>
-          <Connection status={status} reload={reload} />
+          <Mode status={status} reload={reload} />
           <Preferences status={status} reload={reload} />
         </>
       ) : (

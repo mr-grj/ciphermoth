@@ -64,7 +64,7 @@ const FILL_MESSAGES: Record<string, string> = {
 
 // --- small pieces -------------------------------------------------------------
 
-const Header = ({ onLock }: { onLock?: () => void }) => (
+const Header = ({ onLock, lockLabel = "Lock" }: { onLock?: () => void; lockLabel?: string }) => (
   <header class="top">
     <span class="moth">
       <MothIcon />
@@ -73,7 +73,7 @@ const Header = ({ onLock }: { onLock?: () => void }) => (
       Cipher<span>Moth</span>
     </span>
     {onLock && (
-      <button class="icon-button" title="Lock" aria-label="Lock" onClick={onLock}>
+      <button class="icon-button" title={lockLabel} aria-label={lockLabel} onClick={onLock}>
         <Icon name="lock" />
       </button>
     )}
@@ -240,9 +240,177 @@ const Locked = ({ status, onUnlocked }: { status: Status; onUnlocked: (s: Status
   );
 };
 
+// --- desktop mode -----------------------------------------------------------------
+
+const openSettings = () => {
+  void ext.runtime.openOptionsPage();
+  close();
+};
+
+// "482913" -> "482 913", as the app's dialog shows it.
+const spacedCode = (code: string | null): string =>
+  code && /^\d{6}$/.test(code) ? `${code.slice(0, 3)} ${code.slice(3)}` : "";
+
+const Notice = ({
+  title,
+  children,
+  action,
+}: {
+  title: string;
+  children: preact.ComponentChildren;
+  action?: preact.ComponentChildren;
+}) => (
+  <main class="centered" role="status">
+    <h1>{title}</h1>
+    {children}
+    <div class="stack">
+      {action}
+      <button class="button" onClick={openSettings}>
+        Open settings
+      </button>
+    </div>
+  </main>
+);
+
+const Unpaired = ({ status, onChange }: { status: Status; onChange: (s: Status) => void }) => {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(status.error ?? "");
+  const pair = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      onChange(await send<Status>({ type: "pair" }));
+    } catch (err) {
+      setError(
+        err instanceof BackgroundError && err.code === "locked"
+          ? "Unlock CipherMoth first, then pair this browser."
+          : err instanceof Error
+            ? err.message
+            : "Could not pair."
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <main class="centered">
+      <div class="hero">
+        <MothIcon size={44} />
+      </div>
+      <h1>Pair with the CipherMoth app</h1>
+      <p>
+        Fill logins from CipherMoth on this computer. You confirm a code in the app once for this
+        browser.
+      </p>
+      {error && (
+        <p class="error" role="alert">
+          {error}
+        </p>
+      )}
+      <button class="button primary" ref={focusOnMount} onClick={pair} disabled={busy}>
+        {busy ? "Pairing…" : "Pair"}
+      </button>
+    </main>
+  );
+};
+
+const Pairing = ({ status, onCancel }: { status: Status; onCancel: () => void }) => {
+  const code = spacedCode(status.pairingCode);
+  return (
+    <main class="centered">
+      <h1>Confirm in CipherMoth</h1>
+      <p>CipherMoth asks whether to allow this browser. Check that it shows this code:</p>
+      <p class="pairing-code" aria-label={`Pairing code ${code}`}>
+        {code}
+      </p>
+      <p style={{ fontSize: "12px" }}>
+        Choose Allow in CipherMoth if both codes match. If they differ, choose Don't allow.
+      </p>
+      <button
+        class="button"
+        ref={focusOnMount}
+        onClick={() => {
+          void send({ type: "cancel-pair" }).finally(onCancel);
+        }}
+      >
+        Cancel
+      </button>
+    </main>
+  );
+};
+
+const NoApp = () => {
+  const [state, setState] = useState<"idle" | "starting" | "failed">("idle");
+  const start = async () => {
+    setState("starting");
+    try {
+      await send({ type: "open-app" });
+    } catch {
+      setState("failed");
+    }
+  };
+  return (
+    <Notice
+      title="CipherMoth isn't running"
+      action={
+        <button
+          class="button primary"
+          ref={focusOnMount}
+          onClick={start}
+          disabled={state === "starting"}
+        >
+          {state === "starting" ? "Opening…" : "Open CipherMoth"}
+        </button>
+      }
+    >
+      <p>Open the CipherMoth app on this computer to fill logins.</p>
+      {state === "failed" && (
+        <p class="error" role="alert">
+          CipherMoth could not be started. Open it yourself.
+        </p>
+      )}
+    </Notice>
+  );
+};
+
+const DesktopLocked = () => {
+  const [error, setError] = useState("");
+  const show = async () => {
+    setError("");
+    try {
+      await send({ type: "show-app" });
+      close();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not reach CipherMoth.");
+    }
+  };
+  return (
+    <main class="centered">
+      <h1>CipherMoth is locked</h1>
+      <p>Unlock it in the app with your master password, security key or Touch ID.</p>
+      {error && (
+        <p class="error" role="alert">
+          {error}
+        </p>
+      )}
+      <button class="button primary" ref={focusOnMount} onClick={show}>
+        <Icon name="shield" size={16} /> Unlock CipherMoth
+      </button>
+    </main>
+  );
+};
+
 // --- the list ------------------------------------------------------------------
 
-const Unlocked = ({ vault, onLocked }: { vault: string | null; onLocked: () => void }) => {
+const Unlocked = ({
+  vault,
+  desktop,
+  onLocked,
+}: {
+  vault: string | null;
+  desktop: boolean;
+  onLocked: () => void;
+}) => {
   const [listing, setListing] = useState<Listing | null>(null);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Login[] | null>(null);
@@ -259,7 +427,11 @@ const Unlocked = ({ vault, onLocked }: { vault: string | null; onLocked: () => v
 
   const fail = useCallback(
     (err: unknown) => {
-      if (err instanceof BackgroundError && err.code === "invalid_session") return onLocked();
+      if (
+        err instanceof BackgroundError &&
+        (err.code === "invalid_session" || err.code === "locked")
+      )
+        return onLocked();
       setToast({
         text: err instanceof Error ? err.message : "Something went wrong.",
         tone: "bad",
@@ -453,7 +625,7 @@ const Unlocked = ({ vault, onLocked }: { vault: string | null; onLocked: () => v
   if (!listing) {
     return (
       <>
-        <Header onLock={lockNow} />
+        <Header onLock={lockNow} lockLabel={desktop ? "Lock CipherMoth" : "Lock"} />
         <div class="loading" aria-label="Loading">
           <MothIcon size={32} />
         </div>
@@ -466,7 +638,7 @@ const Unlocked = ({ vault, onLocked }: { vault: string | null; onLocked: () => v
 
   return (
     <div>
-      <Header onLock={lockNow} />
+      <Header onLock={lockNow} lockLabel={desktop ? "Lock CipherMoth" : "Lock"} />
       <div class="page mono" title={unicode ? `${page?.host} (${unicode})` : (page?.host ?? "")}>
         {page?.host ? (
           page.insecure ? (
@@ -690,29 +862,45 @@ const Unlocked = ({ vault, onLocked }: { vault: string | null; onLocked: () => v
 
 // --- root ------------------------------------------------------------------------
 
+// Desktop states that change without this popup doing anything (the app is
+// unlocked, started, or the pairing answered) are refreshed every second.
+const WAITING: ReadonlySet<Status["phase"]> = new Set(["pairing", "no-app", "no-host", "locked"]);
+
 const App = () => {
   const [status, setStatus] = useState<Status | null>(null);
 
+  const fetchStatus = useCallback(
+    () =>
+      send<Status>({ type: "status" }).catch((err: unknown): Status => ({
+        phase: "offline",
+        mode: null,
+        vault: null,
+        api: null,
+        serverVersion: null,
+        idleTimeoutMs: null,
+        subdomains: false,
+        strictClipboard: false,
+        handoffPending: false,
+        pairingCode: null,
+        error: err instanceof Error ? err.message : "Something went wrong.",
+      })),
+    []
+  );
+
   const load = useCallback(() => {
     setStatus(null);
-    send<Status>({ type: "status" })
-      .then(setStatus)
-      .catch((err: unknown) =>
-        setStatus({
-          phase: "offline",
-          vault: null,
-          api: null,
-          serverVersion: null,
-          idleTimeoutMs: null,
-          subdomains: false,
-          strictClipboard: false,
-          handoffPending: false,
-          error: err instanceof Error ? err.message : "Something went wrong.",
-        })
-      );
-  }, []);
+    void fetchStatus().then(setStatus);
+  }, [fetchStatus]);
 
   useEffect(load, [load]);
+
+  const desktop = status?.mode === "desktop";
+  const waiting = desktop && status !== null && WAITING.has(status.phase);
+  useEffect(() => {
+    if (!waiting) return;
+    const timer = setInterval(() => void fetchStatus().then(setStatus), 1000);
+    return () => clearInterval(timer);
+  }, [waiting, fetchStatus]);
 
   if (!status) {
     return (
@@ -736,12 +924,68 @@ const App = () => {
       return (
         <>
           <Header />
-          <Locked status={status} onUnlocked={setStatus} />
+          {desktop ? <DesktopLocked /> : <Locked status={status} onUnlocked={setStatus} />}
+        </>
+      );
+    case "unsupported":
+      return (
+        <>
+          <Header />
+          <Notice title="This browser is too old for the CipherMoth app">
+            <p>
+              Update to Chrome 133, Firefox 130 or newer, or connect to your CipherMoth server
+              instead.
+            </p>
+          </Notice>
+        </>
+      );
+    case "unpaired":
+      return (
+        <>
+          <Header />
+          <Unpaired status={status} onChange={setStatus} />
+        </>
+      );
+    case "pairing":
+      return (
+        <>
+          <Header />
+          <Pairing status={status} onCancel={load} />
+        </>
+      );
+    case "no-host":
+      return (
+        <>
+          <Header />
+          <Notice
+            title="Turn on browser extensions in CipherMoth"
+            action={
+              <button class="button primary" ref={focusOnMount} onClick={load}>
+                Try again
+              </button>
+            }
+          >
+            <p>
+              In the CipherMoth app, open Settings → Browser extension and turn on “Allow browser
+              extensions”.
+            </p>
+          </Notice>
+        </>
+      );
+    case "no-app":
+      return (
+        <>
+          <Header />
+          <NoApp />
         </>
       );
     case "unlocked":
       return (
-        <Unlocked vault={status.vault} onLocked={() => setStatus({ ...status, phase: "locked" })} />
+        <Unlocked
+          vault={status.vault}
+          desktop={desktop}
+          onLocked={() => setStatus({ ...status, phase: "locked" })}
+        />
       );
   }
 };
