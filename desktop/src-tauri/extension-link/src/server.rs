@@ -346,6 +346,12 @@ impl<D: Desktop> Link<D> {
             let Ok(plain) = channel.open(counter, &sealed) else {
                 return Ok(());
             };
+            // The switch may have been turned off while this connection was
+            // being accepted (before close_connections could see it): it ends
+            // here instead of opening a session after extension_end.
+            if !self.desktop.store().enabled() {
+                return Ok(());
+            }
             let answer = match serde_json::from_slice::<Value>(&plain) {
                 Ok(Value::Object(request)) => self.answer(&pairing, &request),
                 _ => return Ok(()),
@@ -403,6 +409,9 @@ impl<D: Desktop> Link<D> {
     }
 
     fn token(&self, pairing: &Pairing) -> Result<String, Refusal> {
+        if !self.desktop.store().enabled() {
+            return Err(Refusal::Locked);
+        }
         if let Some(token) = self.tokens.lock().unwrap().get(&pairing.id) {
             return Ok(token.clone());
         }

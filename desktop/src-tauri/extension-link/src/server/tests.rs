@@ -614,3 +614,24 @@ mod fuzz {
         }
     }
 }
+
+#[test]
+fn a_connection_that_survives_the_switch_turning_off_gets_nothing() {
+    let rig = Rig::new();
+    let (id, key, _) = rig.pair();
+    let (mut stream, mut session) = rig.session(&id, &key);
+    session
+        .request(&mut stream, json!({"op": "status"}))
+        .unwrap();
+    // Turned off without close_connections reaching this connection (the race
+    // of a connection accepted while the switch turns off).
+    rig.fake().store.set_enabled(false).unwrap();
+    send(
+        &mut stream,
+        session.seal(json!({"op": "api", "route": "matches", "body": {}})),
+    )
+    .unwrap();
+    assert!(closed(&mut stream));
+    assert_eq!(rig.fake().sessions.load(Ordering::SeqCst), 0);
+    assert!(rig.fake().calls.lock().unwrap().is_empty());
+}
