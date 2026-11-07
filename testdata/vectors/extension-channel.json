@@ -1,0 +1,132 @@
+{
+  "format": "ciphermoth-test-vectors/1",
+  "name": "extension-channel",
+  "description": "The desktop channel between the browser extension and the CipherMoth app (docs/EXTENSION.md). lp(x) = u16be(len(x)) || x. Pairing: the extension sends commit = SHA-256(lp('ciphermoth/extension/v1/commit') || E_x || N_x) before it learns the app's key, the app answers E_a and N_a, the extension reveals E_x and N_x. T = SHA-256(lp('ciphermoth/extension/v1/pair') || lp(browser) || E_x || N_x || E_a || N_a); Z = X25519(own private, peer public), refused when all zero (low-order points); sas = u32be(HKDF-SHA256(salt=T, ikm=Z, info='ciphermoth/extension/v1/sas', L=4)) mod 1000000 as six digits; pairing key = HKDF-SHA256(salt=T, ikm=Z, info='ciphermoth/extension/v1/channel', L=32). Each connection: the extension sends the pairing id and M_x, the app answers M_a; C = SHA-256(lp('ciphermoth/extension/v1/connection') || id || M_x || M_a); connection key = HKDF-SHA256(salt=C, ikm=pairing key, info='ciphermoth/extension/v1/connection', L=32). Message n in direction d (1 = to the app, 2 = to the extension) is AES-256-GCM with nonce d || 000000 || u64be(n) and associated data d || u64be(n); each direction counts from 0 per connection and a message is read only with the next counter. Keys, nonces, ids and ciphertexts are unpadded base64url; private keys and derived secrets are hex.",
+  "cases": [
+    {
+      "name": "chrome",
+      "browser": "Chrome",
+      "extension_private_hex": "101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f",
+      "app_private_hex": "505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f",
+      "extension_public": "2J47rXlDfb7Z-ENBgwT0YP8Fx_6B_kqVd6gEy5Nn_2Y",
+      "app_public": "OS0XSjizsb6vrx_oJIcIQcX6UxvG6v22QCwSRmRIjBw",
+      "extension_nonce": "AQIDBAUGBwgJCgsMDQ4PEA",
+      "app_nonce": "QUJDREVGR0hJSktMTU5PUA",
+      "commit": "3P1wgyjedNFUIoL6qYUiFfQgiGp3XF6nzNMgejOAzrE",
+      "transcript_hex": "97c7e0ffa08fe72dd2a663f46f8da092cf3a3e8c1d5f8abbe53cbedd0cce5380",
+      "shared_hex": "ce233c595ad997651e18a03dddcfd6d6d65ac4bccdeaa1bb7a2f0067b5356342",
+      "sas": "154000",
+      "pairing_key_hex": "abdfa117c57935c7df6042ca7c0970b481eac1c89a1309a0732948db4dd4bb0e",
+      "pairing_id": "gYKDhIWGh4iJiouMjY6PkA",
+      "hello_extension_nonce": "oaKjpKWmp6ipqqusra6vsA",
+      "hello_app_nonce": "wcLDxMXGx8jJysvMzc7P0A",
+      "connection_key_hex": "63ff2693aeca0c6a03af13d315c1f03499c51f6fbcc50fc751397c0cad1452ed",
+      "messages": [
+        {
+          "direction": 1,
+          "counter": 0,
+          "plaintext": "{\"id\":1,\"op\":\"status\"}",
+          "ciphertext": "CPU-PL5_V15W2BhO-dvEvwmwSHMERWl3nJAtUhFh3Q4N4FkgVdQ"
+        },
+        {
+          "direction": 2,
+          "counter": 0,
+          "plaintext": "{\"id\":1,\"ok\":true,\"value\":{\"state\":\"unlocked\"}}",
+          "ciphertext": "IAaqv3EYHWcYQB-_iKaozjcP026S-hmeJ5ckkYpya720H5fev_zkydZCzYiCgBNFivdSm_enRp03geqlWoKD"
+        },
+        {
+          "direction": 1,
+          "counter": 1,
+          "plaintext": "{\"id\":2,\"op\":\"api\",\"route\":\"matches\",\"body\":{\"origin\":\"https://github.com\",\"subdomains\":false}}",
+          "ciphertext": "qomVFliaoQnG6gOTmPRF7oztkqMQ2g_kfAVq7MzuX-da1eSt3gD8Ide1s3ofM0NL-RCQZNd23sOcXPME-iCXNv3Q969EscdlHZzNuwkyVwCQUiYdWAr3ke-n0RTO0WPW2w6Lu3K1OL9VLZBo8CEh"
+        },
+        {
+          "direction": 2,
+          "counter": 1,
+          "plaintext": "{\"id\":2,\"ok\":true,\"value\":{\"logins\":[],\"truncated\":false}}",
+          "ciphertext": "IyR4n3LH-OK88384cUF4ELsoZEE54fqDyFyI2sFPSxh1Usx2sdC4YkumdG62WsNrkd-RDCG6sKhv3idjc2jhla4vMZfRNATs-Xw"
+        }
+      ]
+    },
+    {
+      "name": "firefox",
+      "browser": "Firefox",
+      "extension_private_hex": "909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeaf",
+      "app_private_hex": "d0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeef",
+      "extension_public": "n9etbc_0KY3T-W1bGyr5EKBTWxSI1_j6uzSamCiAthU",
+      "app_public": "az7mdGNYPL49wI_p0HZcJmb_UhDdUnydhwXkSSfIDVU",
+      "extension_nonce": "MzQ1Njc4OTo7PD0-P0BBQg",
+      "app_nonce": "c3R1dnd4eXp7fH1-f4CBgg",
+      "commit": "JYc0hmrjOY49MgRpdYv_cN1YEcTLQEY60mn0gGGmJYk",
+      "transcript_hex": "aa2e1d8e0ea37ddb2a42048acd404a92eb17f38130ffac23b14d0e4548ad9766",
+      "shared_hex": "2cb590ec5f8aa604197e599a571530406b670c32e99c44171d299fa427565e49",
+      "sas": "605222",
+      "pairing_key_hex": "a8f1e3f742d7c0562325a04c62e497421eb0c94618ea869d57f283b125ff6191",
+      "pairing_id": "s7S1tre4ubq7vL2-v8DBwg",
+      "hello_extension_nonce": "09TV1tfY2drb3N3e3-Dh4g",
+      "hello_app_nonce": "8_T19vf4-fr7_P3-_wABAg",
+      "connection_key_hex": "4922ceedec5863a5cb7fcf9fc1153c8f3dcbfda068dd4bb19bd805d0bfd4bec0",
+      "messages": [
+        {
+          "direction": 1,
+          "counter": 0,
+          "plaintext": "{\"id\":1,\"op\":\"status\"}",
+          "ciphertext": "G2J1KLF2JJZroxdAXEZfuWrkWVIJIrE55RCARtZxrHlpZdegigc"
+        },
+        {
+          "direction": 2,
+          "counter": 0,
+          "plaintext": "{\"id\":1,\"ok\":true,\"value\":{\"state\":\"unlocked\"}}",
+          "ciphertext": "26zFbtpsPqJn8bVhetyAn72qpxZL7k65gGdkaiR4OpiO94dKmID5gBHxAYf0CCPxsUfD1VCflr96GEYnAK3N"
+        },
+        {
+          "direction": 1,
+          "counter": 1,
+          "plaintext": "{\"id\":2,\"op\":\"api\",\"route\":\"matches\",\"body\":{\"origin\":\"https://github.com\",\"subdomains\":false}}",
+          "ciphertext": "3A8vB2mnFvhLVouzqha4zP8gPI1RT2Nw1ggUdEPFbi-I-hy83V6cZdVwlkySmcgqBjpPttXZHfTBk2y9s1J8VXFzCO2Z-2JWPYNXCiIw-S57kW3T3BdyYyGAmib4T5kwZV1DetsNnRvJ4C62u93g"
+        },
+        {
+          "direction": 2,
+          "counter": 1,
+          "plaintext": "{\"id\":2,\"ok\":true,\"value\":{\"logins\":[],\"truncated\":false}}",
+          "ciphertext": "7CIDXhcglSERlMKKrQIqsCXhQ84IaEVZO0fGc1vBh-CS69Auf7J-zbP9yw0sm3apniKwzq9UmV6Ox0cCqo4cIreadokT2QyszJ8"
+        }
+      ]
+    }
+  ],
+  "refused": [
+    {
+      "reason": "a flipped ciphertext bit",
+      "direction": 1,
+      "counter": 0,
+      "ciphertext": "CfU-PL5_V15W2BhO-dvEvwmwSHMERWl3nJAtUhFh3Q4N4FkgVdQ"
+    },
+    {
+      "reason": "a replay: sealed as message 0, read as message 1",
+      "direction": 1,
+      "counter": 1,
+      "ciphertext": "CPU-PL5_V15W2BhO-dvEvwmwSHMERWl3nJAtUhFh3Q4N4FkgVdQ"
+    },
+    {
+      "reason": "a reflection: sealed toward the app, read as toward the extension",
+      "direction": 2,
+      "counter": 0,
+      "ciphertext": "CPU-PL5_V15W2BhO-dvEvwmwSHMERWl3nJAtUhFh3Q4N4FkgVdQ"
+    },
+    {
+      "reason": "sealed with another connection's key",
+      "direction": 1,
+      "counter": 0,
+      "ciphertext": "G2J1KLF2JJZroxdAXEZfuWrkWVIJIrE55RCARtZxrHlpZdegigc"
+    }
+  ],
+  "low_order_points": [
+    "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "4Ot6fDtBuK4WVuP68Z_EatoJjeucMrH9hmIFFl9JuAA"
+  ],
+  "framing": {
+    "description": "Native messaging and the local socket: a u32 length in the platform's byte order (little-endian on every supported target), then 1 to 65536 bytes of a UTF-8 JSON object.",
+    "max_bytes": 65536
+  }
+}

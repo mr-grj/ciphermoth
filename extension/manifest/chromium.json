@@ -1,4 +1,5 @@
 {
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtjPJ4rSs3zBqI0StI3ZbmcKvZBzymbdxFPd+0JIx35plZbuFwz+QKv7zl5rQzSo0A4Wkdgv412fcRU9rNB5LuyRGWDsfLMswDc8zX+z1zkWQ9FW4KLx9gPuPOqRIoVJCRu4XL3zJQfzRryRxu3VKb10H0La5ASDkfQUMyliad3SXyUC4zahgKv2Zkp0ODTLox86N4j1OV9bsSvwaZF/U2zc+nYvjx6Fi5vSYC2lq1gm00qjAdGb9URKW8wd+dTHWpBH/q3VsFlpD7I5aGOGsG2FmbcB164KTlzVYaM7bGqmXlxkmFUo+Tmv54Bor7NpUNbAHisxYM756CgZVsQm4sQIDAQAB",
   "minimum_chrome_version": "120",
   "background": { "service_worker": "background.js" },
   "permissions": ["offscreen"],

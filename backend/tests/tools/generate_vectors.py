@@ -23,9 +23,14 @@ from pathlib import Path
 
 import pyzipper
 from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric.x25519 import (
+    X25519PrivateKey,
+    X25519PublicKey,
+)
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.argon2 import Argon2id
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
 OUT = Path(__file__).resolve().parents[3] / "testdata" / "vectors"
 FORMAT = "ciphermoth-test-vectors/1"
@@ -544,6 +549,198 @@ def backup_v2_vectors() -> tuple[dict, bytes]:
     )
 
 
+# The browser extension's desktop channel (docs/EXTENSION.md, "Desktop mode"):
+# X25519 pairing with a commitment and a 6-digit short authentication string,
+# then one AES-256-GCM key per connection with counter nonces.
+
+CHANNEL = "ciphermoth/extension/v1"
+TO_APP = 0x01
+TO_EXTENSION = 0x02
+
+
+def b64url(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
+
+
+def lp(data: bytes) -> bytes:
+    return struct.pack(">H", len(data)) + data
+
+
+def x25519_public(private: bytes) -> bytes:
+    return (
+        X25519PrivateKey.from_private_bytes(private)
+        .public_key()
+        .public_bytes(Encoding.Raw, PublicFormat.Raw)
+    )
+
+
+def hkdf_salted(ikm: bytes, salt: bytes, info: str, length: int) -> bytes:
+    return HKDF(
+        algorithm=hashes.SHA256(), length=length, salt=salt, info=info.encode()
+    ).derive(ikm)
+
+
+def channel_seal(key: bytes, direction: int, counter: int, plaintext: bytes) -> bytes:
+    nonce = bytes([direction, 0, 0, 0]) + struct.pack(">Q", counter)
+    associated = bytes([direction]) + struct.pack(">Q", counter)
+    return AESGCM(key).encrypt(nonce, plaintext, associated)
+
+
+CHANNEL_MESSAGES = [
+    (TO_APP, 0, '{"id":1,"op":"status"}'),
+    (TO_EXTENSION, 0, '{"id":1,"ok":true,"value":{"state":"unlocked"}}'),
+    (
+        TO_APP,
+        1,
+        '{"id":2,"op":"api","route":"matches",'
+        '"body":{"origin":"https://github.com","subdomains":false}}',
+    ),
+    (TO_EXTENSION, 1, '{"id":2,"ok":true,"value":{"logins":[],"truncated":false}}'),
+]
+
+
+def channel_case(
+    name: str, ext_private: bytes, app_private: bytes, browser: str, seed: int
+) -> dict:
+    ext_public = x25519_public(ext_private)
+    app_public = x25519_public(app_private)
+    ext_nonce = fixed(seed, 16)
+    app_nonce = fixed(seed + 0x40, 16)
+    commit = hashlib.sha256(
+        lp(f"{CHANNEL}/commit".encode()) + ext_public + ext_nonce
+    ).digest()
+    transcript = hashlib.sha256(
+        lp(f"{CHANNEL}/pair".encode())
+        + lp(browser.encode())
+        + ext_public
+        + ext_nonce
+        + app_public
+        + app_nonce
+    ).digest()
+    shared = X25519PrivateKey.from_private_bytes(ext_private).exchange(
+        X25519PublicKey.from_public_bytes(app_public)
+    )
+    sas_raw = hkdf_salted(shared, transcript, f"{CHANNEL}/sas", 4)
+    pairing_key = hkdf_salted(shared, transcript, f"{CHANNEL}/channel", 32)
+    pairing_id = fixed(seed + 0x80, 16)
+    hello_ext = fixed(seed + 0xA0, 16)
+    hello_app = fixed(seed + 0xC0, 16)
+    connection_salt = hashlib.sha256(
+        lp(f"{CHANNEL}/connection".encode()) + pairing_id + hello_ext + hello_app
+    ).digest()
+    connection_key = hkdf_salted(
+        pairing_key, connection_salt, f"{CHANNEL}/connection", 32
+    )
+    return {
+        "name": name,
+        "browser": browser,
+        "extension_private_hex": ext_private.hex(),
+        "app_private_hex": app_private.hex(),
+        "extension_public": b64url(ext_public),
+        "app_public": b64url(app_public),
+        "extension_nonce": b64url(ext_nonce),
+        "app_nonce": b64url(app_nonce),
+        "commit": b64url(commit),
+        "transcript_hex": transcript.hex(),
+        "shared_hex": shared.hex(),
+        "sas": f"{int.from_bytes(sas_raw, 'big') % 1_000_000:06d}",
+        "pairing_key_hex": pairing_key.hex(),
+        "pairing_id": b64url(pairing_id),
+        "hello_extension_nonce": b64url(hello_ext),
+        "hello_app_nonce": b64url(hello_app),
+        "connection_key_hex": connection_key.hex(),
+        "messages": [
+            {
+                "direction": direction,
+                "counter": counter,
+                "plaintext": text,
+                "ciphertext": b64url(
+                    channel_seal(connection_key, direction, counter, text.encode())
+                ),
+            }
+            for direction, counter, text in CHANNEL_MESSAGES
+        ],
+    }
+
+
+def extension_channel_vectors() -> dict:
+    cases = [
+        channel_case("chrome", fixed(0x10, 32), fixed(0x50, 32), "Chrome", 0x01),
+        channel_case("firefox", fixed(0x90, 32), fixed(0xD0, 32), "Firefox", 0x33),
+    ]
+    first = cases[0]["messages"][0]
+    sealed = base64.urlsafe_b64decode(first["ciphertext"] + "==")
+    flipped = bytes([sealed[0] ^ 0x01]) + sealed[1:]
+    other_key = bytes.fromhex(cases[1]["connection_key_hex"])
+    refused = [
+        {
+            "reason": "a flipped ciphertext bit",
+            "direction": TO_APP,
+            "counter": 0,
+            "ciphertext": b64url(flipped),
+        },
+        {
+            "reason": "a replay: sealed as message 0, read as message 1",
+            "direction": TO_APP,
+            "counter": 1,
+            "ciphertext": first["ciphertext"],
+        },
+        {
+            "reason": "a reflection: sealed toward the app, read as toward the extension",
+            "direction": TO_EXTENSION,
+            "counter": 0,
+            "ciphertext": first["ciphertext"],
+        },
+        {
+            "reason": "sealed with another connection's key",
+            "direction": TO_APP,
+            "counter": 0,
+            "ciphertext": b64url(
+                channel_seal(other_key, TO_APP, 0, first["plaintext"].encode())
+            ),
+        },
+    ]
+    return doc(
+        "extension-channel",
+        "The desktop channel between the browser extension and the CipherMoth app "
+        "(docs/EXTENSION.md). lp(x) = u16be(len(x)) || x. Pairing: the extension "
+        "sends commit = SHA-256(lp('ciphermoth/extension/v1/commit') || E_x || N_x) "
+        "before it learns the app's key, the app answers E_a and N_a, the extension "
+        "reveals E_x and N_x. T = SHA-256(lp('ciphermoth/extension/v1/pair') || "
+        "lp(browser) || E_x || N_x || E_a || N_a); Z = X25519(own private, peer "
+        "public), refused when all zero (low-order points); sas = "
+        "u32be(HKDF-SHA256(salt=T, ikm=Z, info='ciphermoth/extension/v1/sas', L=4)) "
+        "mod 1000000 as six digits; pairing key = HKDF-SHA256(salt=T, ikm=Z, "
+        "info='ciphermoth/extension/v1/channel', L=32). Each connection: the "
+        "extension sends the pairing id and M_x, the app answers M_a; C = "
+        "SHA-256(lp('ciphermoth/extension/v1/connection') || id || M_x || M_a); "
+        "connection key = HKDF-SHA256(salt=C, ikm=pairing key, "
+        "info='ciphermoth/extension/v1/connection', L=32). Message n in direction d "
+        "(1 = to the app, 2 = to the extension) is AES-256-GCM with nonce d || "
+        "000000 || u64be(n) and associated data d || u64be(n); each direction counts "
+        "from 0 per connection and a message is read only with the next counter. "
+        "Keys, nonces, ids and ciphertexts are unpadded base64url; private keys and "
+        "derived secrets are hex.",
+        cases=cases,
+        refused=refused,
+        low_order_points=[
+            b64url(bytes(32)),
+            b64url(bytes([1]) + bytes(31)),
+            b64url(
+                bytes.fromhex(
+                    "e0eb7a7c3b41b8ae1656e3faf19fc46ada098deb9c32b1fd866205165f49b800"
+                )
+            ),
+        ],
+        framing={
+            "description": "Native messaging and the local socket: a u32 length in "
+            "the platform's byte order (little-endian on every supported target), "
+            "then 1 to 65536 bytes of a UTF-8 JSON object.",
+            "max_bytes": 65536,
+        },
+    )
+
+
 def outputs() -> tuple[dict[str, dict], dict[str, bytes]]:
     backup_doc, backup_zip = backup_vectors()
     backup_v2_doc, backup_v2_file = backup_v2_vectors()
@@ -553,6 +750,7 @@ def outputs() -> tuple[dict[str, dict], dict[str, bytes]]:
             "backup_zip.json": backup_doc,
             "vault-v2.json": vault_v2_vectors(),
             "backup-v2.json": backup_v2_doc,
+            "extension-channel.json": extension_channel_vectors(),
         },
         {"backup-v1.zip": backup_zip, "backup-v2.cmbackup": backup_v2_file},
     )

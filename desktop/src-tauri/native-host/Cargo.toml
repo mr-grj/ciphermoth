@@ -1,0 +1,21 @@
+[package]
+name = "ciphermoth-native-host"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "The native-messaging host of the CipherMoth browser extension: relays between the browser and the running desktop app."
+
+[dependencies]
+ciphermoth-extension-link = { path = "../extension-link" }
+serde_json = "1"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[features]
+default = []
+# The QA identity (com.ciphermoth.desktop.qa, below CIPHERMOTH_QA_ROOT).
+qa = []
+
+[dev-dependencies]
+tempfile = "3"
