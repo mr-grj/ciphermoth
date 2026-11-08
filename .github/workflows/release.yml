@@ -277,9 +277,12 @@ jobs:
           mkdir -p desktop/core/dist/ciphermoth-core frontend/dist
           echo '<!doctype html>' > frontend/dist/index.html
           cd desktop/src-tauri
-          cargo build --release --example verify_update
+          # A debug build: a release build of the app crate needs the real
+          # native host (build.rs), which this job does not build; the
+          # signature check is the same.
+          cargo build --example verify_update
           cd ../..
-          python desktop/release/manifest.py --artifacts release-assets --version "$RELEASE_VERSION" --commit "$GITHUB_SHA" --verifier desktop/src-tauri/target/release/examples/verify_update --public-key release-assets/updater.pub
+          python desktop/release/manifest.py --artifacts release-assets --version "$RELEASE_VERSION" --commit "$GITHUB_SHA" --verifier desktop/src-tauri/target/debug/examples/verify_update --public-key release-assets/updater.pub
           cd release-assets && sha256sum -c SHA256SUMS
       - uses: actions/download-artifact@v4
         with:
