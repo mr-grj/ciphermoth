@@ -93,6 +93,13 @@ fn refuse(writer: &mut Stream, code: &str) -> Flow {
     Flow::Closed
 }
 
+// Frees the pairing slot before the browser hears the answer: an extension
+// that pairs again right after a refusal must not find it still taken.
+fn refuse_released(guard: PairingGuard<'_>, writer: &mut Stream, code: &str) -> Flow {
+    drop(guard);
+    refuse(writer, code)
+}
+
 fn failure(id: u64, code: &str, detail: &str) -> Value {
     json!({"id": id, "ok": false, "code": code, "detail": detail})
 }
@@ -276,7 +283,7 @@ impl<D: Desktop> Link<D> {
         if self.pairing.swap(true, Ordering::SeqCst) {
             return Ok(refuse(writer, "busy"));
         }
-        let _guard = PairingGuard(&self.pairing);
+        let guard = PairingGuard(&self.pairing);
         let app = Exchange::new();
         let app_nonce = channel::random::<16>();
         send(
@@ -293,16 +300,20 @@ impl<D: Desktop> Link<D> {
             has_exactly(&reveal, &["pub", "nonce"]),
             kind(&reveal),
         ) else {
-            return Ok(refuse(writer, "protocol"));
+            return Ok(refuse_released(guard, writer, "protocol"));
         };
         if channel::commit(&public, &nonce) != committed {
-            return Ok(refuse(writer, "protocol"));
+            return Ok(refuse_released(guard, writer, "protocol"));
         }
         let transcript = channel::transcript(browser, &public, &nonce, &app.public, &app_nonce);
         let Ok(paired) = app.finish(&public, &transcript) else {
-            return Ok(refuse(writer, "protocol"));
+            return Ok(refuse_released(guard, writer, "protocol"));
         };
-        if !self.desktop.approve(browser, &paired.sas) {
+        let approved = self.desktop.approve(browser, &paired.sas);
+        // The dialog is answered: the next browser may pair (the store has
+        // its own lock).
+        drop(guard);
+        if !approved {
             return Ok(refuse(writer, "denied"));
         }
         if !self.desktop.store().enabled() {
