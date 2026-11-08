@@ -16,6 +16,7 @@ The browser extension now fills from the desktop app too.
 
 ### Fixed
 
+- Desktop app: adding a security key in **Settings → Security** no longer gets stuck at "Enter your security key's PIN" (the PIN field took no typing because the Settings dialog kept the focus).
 - The desktop core no longer leaves a request unanswered when it carries an extension session's token (the native session-deadline lookup refused the token's scope instead of ignoring it).
 
 ### Changed

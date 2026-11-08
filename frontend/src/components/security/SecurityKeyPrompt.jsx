@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Backdrop, Box, Button, Stack, TextField, Typography } from "@mui/material";
+import { Box, Button, Modal, Stack, TextField, Typography } from "@mui/material";
 import UsbIcon from "@mui/icons-material/Usb";
 
 import useSecurityKeyPrompt from "../../hooks/useSecurityKeyPrompt";
@@ -52,13 +52,30 @@ const PinForm = ({ pin }) => {
 };
 
 // The desktop app's security key prompt: the key's PIN, then "touch your key".
-// Browsers show their own.
+// Browsers show their own. A Modal, not a bare Backdrop: an open dialog (adding a
+// key in Settings) keeps focus inside itself unless the prompt is a modal above
+// it, and the PIN field took no typing.
 const SecurityKeyPrompt = () => {
   const state = useSecurityKeyPrompt();
   if (!IS_DESKTOP) return null;
+  const close = (_event, reason) => {
+    if (reason !== "escapeKeyDown") return;
+    if (state?.pin) state.pin.cancel();
+    else cancelSecurityKey();
+  };
   return (
-    <Backdrop open={Boolean(state)} sx={{ zIndex: (t) => t.zIndex.modal + 10 }}>
+    <Modal
+      open={Boolean(state)}
+      onClose={close}
+      sx={{
+        zIndex: (t) => t.zIndex.modal + 10,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
       <Box
+        tabIndex={-1}
         role="alertdialog"
         aria-live="assertive"
         aria-label={state?.message}
@@ -71,6 +88,7 @@ const SecurityKeyPrompt = () => {
           width: 340,
           textAlign: "center",
           boxShadow: 12,
+          outline: "none",
         }}
       >
         <Box
@@ -107,7 +125,7 @@ const SecurityKeyPrompt = () => {
           </>
         )}
       </Box>
-    </Backdrop>
+    </Modal>
   );
 };
 

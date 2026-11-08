@@ -1,8 +1,8 @@
 // Build ciphermoth-native-host for this machine and put it where Tauri's
 // bundle.externalBin expects it (src-tauri/binaries/<name>-<target triple>), so
 // every package ships it next to the app executable. Run by beforeBuildCommand
-// (release), tauri.qa.json (--qa: the QA identity) and beforeDevCommand
-// (--debug: the development identity).
+// (release; debug for `tauri build --debug`), tauri.qa.json (--qa: the QA
+// identity) and beforeDevCommand (--debug: the development identity).
 //
 //   node build-native-host.mjs [--qa] [--debug]
 
@@ -18,7 +18,11 @@ for (const arg of args) {
 const here = dirname(fileURLToPath(import.meta.url));
 const crate = join(here, "src-tauri");
 const triple = /^host: (\S+)$/m.exec(execFileSync("rustc", ["-vV"], { cwd: crate }).toString())[1];
-const profile = args.has("--debug") ? "debug" : "release";
+// `tauri build --debug` runs beforeBuildCommand with TAURI_ENV_DEBUG=true: a
+// debug app (development identity) needs a debug host, or the host it ships
+// (release = production identity) talks to the real app's socket instead.
+const debug = args.has("--debug") || process.env.TAURI_ENV_DEBUG === "true";
+const profile = debug ? "debug" : "release";
 const cargo = ["build", "-p", "ciphermoth-native-host", "--locked"];
 if (profile === "release") cargo.push("--release");
 if (args.has("--qa")) cargo.push("--features", "qa");
