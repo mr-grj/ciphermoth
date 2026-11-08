@@ -245,6 +245,41 @@ test("Unpair in the extension removes the browser in the app too", async () => {
   await expect(page.getByRole("button", { name: "Pair" })).toBeVisible();
 });
 
+// Chromium gives a running service worker no connectNative for a permission
+// granted after it started; the extension then reloads itself (restart.ts),
+// which closes the settings, and a one-shot marker reopens them. Playwright
+// cannot answer the permission prompt, and an extension loaded with
+// --load-extension does not come back from runtime.reload(), so this stops the
+// worker over CDP instead: the next one starts as after a reload.
+test("a worker started with the restart marker reopens the settings once", async () => {
+  const own = await launch(stack);
+  try {
+    await own.worker.evaluate(() => chrome.storage.local.set({ reopenOptions: true }));
+    const page = await own.context.newPage();
+    const cdp = await own.context.newCDPSession(page);
+    await cdp.send("ServiceWorker.enable");
+    await cdp.send("ServiceWorker.stopAllWorkers");
+    const reopened = own.context.waitForEvent("page", {
+      predicate: (p) => p.url().endsWith("/options.html"),
+      timeout: 15_000,
+    });
+    // Any extension page wakes the worker.
+    await page.goto(`chrome-extension://${own.extensionId}/popup.html`);
+    const settings = await reopened;
+    await expect
+      .poll(() => settings.evaluate(async () => Object.keys(await chrome.storage.local.get(null))))
+      .not.toContain("reopenOptions");
+    // Once: the next start leaves the settings closed.
+    await settings.close();
+    await cdp.send("ServiceWorker.stopAllWorkers");
+    await page.reload();
+    await page.waitForTimeout(1_500);
+    expect(own.context.pages().filter((p) => p.url().endsWith("/options.html"))).toEqual([]);
+  } finally {
+    await own.close();
+  }
+});
+
 test("the profile holds no secret from the vault or the channel", async () => {
   await browser.close();
   const canaries = [GITHUB_PASSWORD, "moth@example.com"];

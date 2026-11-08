@@ -23,6 +23,7 @@ import {
   unlock,
   useDesktop,
 } from "./session";
+import { resumeAfterRestart } from "./restart";
 import { getConfig, getHandoff, restrictSessionStorage, setConfig } from "./storage";
 import { ext } from "../shared/browser";
 import { E2E } from "../shared/constants";
@@ -184,6 +185,7 @@ ext.runtime.onInstalled.addListener((details) => {
 });
 
 void restrictSessionStorage();
+void resumeAfterRestart();
 
 if (E2E) {
   // Test build only (scripts/build.mjs --test): lets Playwright press the

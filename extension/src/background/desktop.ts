@@ -12,6 +12,8 @@
 
 import { ApiError } from "./api";
 import { type Pairing, deletePairing, loadPairing, savePairing } from "./pairing-store";
+import { reportUnexpected } from "./report";
+import { nativeMessagingReady, restart } from "./restart";
 import { ext } from "../shared/browser";
 import {
   Channel,
@@ -43,6 +45,8 @@ export const APP_NOT_RUNNING = "app_not_running";
 export const UNPAIRED = "unpaired";
 const APP_CLOSED = "app_closed";
 const PROTOCOL = "protocol";
+const NO_PERMISSION = "no_permission";
+const RESTARTING = "restarting";
 
 export const MESSAGES: Record<string, string> = {
   [NO_HOST]:
@@ -51,6 +55,9 @@ export const MESSAGES: Record<string, string> = {
   [APP_CLOSED]: "The CipherMoth app closed the connection.",
   [UNPAIRED]: "This browser isn't paired with the CipherMoth app.",
   [PROTOCOL]: "The CipherMoth app and this extension don't understand each other. Update both.",
+  [NO_PERMISSION]:
+    "CipherMoth needs your permission to talk to the app. Allow it in the extension's settings.",
+  [RESTARTING]: "CipherMoth is finishing its setup. Open it again in a moment.",
   locked: "CipherMoth is locked. Unlock it first.",
   denied: "Pairing wasn't allowed in CipherMoth.",
   busy: "CipherMoth is pairing another browser. Try again in a moment.",
@@ -157,6 +164,14 @@ class Port {
   }
 }
 
+// A port to the host, once the browser lets this worker open one (see restart.ts).
+const openPort = async (): Promise<Port> => {
+  if (nativeMessagingReady()) return new Port();
+  if (!(await hasNativePermission())) throw failure(NO_PERMISSION);
+  await restart({ reopenOptions: false });
+  throw failure(RESTARTING);
+};
+
 // An answer that is not part of the protocol: the host's own errors and the
 // app's refusals become errors with their code.
 const answerOf = (message: Envelope, type: string): Envelope => {
@@ -209,7 +224,7 @@ const connect = async (): Promise<Live> => {
   if (live && !live.port.closed) return live;
   const pairing = await loadPairing();
   if (!pairing) throw failure(UNPAIRED);
-  const port = new Port();
+  const port = await openPort();
   try {
     live = { port, channel: await hello(port, pairing), nextId: 1 };
     return live;
@@ -293,6 +308,7 @@ const pairingFailed = (state: PairingState, error: unknown): void => {
   state.port?.close();
   state.port = null;
   state.code = null;
+  if (!(error instanceof ApiError)) reportUnexpected(error);
   state.error = error instanceof ApiError ? error.message : MESSAGES[PROTOCOL]!;
 };
 
@@ -320,7 +336,7 @@ const awaitApproval = async (state: PairingState, port: Port, pairingKey: Crypto
 export const startPairing = async (browser: string): Promise<void> => {
   cancelPairing();
   drop();
-  const port = new Port();
+  const port = await openPort();
   const state: PairingState = { code: null, error: null, port };
   pairing = state;
   try {
@@ -345,7 +361,10 @@ export const startPairing = async (browser: string): Promise<void> => {
     state.code = paired.sas;
     void awaitApproval(state, port, paired.pairingKey);
   } catch (error) {
-    pairingFailed(state, error);
+    // The caller reports it; keeping it for the next status too showed it
+    // twice in the settings, and again after the app was unlocked.
+    state.port?.close();
+    if (pairing === state) pairing = null;
     throw error;
   }
 };
@@ -400,10 +419,11 @@ export const desktopPhase = async (): Promise<{
     if (code === NO_HOST) return { phase: "no-host", ...none };
     if (code === APP_NOT_RUNNING || code === APP_CLOSED) return { phase: "no-app", ...none };
     if (code === UNPAIRED) return { phase: "unpaired", ...none };
+    if (!(error instanceof ApiError)) reportUnexpected(error);
     return {
       phase: "offline",
       code: null,
-      error: error instanceof Error ? error.message : "Something went wrong.",
+      error: error instanceof ApiError ? error.message : "Something went wrong.",
     };
   }
 };
@@ -411,7 +431,7 @@ export const desktopPhase = async (): Promise<{
 // "Open CipherMoth": the host starts the app.
 export const launchApp = async (): Promise<void> => {
   drop();
-  const port = new Port();
+  const port = await openPort();
   try {
     port.send({ t: "launch" });
     answerOf(await port.next(STEP_MS), "launched");

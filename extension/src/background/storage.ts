@@ -1,7 +1,8 @@
 // Where the extension keeps state (docs/EXTENSION.md, "Where state lives").
 //
 // storage.local holds only the configuration (the vault's addresses, two
-// preferences) and a random installation id. No secret, token or entry name.
+// preferences), a random installation id and, for a moment, the restart.ts
+// marker that reopens the settings. No secret, token or entry name.
 // storage.session lives in memory only, is cleared when the browser exits and
 // is readable by extension pages only (TRUSTED_CONTEXTS): the session token,
 // its deadline, a pending handoff and the digest of the last copied value.

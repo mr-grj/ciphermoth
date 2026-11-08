@@ -164,6 +164,9 @@ const Connection = ({ status, reload }: { status: Status; reload: () => void }) 
   );
 };
 
+const NEEDS_NATIVE_PERMISSION =
+  "CipherMoth needs your permission to talk to the app on this computer.";
+
 const DESKTOP_STATES: Partial<Record<Status["phase"], string>> = {
   unlocked: "Paired · CipherMoth is unlocked",
   locked: "Paired · CipherMoth is locked",
@@ -210,10 +213,34 @@ const DesktopConnection = ({ status, reload }: { status: Status; reload: () => v
     reload();
   };
 
+  // The permission was removed (in the browser's extension settings): ask again.
+  const allow = async () => {
+    setMessage(null);
+    const granted = await ext.permissions
+      .request({ permissions: ["nativeMessaging"] })
+      .catch(() => false);
+    if (!granted) {
+      setMessage({ text: NEEDS_NATIVE_PERMISSION, bad: true });
+      return;
+    }
+    await send<Status>({ type: "use-desktop" }).catch(() => undefined);
+    reload();
+  };
+
   const state = DESKTOP_STATES[status.phase];
   return (
     <section aria-labelledby="desktop">
       <h2 id="desktop">CipherMoth app</h2>
+      {status.phase === "setup" && (
+        <>
+          <p>{NEEDS_NATIVE_PERMISSION}</p>
+          <div class="buttons">
+            <button class="button primary" onClick={() => void allow()}>
+              Allow
+            </button>
+          </div>
+        </>
+      )}
       {status.phase === "unsupported" && (
         <p class="error" role="alert">
           This browser can't pair with the CipherMoth app. Update to Chrome 133, Firefox 130 or
@@ -261,13 +288,16 @@ const DesktopConnection = ({ status, reload }: { status: Status; reload: () => v
           </div>
         </>
       )}
-      {status.phase !== "unpaired" && !pairing && status.phase !== "unsupported" && (
-        <div class="buttons">
-          <button class="button danger" type="button" onClick={disconnect}>
-            Unpair
-          </button>
-        </div>
-      )}
+      {status.phase !== "unpaired" &&
+        !pairing &&
+        status.phase !== "unsupported" &&
+        status.phase !== "setup" && (
+          <div class="buttons">
+            <button class="button danger" type="button" onClick={disconnect}>
+              Unpair
+            </button>
+          </div>
+        )}
       {message && (
         <p
           class={message.bad ? "error" : ""}
@@ -300,7 +330,7 @@ const Mode = ({ status, reload }: { status: Status; reload: () => void }) => {
       .catch(() => false);
     if (!granted) {
       setChosen(status.mode ?? "server");
-      setError("CipherMoth needs your permission to talk to the app on this computer.");
+      setError(NEEDS_NATIVE_PERMISSION);
       return;
     }
     try {

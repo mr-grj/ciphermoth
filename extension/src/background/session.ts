@@ -17,7 +17,16 @@ import {
   asUnlock,
   request,
 } from "./api";
-import { api as desktopApi, desktopPhase, forgetDesktop, lockApp, unpair } from "./desktop";
+import {
+  api as desktopApi,
+  desktopPhase,
+  forgetDesktop,
+  hasNativePermission,
+  lockApp,
+  unpair,
+} from "./desktop";
+import { reportUnexpected } from "./report";
+import { nativeMessagingReady, restart } from "./restart";
 import {
   type Config,
   getConfig,
@@ -141,6 +150,7 @@ export const messageOf = (error: unknown): string => {
     }
     return error.message;
   }
+  reportUnexpected(error);
   return "Something went wrong.";
 };
 
@@ -263,6 +273,11 @@ export const useDesktop = async (): Promise<Status> => {
     strictClipboard: previous?.strictClipboard ?? false,
   };
   await setConfig(config);
+  // The permission was just granted: this worker may not see it yet.
+  if (!nativeMessagingReady() && (await hasNativePermission())) {
+    await restart({ reopenOptions: true, force: true });
+    return status(config, { phase: "unpaired" });
+  }
   return desktopStatus(config);
 };
 
