@@ -62,15 +62,18 @@ In each browser:
 
 - [ ] **Choose "CipherMoth app on this computer"** in the extension's settings: the browser
       asks to "communicate with cooperating native applications" (Firefox: "Exchange
-      messages with programs other than Firefox"). Nothing else is asked.
-- [ ] **Pair**: the popup and the app's dialog show the **same six digits**. **Don't
+      messages with programs other than Firefox"). Nothing else is asked. Chrome and Brave
+      then close and reopen the settings (the background restarts to use the permission).
+- [ ] **Pair right away** after choosing (no "Something went wrong."), then: the popup
+      and the app's dialog show the **same six digits**. **Don't
       allow** → the popup says pairing wasn't allowed and nothing is paired. Pair again,
       **Allow** → the popup lists logins; the app's Settings lists the browser.
 - [ ] **Fill, copy, 2FA and the shortcut** work as in server mode (section 1).
 - [ ] **App locked** (Log out, ⌘/Ctrl+Shift+L in the app, or its inactivity timeout): the
       popup says "CipherMoth is locked". **Unlock CipherMoth** brings the app forward;
       unlock with the master password, then (on separate tries) the **YubiKey** and
-      **Touch ID**; the popup works again when reopened, without pairing again.
+      **Touch ID**; the popup works again when reopened, without pairing again. (Adding
+      the YubiKey in Settings → Security: its PIN field takes typing; Escape cancels.)
 - [ ] **Lock CipherMoth** (🔒 in the popup) locks the app.
 - [ ] **Quit the app**: the popup says "CipherMoth isn't running"; **Open CipherMoth**
       starts it.
@@ -81,7 +84,8 @@ In each browser:
       desktop mode the pairing is still there.
 - [ ] **No token in the browser**: in the extension's background console,
       `chrome.storage.session.get()` (Firefox: `browser.storage.session.get()`) holds no
-      `session`, and `chrome.storage.local.get()` only `config`.
+      `session`, and `chrome.storage.local.get()` only `config` (and `installId`, a random
+      non-secret id, once server mode was used; never `reopenOptions` after the restart).
 
 ## 2. Real sites
 
