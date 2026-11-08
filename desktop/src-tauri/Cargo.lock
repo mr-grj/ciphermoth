@@ -649,7 +649,7 @@ dependencies = [
 
 [[package]]
 name = "ciphermoth-desktop"
-version = "3.7.0"
+version = "3.7.1"
 dependencies = [
  "arboard",
  "base64 0.22.1",

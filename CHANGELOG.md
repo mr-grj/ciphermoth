@@ -1,8 +1,8 @@
 # Changelog
 
-## [3.7.0] - 2026-11-08
+## [3.7.1] - 2026-11-08
 
-The browser extension now fills from the desktop app too.
+The browser extension now fills from the desktop app too. (v3.7.0 was tagged but never published: its release workflow stopped before publishing. This release contains everything intended for it.)
 
 ### Added
 
@@ -18,6 +18,8 @@ The browser extension now fills from the desktop app too.
 
 - Desktop app: adding a security key in **Settings → Security** no longer gets stuck at "Enter your security key's PIN" (the PIN field took no typing because the Settings dialog kept the focus).
 - The desktop core no longer leaves a request unanswered when it carries an extension session's token (the native session-deadline lookup refused the token's scope instead of ignoring it).
+- Desktop mode: pairing a browser again right after **Don't allow** could briefly be refused with "CipherMoth is pairing another browser".
+- Release workflow: the publish step built its update-signature verifier in release mode, which now needs the native host; it builds it in debug mode (same check).
 
 ### Changed
 
