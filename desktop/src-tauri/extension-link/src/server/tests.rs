@@ -153,6 +153,18 @@ impl Rig {
         let start = client::pair_commit(&mut stream, "Chrome").unwrap();
         let revealed = client::pair_reveal(&mut stream, start).unwrap().unwrap();
         let id = client::pair_result(&mut stream).unwrap().unwrap();
+        // The app stores the pairing just after sending "paired" (so a browser
+        // that went away leaves none). The extension goes on over the same
+        // connection, which the app reads only after storing; these tests open
+        // a new one, which could arrive first on a busy runner.
+        let deadline = std::time::Instant::now() + Duration::from_secs(10);
+        while self.fake().store.find(&id).is_none() {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "the pairing was never stored"
+            );
+            std::thread::sleep(Duration::from_millis(5));
+        }
         (id, revealed.key, revealed.sas)
     }
 
