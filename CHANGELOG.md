@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [3.7.0] - 2026-11-08
 
 The browser extension now fills from the desktop app too.
 
