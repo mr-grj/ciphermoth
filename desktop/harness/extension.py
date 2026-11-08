@@ -294,9 +294,15 @@ def linux_strangers(path: Path) -> dict:
         "try:\n s.connect(sys.argv[1])\n"
         "except OSError as e:\n print('refused',e.errno);sys.exit(0)\n"
         'b=b\'{"t":"host","caller":"chrome-extension://%s/","version":"1"}\'%sys.argv[2].encode()\n'
-        "s.sendall(struct.pack('=I',len(b))+b)\n"
-        "s.settimeout(10)\n"
-        "print('answer',len(s.recv(4096)))\n"
+        # Closed unread: an end of file, or a reset when our frame was still
+        # unread in the app's buffer (Linux answers that close with RST).
+        "try:\n"
+        " s.sendall(struct.pack('=I',len(b))+b)\n"
+        " s.settimeout(10)\n"
+        " d=s.recv(4096)\n"
+        "except (ConnectionResetError,BrokenPipeError):\n"
+        " d=b''\n"
+        "print('answer',len(d))\n"
     )
     results = {}
     for name, prefix in (

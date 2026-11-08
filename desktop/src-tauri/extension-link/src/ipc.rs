@@ -461,6 +461,48 @@ mod windows {
         }
     }
 
+    /// `sddl` as Windows writes it back: a SID that has an alias comes out as
+    /// the alias (the built-in Administrator, which GitHub's Windows runners
+    /// run as, is "LA"), so tests compare trustees in this form.
+    #[cfg(test)]
+    pub fn sddl_round_trip(sddl: &str) -> io::Result<String> {
+        use windows_sys::Win32::Security::Authorization::ConvertSecurityDescriptorToStringSecurityDescriptorW;
+        use windows_sys::Win32::Security::DACL_SECURITY_INFORMATION;
+        let mut raw = null_mut();
+        // SAFETY: NUL-terminated SDDL; the descriptor is freed by Descriptor.
+        if unsafe {
+            ConvertStringSecurityDescriptorToSecurityDescriptorW(
+                wide(sddl).as_ptr(),
+                SDDL_REVISION_1,
+                &mut raw,
+                null_mut(),
+            )
+        } == 0
+        {
+            return Err(io::Error::last_os_error());
+        }
+        let descriptor = Descriptor(raw);
+        let mut text = null_mut();
+        let mut len = 0;
+        // SAFETY: valid descriptor; the string is freed with LocalFree.
+        if unsafe {
+            ConvertSecurityDescriptorToStringSecurityDescriptorW(
+                descriptor.0,
+                SDDL_REVISION_1,
+                DACL_SECURITY_INFORMATION,
+                &mut text,
+                &mut len,
+            )
+        } == 0
+        {
+            return Err(io::Error::last_os_error());
+        }
+        let out =
+            String::from_utf16_lossy(unsafe { std::slice::from_raw_parts(text, len as usize) });
+        unsafe { LocalFree(text.cast()) };
+        Ok(out.trim_end_matches('\0').to_string())
+    }
+
     struct Descriptor(PSECURITY_DESCRIPTOR);
     impl Drop for Descriptor {
         fn drop(&mut self) {
@@ -839,7 +881,12 @@ mod windows_tests {
             dacl.starts_with("D:P"),
             "protected, nothing inherited: {dacl}"
         );
-        assert!(dacl.contains(&sid), "{dacl}");
+        // The one allowed trustee is this user, as Windows writes it (a SID, or
+        // "LA" when the tests run as the built-in Administrator).
+        let trustee = |sddl: &str| sddl.rsplit(';').next().unwrap_or("").to_string();
+        let me = sddl_round_trip(&format!("D:P(A;;GA;;;{sid})")).unwrap();
+        assert_eq!(trustee(&dacl), trustee(&me), "{dacl} vs {me}");
+        assert!(trustee(&dacl).len() > 1, "{dacl}");
         for other in [";WD)", ";AU)", ";BU)", ";AN)", ";NU)"] {
             assert!(!dacl.contains(other), "{other} in {dacl}");
         }

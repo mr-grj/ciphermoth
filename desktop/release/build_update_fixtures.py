@@ -73,10 +73,20 @@ def main():
     try:
         for version in sys.argv[2:] or ("3.0.99", "3.0.98"):
             for name, data in original.items():
-                if name.endswith("Cargo.lock"):
-                    continue
                 path = ROOT / name
                 text = data.decode()
+                if name.endswith("Cargo.lock"):
+                    # build-native-host.mjs builds with --locked, which refuses
+                    # a lock file that disagrees with the app's Cargo.toml.
+                    locked, count = re.subn(
+                        r'(name = "ciphermoth-desktop"\r?\nversion = ")[^"\r\n]+(")',
+                        lambda m, version=version: f"{m[1]}{version}{m[2]}",
+                        text,
+                    )
+                    if count != 1:
+                        raise SystemExit("ciphermoth-desktop not found in Cargo.lock")
+                    path.write_bytes(locked.encode())
+                    continue
                 if name.endswith(".json"):
                     config = json.loads(text)
                     config["version"] = version
