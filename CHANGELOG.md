@@ -1,5 +1,20 @@
 # Changelog
 
+## [Unreleased]
+
+Dependency security fixes; no change to what the app or the extension does.
+
+### Security
+
+- **Desktop updater (Windows):** `tauri-plugin-updater` 2.14.1 moves to `zip` 9.5.0, fixing GHSA-m665-v7pm-7grj (critical: parser differential between ZIP headers), GHSA-q7v9-x93c-xqv3 (unbounded symlink targets) and GHSA-8hxf-qr8p-62x4 (AES entry authentication bypass on early EOF). Updates were already signature-checked before extraction, so exploiting these needed the release signing key too.
+- **Desktop app (Linux):** Tauri 2 still requires `glib` 0.18, whose `VariantStrIter` is unsound (RUSTSEC-2024-0429 / GHSA-wrw7-89jp-8q8g, fixed upstream only in 0.20). The app now builds a vendored `glib` 0.18.5 carrying the upstream one-line fix (`desktop/src-tauri/vendor/`).
+- **Extension build tooling:** `web-ext`'s linter uses `deepmerge` 4.3.1 (GHSA-gcqx-w48m-w2h4, prototype poisoning; no fixed release). A vendored copy writes merged keys as own properties (`extension/vendor/`). Development only: the extension packages are byte-identical to 3.7.1's.
+
+### Fixed
+
+- Desktop QA harness: the native harness retries reading its report when Windows refuses the file mid-rename (#67).
+- Extension e2e: the unlock test waits for the search box to take focus instead of reading it once.
+
 ## [3.7.1] - 2026-11-08
 
 The browser extension now fills from the desktop app too. (v3.7.0 was tagged but never published: its release workflow stopped before publishing. This release contains everything intended for it.)

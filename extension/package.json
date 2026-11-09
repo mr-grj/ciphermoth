@@ -24,7 +24,8 @@
   "overrides": {
     "@typescript-eslint/typescript-estree": {
       "minimatch": "11.0.4"
-    }
+    },
+    "deepmerge": "$deepmerge"
   },
   "devDependencies": {
     "@eslint/js": "9.39.5",
@@ -32,6 +33,7 @@
     "@fontsource/space-mono": "5.3.0",
     "@playwright/test": "1.64.1",
     "@types/chrome": "0.3.7",
+    "deepmerge": "file:vendor/deepmerge",
     "esbuild": "0.28.2",
     "eslint": "9.39.5",
     "globals": "17.14.0",

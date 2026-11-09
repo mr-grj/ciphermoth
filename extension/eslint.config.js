@@ -43,6 +43,8 @@ export default tseslint.config(
       "dist-test/**",
       "dist-dev/**",
       "node_modules/**",
+      // Third-party code patched for a security fix (vendor/README.md).
+      "vendor/**",
       "test-results/**",
       "playwright-report/**",
     ],
