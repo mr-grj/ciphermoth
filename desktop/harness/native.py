@@ -79,7 +79,13 @@ def wait_report(path, process, timeout=240, dialogs=False, started=None):
     stages = set()
     while time.monotonic() < deadline:
         if path.exists():
-            report = json.loads(path.read_text(encoding="utf-8"))
+            try:
+                report = json.loads(path.read_text(encoding="utf-8"))
+            except (PermissionError, json.JSONDecodeError):
+                # Windows refuses to open a file while the app renames over
+                # it; the next poll reads the finished one.
+                time.sleep(0.05)
+                continue
             stage = report.get("stage")
             if stage == "interactive" and interactive is None:
                 interactive = round(time.monotonic() - started, 3)
