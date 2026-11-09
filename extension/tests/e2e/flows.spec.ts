@@ -94,7 +94,8 @@ test("unlock with the master password, and a wrong one is refused", async () => 
   expect(await sessionToken(browser)).toBeNull();
   await unlockInPopup(popup);
   await expect(popup.getByPlaceholder("Search logins")).toBeVisible();
-  expect(await popup.evaluate(() => document.activeElement?.id)).toBe("search");
+  // The list view focuses its search box in an effect, just after it shows.
+  await expect(popup.getByPlaceholder("Search logins")).toBeFocused();
   expect(await sessionToken(browser)).toMatch(/^[A-Za-z0-9_-]{43}$/);
   const sessions = await api(stack, "/extension/sessions", { method: "GET", token: webToken });
   expect(sessions.body).toEqual([expect.objectContaining({ browser: "Chromium" })]);
