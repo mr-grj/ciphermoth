@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [3.8.0] - 2026-11-09
 
 Dependency security fixes; no change to what the app or the extension does.
 
