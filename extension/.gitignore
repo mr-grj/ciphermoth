@@ -5,3 +5,5 @@ dist-dev/
 test-results/
 playwright-report/
 .e2e/
+# The vendored packages ship their published build output (vendor/README.md).
+!vendor/*/dist/
