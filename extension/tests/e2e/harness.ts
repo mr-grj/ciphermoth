@@ -398,6 +398,7 @@ export const launch = async (
     otherExtension = false,
     env,
     before,
+    scale,
   }: {
     profile?: string;
     otherExtension?: boolean;
@@ -405,6 +406,8 @@ export const launch = async (
     env?: Record<string, string>;
     // Runs with the profile folder before the browser starts.
     before?: (profile: string) => void;
+    // Device pixels per CSS pixel (screenshots for the store).
+    scale?: number;
   } = {}
 ): Promise<Browser> => {
   const dir = profile ?? mkdtempSync(join(tmpdir(), "cm-ext-profile-"));
@@ -415,6 +418,7 @@ export const launch = async (
     ...(env ? { env: { ...process.env, ...env } as Record<string, string> } : {}),
     headless: !process.env.HEADED,
     viewport: { width: 1100, height: 760 },
+    ...(scale ? { deviceScaleFactor: scale } : {}),
     args: [
       `--disable-extensions-except=${extensions}`,
       `--load-extension=${extensions}`,

@@ -1,6 +1,7 @@
 // Screenshots of every popup state in light and dark, for review and the store
 // listing: SCREENSHOTS=1 npx playwright test screenshots. Written to
-// .e2e/screenshots/, plus one contact sheet (popup-states.png).
+// .e2e/screenshots/ at 2x, plus one contact sheet (popup-states.png), and the
+// Chrome Web Store images to .e2e/store/ (texts: extension/store/).
 
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -18,7 +19,7 @@ import {
   unlockInPopup,
   unlocked,
 } from "./harness";
-import { E2E_DIR } from "./paths";
+import { E2E_DIR, TEST_BUILD } from "./paths";
 
 test.skip(!process.env.SCREENSHOTS, "set SCREENSHOTS=1 to write screenshots");
 test.describe.configure({ mode: "serial" });
@@ -32,7 +33,7 @@ test.beforeAll(async () => {
   mkdirSync(OUT, { recursive: true });
   stack = await startStack();
   await seedVault(stack);
-  browser = await launch(stack);
+  browser = await launch(stack, { scale: 2 });
 });
 
 test.afterAll(async () => {
@@ -196,4 +197,115 @@ test("contact sheet", async () => {
   await page.setViewportSize({ width: 1000, height: 800 });
   await page.goto(`file://${join(OUT, "popup-states.html")}`);
   await page.screenshot({ path: join(OUT, "popup-states.png"), fullPage: true });
+});
+
+// Chrome Web Store graphics: five 1280x800 screenshots (full bleed), the small
+// promo tile (440x280), the marquee (1400x560) and the store icon (96 px of
+// artwork in 128 px with transparent padding).
+const SLIDES = [
+  [
+    "4-matches",
+    "Fills only when you ask",
+    "Click the toolbar button or press Ctrl+Shift+L (⌘+Shift+L on a Mac). Nothing appears inside web pages, nothing fills on page load.",
+  ],
+  [
+    "8-confirm-other-site",
+    "Exact-origin matching",
+    "Lookalike domains, other ports and http:// copies of an https:// site never match. A login saved for another site asks first.",
+  ],
+  [
+    "5-copied-2fa",
+    "Passwords and 2FA codes",
+    "Copy a password or a live 2FA code in one click. The clipboard clears itself.",
+  ],
+  [
+    "2-locked",
+    "Your vault stays yours",
+    "Unlock with your master password, or hand off to CipherMoth for a security key. No CipherMoth account, no tracking.",
+  ],
+  [
+    "7-search",
+    "Your server or your desktop app",
+    "Works with your self-hosted CipherMoth server, or with the CipherMoth desktop app on this computer, without any network.",
+  ],
+] as const;
+
+test("store images", async () => {
+  const dir = join(E2E_DIR, "store");
+  mkdirSync(dir, { recursive: true });
+  // setContent pages (about:blank) cannot load file: URLs.
+  const font = (name: string) =>
+    `data:font/woff2;base64,${readFileSync(join(TEST_BUILD, "fonts", `${name}.woff2`)).toString("base64")}`;
+  const icon = `data:image/png;base64,${readFileSync(join(TEST_BUILD, "icons/icon-128.png")).toString("base64")}`;
+  const png = (file: string) => `data:image/png;base64,${readFileSync(file).toString("base64")}`;
+  const style = `<style>
+    @font-face{font-family:G;src:url(${font("space-grotesk")})}
+    @font-face{font-family:M;src:url(${font("space-mono")})}
+    *{box-sizing:border-box} html,body{margin:0;background:#0b0b0c;color:#f4f4f2;font-family:G}
+    .glow{color:#7dd3c0} .word{font-weight:700;letter-spacing:-.02em}
+  </style>`;
+  const page = await browser.context.newPage();
+  const shoot = async (
+    html: string,
+    width: number,
+    height: number,
+    file: string,
+    clear = false
+  ) => {
+    await page.setViewportSize({ width, height });
+    await page.setContent(`<!doctype html>${style}${html}`);
+    await page.evaluate(() => document.fonts.ready);
+    // The context renders at 2x; the store wants exact pixel sizes.
+    await page.screenshot({ path: join(dir, file), omitBackground: clear, scale: "css" });
+  };
+  for (const [index, [state, title, text]] of SLIDES.entries()) {
+    const shot = shots.find((s) => s.state === state && s.scheme === "dark");
+    expect(shot, state).toBeTruthy();
+    await shoot(
+      `<div style="display:flex;align-items:center;gap:72px;height:800px;padding:0 96px;
+        background:radial-gradient(circle at 78% 50%,rgba(125,211,192,.16),transparent 55%)">
+        <div style="flex:1">
+          <div style="display:flex;align-items:center;gap:14px;margin-bottom:40px">
+            <img src="${icon}" width="44" height="44"><span class="word" style="font-size:28px">Cipher<span class="glow">Moth</span></span>
+          </div>
+          <h1 style="font-size:54px;line-height:1.08;margin:0 0 24px;letter-spacing:-.02em">${title}</h1>
+          <p style="font-size:24px;line-height:1.45;margin:0;color:#b9bdb9">${text}</p>
+        </div>
+        <img src="${png(shot!.file)}" style="width:450px;border-radius:16px;
+          box-shadow:0 0 0 1px rgba(125,211,192,.35),0 24px 80px rgba(0,0,0,.6)">
+      </div>`,
+      1280,
+      800,
+      `screenshot-${index + 1}-${state.replace(/^\d+-/, "")}.png`
+    );
+  }
+  const brand = (size: number, tagline: number) => `
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;
+      background:radial-gradient(circle at 50% 40%,rgba(125,211,192,.22),transparent 60%)">
+      <img src="${icon}" width="${size}" height="${size}">
+      <div class="word" style="font-size:${size * 0.55}px;margin-top:${size * 0.18}px">Cipher<span class="glow">Moth</span></div>
+      <div style="font-family:M;font-size:${tagline}px;color:#b9bdb9;margin-top:10px">Fill logins from your own vault</div>
+    </div>`;
+  await shoot(
+    `<div style="height:280px">${brand(84, 15)}</div>`,
+    440,
+    280,
+    "small-promo-tile-440x280.png"
+  );
+  await shoot(
+    `<div style="height:560px">${brand(150, 26)}</div>`,
+    1400,
+    560,
+    "marquee-1400x560.png"
+  );
+  await shoot(
+    `<style>html,body{background:transparent}</style>
+    <div style="width:128px;height:128px;display:flex;align-items:center;justify-content:center;background:transparent">
+      <img src="${icon}" width="96" height="96"></div>`,
+    128,
+    128,
+    "store-icon-128.png",
+    true
+  );
+  await page.close();
 });
