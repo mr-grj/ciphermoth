@@ -1,6 +1,8 @@
 # Changelog
 
-## [Unreleased]
+## [3.9.0] - 2026-11-10
+
+The browser extension gets its permanent Chromium id, ahead of the Chrome Web Store listing.
 
 ### Changed
 
@@ -9,6 +11,7 @@
 ### Added
 
 - Desktop mode: an extension newer than the app (an id the app does not know yet) now says **Update the CipherMoth app** instead of asking to turn browser extensions on.
+- A privacy policy ([docs/PRIVACY.md](docs/PRIVACY.md)) for the store listings: the developer receives no data from any part of CipherMoth.
 
 ## [3.8.0] - 2026-11-09
 
