@@ -21,16 +21,18 @@ from one of two places, chosen in its settings:
 
 ## Install
 
-| Browser | Recommended | Without a store |
+| Browser | From the store | Without a store |
 |---|---|---|
-| Chrome, Brave, Vivaldi | Chrome Web Store (listing pending) | Load unpacked from `ciphermoth-extension-chromium-X.Y.Z.zip` |
-| Edge | Chrome Web Store, or Edge Add-ons later | Load unpacked |
-| Opera | Chrome Web Store through Opera's "Install Chrome Extensions" | Load unpacked |
-| Firefox | addons.mozilla.org (listing pending) | The signed `ciphermoth-extension-firefox-X.Y.Z.xpi` from the GitHub release |
+| Chrome, Brave, Vivaldi | [Chrome Web Store](https://chromewebstore.google.com/detail/ciphermoth/gjdobbdnepjkgfpcmhjdagkcjholjkkd) | Load unpacked from `ciphermoth-extension-chromium-X.Y.Z.zip` |
+| Edge | [Chrome Web Store](https://chromewebstore.google.com/detail/ciphermoth/gjdobbdnepjkgfpcmhjdagkcjholjkkd) (Edge first asks to **Allow extensions from other stores**) | Load unpacked |
+| Opera | The Chrome Web Store, after adding Opera's **Install Chrome Extensions** | Load unpacked |
+| Firefox | [addons.mozilla.org](https://addons.mozilla.org/firefox/addon/ciphermoth/) | A temporary add-on from `ciphermoth-extension-firefox-X.Y.Z.zip` (below) |
 
-Until the store listings exist, use the files attached to each
-[GitHub release](https://github.com/mr-grj/ciphermoth/releases/latest). Settings →
-**Browser extension** in CipherMoth links here.
+Store installs update themselves, usually within a few days of a release (each version
+is reviewed by the store first). Settings → **Browser extension** in CipherMoth offers
+the right store for the browser you are using. The files attached to each
+[GitHub release](https://github.com/mr-grj/ciphermoth/releases/latest) are the same
+reproducible builds the stores receive ([check a download](#check-a-download)).
 
 ### Load unpacked (Chromium browsers)
 
@@ -49,14 +51,15 @@ Things to know about this path:
 - Loading unknown unpacked extensions is a habit worth not forming. Do it only for files
   you checked against `SHA256SUMS`.
 
-### Signed XPI (Firefox)
+### Firefox without the store
 
-Download `ciphermoth-extension-firefox-X.Y.Z.xpi` from the release and open it in
-Firefox (drag it onto a window, or `about:addons` → gear → **Install Add-on From
-File**). It is signed by Mozilla as an unlisted add-on, so release Firefox installs it.
-The unsigned `ciphermoth-extension-firefox-X.Y.Z.zip` (the package sent to Mozilla) only
-loads as a temporary add-on (`about:debugging`) or in Developer Edition, Nightly and ESR
-with signing turned off.
+Release Firefox installs only add-ons signed by Mozilla, which is what the
+addons.mozilla.org listing provides. The unsigned `ciphermoth-extension-firefox-X.Y.Z.zip`
+(the package sent to Mozilla) loads as a temporary add-on (`about:debugging` → **This
+Firefox** → **Load Temporary Add-on**, gone after a restart) or, with signing turned off,
+in Firefox Developer Edition, Nightly and ESR. Version 3.9.0 alone was also released as a
+signed `ciphermoth-extension-firefox-3.9.0.xpi`; installing the store version over it
+keeps your settings.
 
 ## Desktop mode
 
@@ -249,9 +252,9 @@ node scripts/verify.mjs ~/Downloads/SHA256SUMS
 `verify.mjs` rebuilds the packages and prints `OK` or `MISMATCH` for each. There are
 three: `chromium` (load unpacked; its manifest carries the `key` that pins the extension
 id), `chromium-store` (the same files without `key`, which the Chrome Web Store refuses;
-the store gives its item the same id) and `firefox`. The signed XPI differs from the
-Firefox zip only by Mozilla's `META-INF/` signature files: unzip both and compare the
-rest. To check a store install, compare the extension's folder in your browser profile
+the store gives its item the same id) and `firefox`. The Firefox add-on Mozilla signs
+differs from the Firefox zip only by its `META-INF/` signature files: unzip both and
+compare the rest. To check a store install, compare the extension's folder in your browser profile
 with `extension/dist/store-chromium` after the build (the store may add its own
 `_metadata/` folder).
 

@@ -127,15 +127,18 @@ export const detectBrowser = (nav = globalThis.navigator) => {
   return null;
 };
 
-// Store listings do not exist yet: until one is published its entry stays null
-// and the install button points at the release assets and docs/EXTENSION.md.
+// The store listings (docs/EXTENSION.md#install). Chromium browsers install from
+// the Chrome Web Store (Edge asks to allow extensions from other stores first);
+// Opera needs its "Install Chrome Extensions" add-on, so it gets the docs.
+const CHROME_WEB_STORE =
+  "https://chromewebstore.google.com/detail/ciphermoth/gjdobbdnepjkgfpcmhjdagkcjholjkkd";
 export const STORE_LINKS = {
-  Chrome: null,
-  Edge: null,
-  Brave: null,
+  Chrome: CHROME_WEB_STORE,
+  Edge: CHROME_WEB_STORE,
+  Brave: CHROME_WEB_STORE,
   Opera: null,
-  Vivaldi: null,
-  Firefox: null,
+  Vivaldi: CHROME_WEB_STORE,
+  Firefox: "https://addons.mozilla.org/firefox/addon/ciphermoth/",
 };
 export const RELEASES_URL = `https://github.com/${GITHUB_REPO}/releases/latest`;
 export const EXTENSION_DOCS_URL = `https://github.com/${GITHUB_REPO}/blob/master/docs/EXTENSION.md`;

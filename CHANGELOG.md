@@ -1,5 +1,19 @@
 # Changelog
 
+## [3.9.1] - 2026-11-10
+
+The browser extension is in the stores.
+
+### Added
+
+- **Install the extension from the [Chrome Web Store](https://chromewebstore.google.com/detail/ciphermoth/gjdobbdnepjkgfpcmhjdagkcjholjkkd)** (Chrome, Brave, Edge, Vivaldi) **or [addons.mozilla.org](https://addons.mozilla.org/firefox/addon/ciphermoth/)** (Firefox); store installs update themselves. The web app's Settings → **Browser extension** now offers the store for the browser you are using, and [docs/EXTENSION.md](docs/EXTENSION.md#install) lists both. To move a copy loaded unpacked to the store version, remove it in `chrome://extensions`, install from the store, then connect it again (desktop mode: pair again, and remove the old entry in the app's Settings → **Browser extension**). If you installed 3.9.0's signed `.xpi` in Firefox, install from addons.mozilla.org once to get updates.
+- `extension/README.md`: how to build the packages and check them against a release, for store reviewers and anyone else.
+
+### Changed
+
+- Releases no longer attach a signed Firefox `.xpi`: Firefox installs from addons.mozilla.org, which signs each version. The unsigned `ciphermoth-extension-firefox-X.Y.Z.zip` (the package sent to Mozilla) is still attached, with the two Chromium zips.
+- `npm run lint:firefox` checks the Firefox package as addons.mozilla.org does for listed add-ons.
+
 ## [3.9.0] - 2026-11-10
 
 The browser extension gets its permanent Chromium id, ahead of the Chrome Web Store listing.

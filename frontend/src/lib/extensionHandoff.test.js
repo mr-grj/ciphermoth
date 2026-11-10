@@ -168,10 +168,20 @@ describe("detectBrowser and installTarget", () => {
     expect(isConnectedIn([], "Chrome")).toBe(false);
   });
 
-  it("points at the docs until a store listing exists", () => {
-    expect(installTarget("Chrome")).toEqual({
+  it("points at the store listing, or at the docs without one", () => {
+    for (const browser of ["Chrome", "Brave", "Edge", "Vivaldi"]) {
+      expect(installTarget(browser)).toEqual({
+        url: "https://chromewebstore.google.com/detail/ciphermoth/gjdobbdnepjkgfpcmhjdagkcjholjkkd",
+        label: `Add to ${browser}`,
+      });
+    }
+    expect(installTarget("Firefox")).toEqual({
+      url: "https://addons.mozilla.org/firefox/addon/ciphermoth/",
+      label: "Add to Firefox",
+    });
+    expect(installTarget("Opera")).toEqual({
       url: expect.stringContaining("docs/EXTENSION.md"),
-      label: "Install in Chrome",
+      label: "Install in Opera",
     });
     expect(installTarget(null).label).toBe("Install the extension");
   });

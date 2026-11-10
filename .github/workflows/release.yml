@@ -34,10 +34,10 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
   # The browser extension: reproducible packages (docs/EXTENSION.md), checked
-  # by rebuilding, then the Firefox package signed by addons.mozilla.org as an
-  # unlisted add-on when the AMO credentials exist in the protected
-  # extension-release environment. Store uploads (Chrome Web Store, AMO
-  # listing) stay manual for now.
+  # by rebuilding. The maintainer uploads the release's packages to the Chrome
+  # Web Store and to the addons.mozilla.org listing (extension/store/). No AMO
+  # signing here: AMO accepts each version number once in either channel, so an
+  # unlisted signature would block the listed upload (design decision 64).
   extension:
     needs: source
     runs-on: ubuntu-latest
@@ -48,9 +48,6 @@ jobs:
       attestations: write
     env:
       RELEASE_VERSION: ${{ needs.source.outputs.version }}
-      # Only whether signing is configured; the credentials themselves are given
-      # to the signing step alone, never to npm ci or the build.
-      HAS_AMO_CREDENTIALS: ${{ secrets.AMO_JWT_ISSUER != '' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -74,17 +71,6 @@ jobs:
           cp dist/packages/SHA256SUMS "$RUNNER_TEMP/SHA256SUMS"
           node scripts/verify.mjs "$RUNNER_TEMP/SHA256SUMS"
           npm run lint:firefox
-      - name: Sign the Firefox package (unlisted, addons.mozilla.org)
-        if: env.HAS_AMO_CREDENTIALS == 'true'
-        working-directory: extension
-        env:
-          AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
-          AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
-        run: |
-          npx web-ext sign --channel unlisted --source-dir dist/firefox \
-            --artifacts-dir "$RUNNER_TEMP/signed" \
-            --api-key "$AMO_JWT_ISSUER" --api-secret "$AMO_JWT_SECRET"
-          cp "$RUNNER_TEMP"/signed/*.xpi "dist/packages/ciphermoth-extension-firefox-$RELEASE_VERSION.xpi"
       - name: Build provenance
         uses: actions/attest-build-provenance@v2
         with:

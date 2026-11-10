@@ -16,8 +16,8 @@ best effort: a quick load-and-fill check when convenient.
 
 For each browser:
 
-- [ ] **Install** from the store (once listed) or the signed XPI (Firefox), and the
-      unpacked/sideload path from the release zip after checking `SHA256SUMS`.
+- [ ] **Install** from the store (Chrome Web Store, addons.mozilla.org), and the
+      unpacked/temporary path from the release zip after checking `SHA256SUMS`.
 - [ ] **Permissions at install**: only "read and change data on websites you click on"
       style wording (activeTab), storage, clipboard write; no "all websites".
 - [ ] **Onboarding**: settings open on install; connecting asks for exactly the vault's

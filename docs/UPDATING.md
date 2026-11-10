@@ -19,7 +19,7 @@ The production identity is `com.ciphermoth.desktop`. It never opens or migrates 
 
 ## Browser extension updates
 
-The extension shares CipherMoth's version number and is released with it. Installed from a store (once listed), it updates itself. Installed from a file, it does not: download the new `ciphermoth-extension-*` file from the release, check it against `SHA256SUMS`, and load it again (Chromium: replace the unpacked folder's contents and click **Reload** on `chrome://extensions`; Firefox: open the new signed `.xpi`). Your connection settings stay; you unlock again. An extension needs a server that lists the `browser-extension` feature in `/api/meta`; an older server makes the popup say "CipherMoth needs an update". Updating the server ends every extension session, like every other session. Details: [docs/EXTENSION.md](EXTENSION.md).
+The extension shares CipherMoth's version number and is released with it. Installed from the Chrome Web Store or addons.mozilla.org, it updates itself, usually within a few days of a release (the store reviews each version first). Loaded unpacked, it does not: download the new `ciphermoth-extension-chromium-*` zip from the release, check it against `SHA256SUMS`, replace the unpacked folder's contents and click **Reload** on `chrome://extensions`. Your connection settings stay; you unlock again. An extension needs a server that lists the `browser-extension` feature in `/api/meta`; an older server makes the popup say "CipherMoth needs an update". Updating the server ends every extension session, like every other session. Details: [docs/EXTENSION.md](EXTENSION.md).
 
 ## Docker edition
 
