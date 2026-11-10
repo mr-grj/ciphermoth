@@ -32,6 +32,8 @@ from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
 HOST_NAME = "com.ciphermoth.desktop.qa"
 CHROMIUM_ID = "gjdobbdnepjkgfpcmhjdagkcjholjkkd"
+# The 3.6.0-3.8.x throwaway id, still accepted (design decision 62).
+LEGACY_CHROMIUM_ID = "emeejhcdcdnlhejcpeohdafdnkmbaddn"
 LABEL = "ciphermoth/extension/v1"
 TO_APP, TO_EXTENSION = 1, 2
 LOGIN = {
@@ -330,8 +332,9 @@ def check_on(root: Path, report: dict, report_path: Path, app_executable: Path) 
     manifests = read_manifests(root)
     assert sorted(manifests) == ["Chrome", "Firefox"], sorted(manifests)
     assert manifests["Chrome"]["allowed_origins"] == [
-        f"chrome-extension://{CHROMIUM_ID}/"
-    ]
+        f"chrome-extension://{CHROMIUM_ID}/",
+        f"chrome-extension://{LEGACY_CHROMIUM_ID}/",
+    ], manifests["Chrome"]["allowed_origins"]
     assert manifests["Firefox"]["allowed_extensions"] == ["ciphermoth@mr-grj.github.io"]
     host = manifests["Chrome"]["path"]
     assert manifests["Firefox"]["path"] == host
