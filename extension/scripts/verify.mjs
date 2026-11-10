@@ -7,8 +7,8 @@
 // SOURCE_DATE_EPOCH defaulting to the value the release used) and compares
 // every checksum. A store package can be checked the same way: download it
 // (Chrome: the .crx is a zip with a header; unzip it and compare the files with
-// dist/chromium), or compare the zip from the GitHub release, which is what is
-// uploaded to the stores. The signed Firefox XPI adds Mozilla's signature
+// dist/store-chromium), or compare the zip from the GitHub release, which is
+// what is uploaded to the stores (chromium-store for the Chrome Web Store). The signed Firefox XPI adds Mozilla's signature
 // files (META-INF/); everything else must equal dist/firefox.
 
 import { execFileSync } from "node:child_process";

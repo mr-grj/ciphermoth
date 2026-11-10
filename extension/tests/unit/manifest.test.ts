@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 // @ts-expect-error -- plain ESM build script without types
-import { manifestFor, nativeHost, zipDirectory } from "../../scripts/build.mjs";
+import { manifestFor, nativeHost, storeManifest, zipDirectory } from "../../scripts/build.mjs";
 
 const ROOT = join(import.meta.dirname, "../..");
 
@@ -125,6 +125,15 @@ describe("the shipped manifests", () => {
     const { version } = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
     expect(manifestFor("chromium").version).toBe(version);
     expect(manifestFor("firefox").version).toBe(version);
+  });
+});
+
+describe("the Chrome Web Store package", () => {
+  it("is the Chromium manifest without the key, which the store refuses", () => {
+    const manifest = manifestFor("chromium");
+    const store = storeManifest(manifest);
+    expect(store).not.toHaveProperty("key");
+    expect({ ...store, key: manifest.key }).toEqual(manifest);
   });
 });
 

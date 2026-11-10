@@ -2,6 +2,7 @@
 //
 //   node scripts/build.mjs             dist/chromium, dist/firefox
 //   node scripts/build.mjs --package   ... plus dist/packages/*.zip and SHA256SUMS
+//                                      (chromium, chromium-store, firefox)
 //   node scripts/build.mjs --test      dist-test/chromium (Playwright build, see below)
 //   node scripts/build.mjs --desktop-dev  dist-dev/{chromium,firefox}: a real build
 //                                         that talks to the development desktop app
@@ -71,6 +72,22 @@ export const manifestFor = (target, { test = false } = {}) => {
     manifest.name = "CipherMoth (test build)";
   }
   return manifest;
+};
+
+// The Chrome Web Store refuses a manifest with "key" (design decision 63): its
+// package is the Chromium build without it, and the store item has our id from
+// the key.pem of the first upload. Loaded unpacked, the key pins the same id.
+export const storeManifest = (manifest) => {
+  const store = { ...manifest };
+  delete store.key;
+  return store;
+};
+
+const writeStoreBuild = (from, to) => {
+  rmSync(to, { recursive: true, force: true });
+  cpSync(from, to, { recursive: true });
+  const manifest = JSON.parse(readFileSync(join(to, "manifest.json"), "utf8"));
+  writeFileSync(join(to, "manifest.json"), `${JSON.stringify(storeManifest(manifest), null, 2)}\n`);
 };
 
 // The extension must keep the app's brand: every token in base.css must equal
@@ -263,8 +280,20 @@ const main = async () => {
   rmSync(packages, { recursive: true, force: true });
   mkdirSync(packages, { recursive: true });
   const sums = [];
-  for (const target of targets) {
-    const zip = zipDirectory(join(outRoot, target), epoch);
+  // [folder, package]; the store build gets its own folder name because
+  // Node 22.7's cpSync takes dist/chromium-store for a subfolder of dist/chromium.
+  const packaged = targets.flatMap((t) =>
+    t === "chromium"
+      ? [
+          [t, t],
+          ["store-chromium", "chromium-store"],
+        ]
+      : [[t, t]]
+  );
+  if (targets.includes("chromium"))
+    writeStoreBuild(join(outRoot, "chromium"), join(outRoot, "store-chromium"));
+  for (const [folder, target] of packaged) {
+    const zip = zipDirectory(join(outRoot, folder), epoch);
     const name = packageName(target);
     writeFileSync(join(packages, name), zip);
     sums.push(`${createHash("sha256").update(zip).digest("hex")}  ${name}`);

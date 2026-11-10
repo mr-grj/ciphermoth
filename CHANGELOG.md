@@ -11,6 +11,7 @@ The browser extension gets its permanent Chromium id, ahead of the Chrome Web St
 ### Added
 
 - Desktop mode: an extension newer than the app (an id the app does not know yet) now says **Update the CipherMoth app** instead of asking to turn browser extensions on.
+- Releases carry a third extension package, `ciphermoth-extension-chromium-store-X.Y.Z.zip`: the Chromium build without the manifest `key` (the Chrome Web Store refuses one), for the store upload. Load the plain `chromium` zip unpacked as before.
 - A privacy policy ([docs/PRIVACY.md](docs/PRIVACY.md)) for the store listings: the developer receives no data from any part of CipherMoth.
 
 ## [3.8.0] - 2026-11-09

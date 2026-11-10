@@ -135,8 +135,10 @@ only on the user's device and the user's own server.
 
 ## Submitting
 
-- First upload only: the CI-built `ciphermoth-extension-chromium-X.Y.Z.zip` plus
-  `key.pem` at the zip root (desktop/RELEASING.md); check the dashboard's Item ID is
+- Always the **`ciphermoth-extension-chromium-store-X.Y.Z.zip`** package (no `key` in
+  its manifest; the store refuses one with "key field is not allowed in manifest").
+- First upload only: the CI-built store zip plus `key.pem` at the zip root
+  (desktop/RELEASING.md); check the dashboard's Item ID is
   `gjdobbdnepjkgfpcmhjdagkcjholjkkd` before submitting.
 - Later uploads: the release asset unchanged (Package tab → Upload new package).
 - "Submit for review": untick "Publish automatically after the review" when the

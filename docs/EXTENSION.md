@@ -246,10 +246,14 @@ npm ci                                   # Node 22
 node scripts/verify.mjs ~/Downloads/SHA256SUMS
 ```
 
-`verify.mjs` rebuilds both packages and prints `OK` or `MISMATCH` for each. The signed
-XPI differs from the zip only by Mozilla's `META-INF/` signature files: unzip both and
-compare the rest. To check a store install, compare the extension's folder in your
-browser profile with `extension/dist/chromium` after the build.
+`verify.mjs` rebuilds the packages and prints `OK` or `MISMATCH` for each. There are
+three: `chromium` (load unpacked; its manifest carries the `key` that pins the extension
+id), `chromium-store` (the same files without `key`, which the Chrome Web Store refuses;
+the store gives its item the same id) and `firefox`. The signed XPI differs from the
+Firefox zip only by Mozilla's `META-INF/` signature files: unzip both and compare the
+rest. To check a store install, compare the extension's folder in your browser profile
+with `extension/dist/store-chromium` after the build (the store may add its own
+`_metadata/` folder).
 
 ## Troubleshooting
 
