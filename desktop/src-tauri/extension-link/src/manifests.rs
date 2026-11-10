@@ -435,7 +435,10 @@ mod tests {
         );
         assert_eq!(
             chromium["allowed_origins"],
-            json!(["chrome-extension://emeejhcdcdnlhejcpeohdafdnkmbaddn/"])
+            json!([
+                "chrome-extension://gjdobbdnepjkgfpcmhjdagkcjholjkkd/",
+                "chrome-extension://emeejhcdcdnlhejcpeohdafdnkmbaddn/"
+            ])
         );
         assert!(chromium.get("allowed_extensions").is_none());
         let firefox = manifest(

@@ -111,7 +111,8 @@ export interface Login {
 
 // Desktop mode adds: unsupported (no X25519 in this browser), unpaired,
 // pairing (a code is shown), no-host (the app's switch is off or the app is
-// not installed), no-app (installed, not running).
+// not installed), app-outdated (the app does not know this extension's id),
+// no-app (installed, not running).
 export type Phase =
   | "setup"
   | "locked"
@@ -122,6 +123,7 @@ export type Phase =
   | "unpaired"
   | "pairing"
   | "no-host"
+  | "app-outdated"
   | "no-app";
 
 export interface Status {

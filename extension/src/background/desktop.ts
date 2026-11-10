@@ -41,6 +41,7 @@ const APPROVAL_MS = 150_000;
 const IDLE_MS = 30_000;
 
 export const NO_HOST = "no_host";
+export const APP_OUTDATED = "app_outdated";
 export const APP_NOT_RUNNING = "app_not_running";
 export const UNPAIRED = "unpaired";
 const APP_CLOSED = "app_closed";
@@ -51,6 +52,8 @@ const RESTARTING = "restarting";
 export const MESSAGES: Record<string, string> = {
   [NO_HOST]:
     "CipherMoth can't be reached from this browser. In the CipherMoth app, turn on Settings → Browser extension → Allow browser extensions.",
+  [APP_OUTDATED]:
+    "This CipherMoth app doesn't know this copy of the extension. Update the CipherMoth app.",
   [APP_NOT_RUNNING]: "The CipherMoth app isn't running.",
   [APP_CLOSED]: "The CipherMoth app closed the connection.",
   [UNPAIRED]: "This browser isn't paired with the CipherMoth app.",
@@ -106,10 +109,16 @@ class Port {
     });
     this.port.onDisconnect.addListener((port) => {
       // Chromium: runtime.lastError; Firefox: port.error. A host that never
-      // answered was not found or not allowed: the switch in the app is off.
+      // answered was not found (the switch in the app is off) or not allowed:
+      // Chromium says "forbidden" when the app's manifest does not name this
+      // extension's id, which is an app older than this id (decision 62).
       const reason =
         ext.runtime.lastError?.message ?? (port as { error?: { message?: string } }).error?.message;
-      this.fail(failure(this.heard || !reason ? APP_CLOSED : NO_HOST));
+      this.fail(
+        failure(
+          this.heard || !reason ? APP_CLOSED : /forbidden/i.test(reason) ? APP_OUTDATED : NO_HOST
+        )
+      );
     });
   }
 
@@ -389,6 +398,7 @@ export type DesktopPhase =
   | "pairing"
   | "unpaired"
   | "no-host"
+  | "app-outdated"
   | "no-app"
   | "locked"
   | "unlocked"
@@ -417,6 +427,7 @@ export const desktopPhase = async (): Promise<{
   } catch (error) {
     const code = error instanceof ApiError ? error.code : null;
     if (code === NO_HOST) return { phase: "no-host", ...none };
+    if (code === APP_OUTDATED) return { phase: "app-outdated", ...none };
     if (code === APP_NOT_RUNNING || code === APP_CLOSED) return { phase: "no-app", ...none };
     if (code === UNPAIRED) return { phase: "unpaired", ...none };
     if (!(error instanceof ApiError)) reportUnexpected(error);

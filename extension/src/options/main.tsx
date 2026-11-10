@@ -172,6 +172,7 @@ const DESKTOP_STATES: Partial<Record<Status["phase"], string>> = {
   locked: "Paired · CipherMoth is locked",
   "no-app": "Paired · the CipherMoth app isn't running",
   "no-host": "Browser extensions are turned off in the CipherMoth app",
+  "app-outdated": "Update the CipherMoth app to use this extension",
   offline: "Can't reach the CipherMoth app",
 };
 

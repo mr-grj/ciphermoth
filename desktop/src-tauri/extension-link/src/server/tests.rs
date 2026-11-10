@@ -8,7 +8,9 @@ use crate::ipc::Endpoint;
 use std::sync::atomic::AtomicU32;
 use std::sync::mpsc;
 
-const CHROME: &str = "chrome-extension://emeejhcdcdnlhejcpeohdafdnkmbaddn/";
+const CHROME: &str = "chrome-extension://gjdobbdnepjkgfpcmhjdagkcjholjkkd/";
+/// The throwaway id of 3.6.0-3.8.x copies loaded unpacked (decision 62).
+const LEGACY_CHROME: &str = "chrome-extension://emeejhcdcdnlhejcpeohdafdnkmbaddn/";
 
 struct Fake {
     store: Store,
@@ -136,13 +138,17 @@ impl Rig {
 
     /// A connection as the native host makes it.
     fn connect(&self) -> Stream {
+        self.connect_as(CHROME)
+    }
+
+    fn connect_as(&self, caller: &str) -> Stream {
         let mut stream = self.endpoint.connect().unwrap();
         stream
             .set_read_timeout(Some(Duration::from_secs(10)))
             .unwrap();
         send(
             &mut stream,
-            json!({"t": "host", "caller": CHROME, "version": "test"}),
+            json!({"t": "host", "caller": caller, "version": "test"}),
         )
         .unwrap();
         stream
@@ -153,19 +159,23 @@ impl Rig {
         let start = client::pair_commit(&mut stream, "Chrome").unwrap();
         let revealed = client::pair_reveal(&mut stream, start).unwrap().unwrap();
         let id = client::pair_result(&mut stream).unwrap().unwrap();
-        // The app stores the pairing just after sending "paired" (so a browser
-        // that went away leaves none). The extension goes on over the same
-        // connection, which the app reads only after storing; these tests open
-        // a new one, which could arrive first on a busy runner.
+        self.wait_stored(&id);
+        (id, revealed.key, revealed.sas)
+    }
+
+    /// The app stores the pairing just after sending "paired" (so a browser
+    /// that went away leaves none). The extension goes on over the same
+    /// connection, which the app reads only after storing; these tests open
+    /// a new one, which could arrive first on a busy runner.
+    fn wait_stored(&self, id: &str) {
         let deadline = std::time::Instant::now() + Duration::from_secs(10);
-        while self.fake().store.find(&id).is_none() {
+        while self.fake().store.find(id).is_none() {
             assert!(
                 std::time::Instant::now() < deadline,
                 "the pairing was never stored"
             );
             std::thread::sleep(Duration::from_millis(5));
         }
-        (id, revealed.key, revealed.sas)
     }
 
     fn session(&self, id: &str, key: &[u8; 32]) -> (Stream, client::Session) {
@@ -240,6 +250,33 @@ fn a_pairing_on_the_same_connection_goes_straight_to_hello() {
             .unwrap()["ok"],
         true
     );
+}
+
+#[test]
+fn a_copy_with_the_old_id_keeps_its_pairing_next_to_a_new_copy() {
+    let rig = Rig::new();
+    // A 3.8 copy paired before the store id existed.
+    let mut stream = rig.connect_as(LEGACY_CHROME);
+    let start = client::pair_commit(&mut stream, "Chrome").unwrap();
+    let old = client::pair_reveal(&mut stream, start).unwrap().unwrap();
+    let old_id = client::pair_result(&mut stream).unwrap().unwrap();
+    rig.wait_stored(&old_id);
+    drop(stream);
+    // The store copy starts with nothing, pairs again and gets its own pairing.
+    let (new_id, new_key, _) = rig.pair();
+    assert_ne!(old_id, new_id);
+    assert_eq!(rig.fake().store.list().len(), 2);
+    for (caller, id, key) in [
+        (LEGACY_CHROME, &old_id, &old.key),
+        (CHROME, &new_id, &new_key),
+    ] {
+        let mut stream = rig.connect_as(caller);
+        let mut session = client::hello(&mut stream, id, key).unwrap().unwrap();
+        let status = session
+            .request(&mut stream, json!({"op": "status"}))
+            .unwrap();
+        assert_eq!(status["value"]["state"], "unlocked", "{caller}");
+    }
 }
 
 #[test]

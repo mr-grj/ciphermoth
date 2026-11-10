@@ -270,6 +270,13 @@ browser profile with `extension/dist/chromium` after the build.
 - **"Turn on browser extensions in CipherMoth"**: the app's **Allow browser
   extensions** is off, or the app is not installed for this user. Turn it on, then
   **Try again**. A browser installed after the app started needs a CipherMoth restart.
+- **"Update the CipherMoth app"**: the extension is newer than the app and has an id
+  the app does not know yet (3.9.0 moved the Chromium extension to its Chrome Web Store
+  id). Update the app, then **Try again**.
+- **A copy loaded unpacked before 3.9.0** has another id than the store version (or
+  the 3.9.0 zip). It keeps working with the app and its pairing, but it is a separate
+  extension: install the new one, pair it, then remove the old copy in
+  `chrome://extensions` and its entry in the app's Settings → **Browser extension**.
 - **"This browser is too old for the CipherMoth app"**: desktop mode needs WebCrypto
   X25519 (Chrome 133, Firefox 130 or newer).
 - **"Pairing wasn't allowed"** or the codes differ: pair again from the popup. Codes

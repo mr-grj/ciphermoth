@@ -109,15 +109,20 @@ def main():
     )
     assert (refused.returncode, refused.stdout) == (2, b""), refused
     hello = json.dumps({"t": "hello", "id": "x", "nonce": "y"}).encode()
-    probe = subprocess.run(
-        [str(host), "chrome-extension://emeejhcdcdnlhejcpeohdafdnkmbaddn/"],
-        input=struct.pack("=I", len(hello)) + hello,
-        capture_output=True,
-        timeout=30,
-    )
-    # No production app runs on the runner: the production host says so.
-    answer = probe.stdout[4:]
-    assert json.loads(answer) == {"t": "error", "code": "app_not_running"}, probe
+    # The store id and the throwaway id of 3.6.0-3.8.x unpacked copies.
+    for chromium_id in (
+        "gjdobbdnepjkgfpcmhjdagkcjholjkkd",
+        "emeejhcdcdnlhejcpeohdafdnkmbaddn",
+    ):
+        probe = subprocess.run(
+            [str(host), f"chrome-extension://{chromium_id}/"],
+            input=struct.pack("=I", len(hello)) + hello,
+            capture_output=True,
+            timeout=30,
+        )
+        # No production app runs on the runner: the production host says so.
+        answer = probe.stdout[4:]
+        assert json.loads(answer) == {"t": "error", "code": "app_not_running"}, probe
     raw = shell.read_bytes()
     for forbidden in (
         b"qa_update_step",

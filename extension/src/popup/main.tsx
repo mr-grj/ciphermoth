@@ -870,6 +870,7 @@ const WAITING: Partial<Record<Status["phase"], number>> = {
   locked: 1000,
   "no-app": 3000,
   "no-host": 3000,
+  "app-outdated": 3000,
 };
 
 const App = () => {
@@ -974,6 +975,25 @@ const App = () => {
             <p>
               In the CipherMoth app, open Settings → Browser extension and turn on “Allow browser
               extensions”.
+            </p>
+          </Notice>
+        </>
+      );
+    case "app-outdated":
+      return (
+        <>
+          <Header />
+          <Notice
+            title="Update the CipherMoth app"
+            action={
+              <button class="button primary" ref={focusOnMount} onClick={load}>
+                Try again
+              </button>
+            }
+          >
+            <p>
+              This version of the CipherMoth app doesn't know this copy of the extension. Update the
+              app to the latest version, then try again.
             </p>
           </Notice>
         </>

@@ -86,7 +86,8 @@ describe("the shipped manifests", () => {
       .map((n) => String.fromCharCode(97 + n))
       .join("");
     const ids = readFileSync(join(ROOT, "../desktop/src-tauri/extension-link/src/ids.rs"), "utf8");
-    expect(ids).toContain(`CHROMIUM_IDS: &[&str] = &["${id}"]`);
+    // The store item's id comes first; later ones are only still accepted.
+    expect(ids).toMatch(new RegExp(`CHROMIUM_IDS: &\\[&str\\] = &\\[\\s*"${id}",`));
     expect(manifestFor("firefox").key).toBeUndefined();
   });
 

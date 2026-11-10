@@ -13,7 +13,7 @@ use ciphermoth_extension_link::framing;
 use ciphermoth_extension_link::identity::Identity;
 use serde_json::{json, Value};
 
-const CHROME: &str = "chrome-extension://emeejhcdcdnlhejcpeohdafdnkmbaddn/";
+const CHROME: &str = "chrome-extension://gjdobbdnepjkgfpcmhjdagkcjholjkkd/";
 const FIREFOX: &str = "ciphermoth@mr-grj.github.io";
 
 fn host(root: &Path, args: &[&str]) -> Child {

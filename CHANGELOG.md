@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **The Chromium extension has its permanent id** (`gjdobbdnepjkgfpcmhjdagkcjholjkkd`), the one the Chrome Web Store listing will use. Chrome, Brave and Edge treat it as a new extension: **if you loaded a 3.6.0-3.8.0 zip unpacked, install the new one, set it up again and, in desktop mode, pair it again**; then remove the old copy in `chrome://extensions` and, in the desktop app, its entry under Settings → **Browser extension**. The old copy keeps working with the app (and its pairing) until you remove it. Firefox is unchanged.
+
+### Added
+
+- Desktop mode: an extension newer than the app (an id the app does not know yet) now says **Update the CipherMoth app** instead of asking to turn browser extensions on.
+
 ## [3.8.0] - 2026-11-09
 
 Dependency security fixes; no change to what the app or the extension does.

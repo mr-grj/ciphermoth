@@ -40,14 +40,17 @@ The Release workflow's `extension` job (environment **extension-release**) check
 
 Store submissions are manual for now: upload `ciphermoth-extension-chromium-X.Y.Z.zip` to the Chrome Web Store (and Edge Add-ons, Opera add-ons once used) and the Firefox zip to the AMO listing, from the release assets, never from a local build. Every publisher account uses hardware-key 2FA. Keep the Chrome extension signing key (which pins the extension ID through the manifest `key`, which desktop mode's native host trusts) offline; record every store-assigned ID. AMO credentials only ever live in the protected environment.
 
-**The Chromium id is a throwaway for now** (design decision 34): `extension/manifest/chromium.json` carries a public `key` whose private half was discarded, so desktop mode works for unpacked builds but no store item can ever have that id. Before the first Chrome Web Store upload, generate the real pair offline:
+**The Chromium id is the Chrome Web Store item's** (design decision 62): `gjdobbdnepjkgfpcmhjdagkcjholjkkd`, pinned by the public `key` in `extension/manifest/chromium.json`. The maintainer generated the pair (since 3.9.0); the private key lives only in the maintainer's own vault, never in the repo, CI or a release. It was made with:
 
 ```sh
-openssl genrsa -out ciphermoth-extension.pem 2048        # keep offline, never commit
-openssl rsa -in ciphermoth-extension.pem -pubout -outform DER | base64 | tr -d '\n'   # the manifest "key"
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out key.pem
+openssl pkey -in key.pem -pubout -outform DER | base64 | tr -d '\n'        # the manifest "key"
+openssl pkey -in key.pem -pubout -outform DER | shasum -a 256 | head -c 32 | tr '0-9a-f' 'a-p'   # the id
 ```
 
-Replace `key` in `extension/manifest/chromium.json` and the id in `CHROMIUM_IDS` (`desktop/src-tauri/extension-link/src/ids.rs`; `cargo test` and the extension's manifest test compute the id from the key and fail until both agree), then upload the first zip with the private key as `key.pem` at its root so the store keeps that id. Ids assigned by other stores (Edge Add-ons, Opera) go into `CHROMIUM_IDS` too. Changing the id later unpairs every browser.
+`CHROMIUM_IDS` (`desktop/src-tauri/extension-link/src/ids.rs`) lists the store id first (`cargo test` and the extension's manifest test compute it from the key and fail until both agree), then ids that are only still accepted: the throwaway id of 3.6.0-3.8.x (decision 34), so copies loaded unpacked keep their pairing; drop it in a later major release. Ids assigned by other stores (Edge Add-ons, Opera) go into `CHROMIUM_IDS` too. Removing an id unpairs every browser using it.
+
+Only the **first** Chrome Web Store upload carries the private key, as `key.pem` at the zip root, so the store assigns the item our id; later uploads are the release zip unchanged. Add it to a copy of the release asset outside the repo and delete the copy after the upload.
 
 ### The native host
 

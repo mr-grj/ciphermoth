@@ -55,8 +55,10 @@ In the desktop app:
       Linux: `~/.config/{google-chrome,BraveSoftware/Brave-Browser}/NativeMessagingHosts/`,
       `~/.mozilla/native-messaging-hosts/`; Windows: `HKCU\Software\{Google\Chrome,BraveSoftware\Brave-Browser,Mozilla}\NativeMessagingHosts\com.ciphermoth.desktop`).
 - [ ] **Turn it on**: "Set up for Chrome, Brave and Firefox" (the installed ones); the
-      manifests exist and name only the CipherMoth extension ids and the host inside the
-      app.
+      manifests exist and name only the CipherMoth extension ids (Chromium: the store id
+      `gjdobbdnepjkgfpcmhjdagkcjholjkkd` and the 3.6-3.8 throwaway id
+      `emeejhcdcdnlhejcpeohdafdnkmbaddn`; Firefox `ciphermoth@mr-grj.github.io`) and the
+      host inside the app.
 
 In each browser:
 

@@ -18,7 +18,7 @@ const exe = process.platform === "win32" ? ".exe" : "";
 export const HOST_BIN = join(TARGET, "debug", `native-host${exe}`);
 export const STUB_BIN = join(TARGET, "debug", "examples", `app_stub${exe}`);
 export const HOST_NAME = "com.ciphermoth.desktop.qa";
-export const CHROMIUM_ID = "emeejhcdcdnlhejcpeohdafdnkmbaddn";
+export const CHROMIUM_ID = "gjdobbdnepjkgfpcmhjdagkcjholjkkd";
 
 export const buildDesktopBinaries = (): void => {
   const options = {
@@ -40,7 +40,11 @@ export const newQaRoot = (): string => mkdtempSync(join(tmpdir(), "cm-qa-"));
 export const hostManifestPath = (profile: string): string =>
   join(profile, "NativeMessagingHosts", `${HOST_NAME}.json`);
 
-export const installHost = (profile: string): void => {
+// The app writes every id it knows; one older than this extension's id
+// (3.8 and before) names only the throwaway one (decision 62).
+export const LEGACY_CHROMIUM_ID = "emeejhcdcdnlhejcpeohdafdnkmbaddn";
+
+export const installHost = (profile: string, ids: string[] = [CHROMIUM_ID]): void => {
   mkdirSync(join(profile, "NativeMessagingHosts"), { recursive: true });
   writeFileSync(
     hostManifestPath(profile),
@@ -49,7 +53,7 @@ export const installHost = (profile: string): void => {
       description: "CipherMoth desktop app (e2e)",
       path: HOST_BIN,
       type: "stdio",
-      allowed_origins: [`chrome-extension://${CHROMIUM_ID}/`],
+      allowed_origins: ids.map((id) => `chrome-extension://${id}/`),
     })
   );
 };

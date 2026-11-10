@@ -10,7 +10,7 @@ import { join } from "node:path";
 
 import { type Page, expect, test } from "@playwright/test";
 
-import { AppStub, installHost, newQaRoot, uninstallHost } from "./desktop";
+import { AppStub, LEGACY_CHROMIUM_ID, installHost, newQaRoot, uninstallHost } from "./desktop";
 import {
   type Browser,
   type Stack,
@@ -180,6 +180,18 @@ test("the switch turned off in the app: the popup says how to turn it on", async
   installHost(browser.profile);
   app = await AppStub.start(qaRoot, stack);
   await popup.getByRole("button", { name: "Try again" }).click();
+  await expect(popup.getByPlaceholder("Search logins")).toBeVisible();
+});
+
+test("an app older than this extension's id: the popup says to update the app", async () => {
+  await app!.stop();
+  installHost(browser.profile, [LEGACY_CHROMIUM_ID]);
+  const popup = await openPopup(browser, null);
+  await expect(popup.getByRole("heading", { name: "Update the CipherMoth app" })).toBeVisible();
+  installHost(browser.profile);
+  app = await AppStub.start(qaRoot, stack);
+  await popup.getByRole("button", { name: "Try again" }).click();
+  // The pairing survived: no new pairing, straight back to the logins.
   await expect(popup.getByPlaceholder("Search logins")).toBeVisible();
 });
 

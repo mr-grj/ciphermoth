@@ -31,7 +31,7 @@ from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
 HOST_NAME = "com.ciphermoth.desktop.qa"
-CHROMIUM_ID = "emeejhcdcdnlhejcpeohdafdnkmbaddn"
+CHROMIUM_ID = "gjdobbdnepjkgfpcmhjdagkcjholjkkd"
 LABEL = "ciphermoth/extension/v1"
 TO_APP, TO_EXTENSION = 1, 2
 LOGIN = {

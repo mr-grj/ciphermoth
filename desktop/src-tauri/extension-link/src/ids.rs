@@ -3,13 +3,19 @@
 //! `chrome-extension://<id>/` (Windows adds `--parent-window=<n>`), Firefox
 //! passes the manifest path and the extension id.
 //!
-//! The Chromium id comes from the public `key` in extension/manifest/
-//! chromium.json (design decision 34: a throwaway key until the maintainer's
-//! own; a test checks the two agree). A public key is public: any unpacked
-//! extension can claim this id, so the check only keeps out other store
-//! extensions. The pairing is what authenticates the extension.
+//! The first Chromium id comes from the public `key` in extension/manifest/
+//! chromium.json, the Chrome Web Store item's key (design decision 62; a test
+//! checks the two agree). A public key is public: any unpacked extension can
+//! claim these ids, so the check only keeps out other store extensions. The
+//! pairing is what authenticates the extension.
 
-pub const CHROMIUM_IDS: &[&str] = &["emeejhcdcdnlhejcpeohdafdnkmbaddn"];
+pub const CHROMIUM_IDS: &[&str] = &[
+    "gjdobbdnepjkgfpcmhjdagkcjholjkkd",
+    // The throwaway id of 3.6.0-3.8.x (decision 34; its private key was
+    // discarded, so no store item can have it), still accepted so copies
+    // loaded unpacked keep their pairing until users replace them.
+    "emeejhcdcdnlhejcpeohdafdnkmbaddn",
+];
 pub const FIREFOX_IDS: &[&str] = &["ciphermoth@mr-grj.github.io"];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -66,8 +72,10 @@ mod tests {
 
     #[test]
     fn pinned_callers_only() {
-        let chrome = "chrome-extension://emeejhcdcdnlhejcpeohdafdnkmbaddn/";
+        let chrome = "chrome-extension://gjdobbdnepjkgfpcmhjdagkcjholjkkd/";
         assert!(caller_from_args(&args(&[chrome])).is_some());
+        let legacy = "chrome-extension://emeejhcdcdnlhejcpeohdafdnkmbaddn/";
+        assert!(caller_from_args(&args(&[legacy])).is_some());
         assert!(caller_from_args(&args(&[chrome, "--parent-window=1234"])).is_some());
         assert!(caller_from_args(&args(&[
             "/x/com.ciphermoth.desktop.json",
@@ -76,16 +84,16 @@ mod tests {
         .is_some());
         for refused in [
             &["chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/"][..],
-            &["chrome-extension://emeejhcdcdnlhejcpeohdafdnkmbaddn"],
-            &["chrome-extension://emeejhcdcdnlhejcpeohdafdnkmbaddn/x"],
-            &["chrome-extension://EMEEJHCDCDNLHEJCPEOHDAFDNKMBADDN/"],
+            &["chrome-extension://gjdobbdnepjkgfpcmhjdagkcjholjkkd"],
+            &["chrome-extension://gjdobbdnepjkgfpcmhjdagkcjholjkkd/x"],
+            &["chrome-extension://GJDOBBDNEPJKGFPCMHJDAGKCJHOLJKKD/"],
             &[chrome, "--other"],
             &[chrome, "--parent-window=1", "--parent-window=2"],
             &["/x/manifest.json", "evil@example.com"],
             &["/x/manifest.json", "ciphermoth@mr-grj.github.io.evil"],
             &[
                 "/x/manifest.json",
-                "chrome-extension://emeejhcdcdnlhejcpeohdafdnkmbaddn/",
+                "chrome-extension://gjdobbdnepjkgfpcmhjdagkcjholjkkd/",
             ],
             &["ciphermoth@mr-grj.github.io"],
             &[],
@@ -112,6 +120,6 @@ mod tests {
             .flat_map(|b| [b >> 4, b & 15])
             .map(|n| (b'a' + n) as char)
             .collect();
-        assert_eq!(CHROMIUM_IDS, &[id.as_str()]);
+        assert_eq!(CHROMIUM_IDS[0], id);
     }
 }
