@@ -1,6 +1,6 @@
 # Changelog
 
-## [3.9.1] - 2026-11-10
+## [3.9.1] - 2026-11-11
 
 The browser extension is in the stores.
 
