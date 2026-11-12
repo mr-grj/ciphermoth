@@ -70,7 +70,10 @@ if __name__ == "__main__":
                 cwd=ROOT / folder,
                 check=True,
             )
-        for name in ("desktop/src-tauri/tauri.conf.json", "extension/manifest/base.json"):
+        for name in (
+            "desktop/src-tauri/tauri.conf.json",
+            "extension/manifest/base.json",
+        ):
             p = ROOT / name
             data = json.loads(p.read_text())
             data["version"] = args.version

@@ -67,7 +67,10 @@ class MemorySampler:
             "peak_total_rss": self.peak,
             "samples": self.samples,
             "macos_new_webkit_pids": sorted(self.webviews),
-            "scope": "process tree plus WebKit XPCs started during this isolated launch; RSS includes shared pages",
+            "scope": (
+                "process tree plus WebKit XPCs started during this isolated launch; "
+                "RSS includes shared pages"
+            ),
         }
 
 

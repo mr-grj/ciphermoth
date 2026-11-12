@@ -17,9 +17,9 @@ async def serve(proto_in, proto_out, data_dir, applied, started):
 
     from crud.engine import Database
     from main import get_application
-    from vault_sessions import VaultSessions
     from models import SETTINGS_DEFAULTS
     from settings import get_api_settings
+    from vault_sessions import VaultSessions
 
     from .server import CoreServer
 
@@ -99,7 +99,11 @@ def main(started):
                 0,
                 {
                     "code": "startup_failed",
-                    "message": "The vault could not be opened. Check folder permissions, close other CipherMoth windows, or restore a compatible backup. Your vault was not replaced.",
+                    "message": (
+                        "The vault could not be opened. Check folder permissions, "
+                        "close other CipherMoth windows, or restore a compatible "
+                        "backup. Your vault was not replaced."
+                    ),
                 },
             ),
         )
