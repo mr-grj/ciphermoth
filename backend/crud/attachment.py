@@ -1,6 +1,7 @@
 import logging
 
 from sqlalchemy import func, select
+from sqlalchemy.orm import defer
 
 from crud.base import BaseCRUD
 from crud.records import (
@@ -57,6 +58,7 @@ class AttachmentCRUD(BaseCRUD):
         models = (
             await self.session.execute(
                 select(AttachmentModel)
+                .options(defer(AttachmentModel.content, raiseload=True))
                 .where(AttachmentModel.entry_id == entry.id)
                 .order_by(AttachmentModel.created, AttachmentModel.id)
             )

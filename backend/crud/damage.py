@@ -32,15 +32,15 @@ class DamageCRUD(BaseCRUD):
     any remain.
     """
 
-    async def _attachment_is_damaged(
-        self, key: VaultKey, attachment: AttachmentModel
+    @staticmethod
+    def _attachment_is_damaged(
+        key: VaultKey, attachment: AttachmentModel, entry_uid: bytes | None
     ) -> bool:
-        entry = await self.session.get(EntryModel, attachment.entry_id)
-        if entry is None:
+        if entry_uid is None:
             return True
         try:
-            open_attachment_metadata(key, attachment, entry.uid)
-            open_attachment_content(key, attachment, entry.uid)
+            open_attachment_metadata(key, attachment, entry_uid)
+            open_attachment_content(key, attachment, entry_uid)
         except VaultDamaged:
             return True
         return False
@@ -54,16 +54,21 @@ class DamageCRUD(BaseCRUD):
             if entry_is_damaged(key, entry)
         ]
         attachments = []
-        ids = (
-            await self.session.scalars(
-                select(AttachmentModel.id).order_by(AttachmentModel.id)
-            )
-        ).all()
-        for attachment_id in ids:
-            attachment = await self.session.get_one(AttachmentModel, attachment_id)
-            if await self._attachment_is_damaged(key, attachment):
-                attachments.append(attachment_id)
-            self.session.expunge(attachment)
+        # Stream one attachment at a time, including its parent's binding UID,
+        # so the scan neither buffers the vault's file bytes nor queries per file.
+        rows = await self.session.stream(
+            select(AttachmentModel, EntryModel.uid)
+            .outerjoin(EntryModel, AttachmentModel.entry_id == EntryModel.id)
+            .order_by(AttachmentModel.id),
+            execution_options={"yield_per": 1},
+        )
+        try:
+            async for attachment, entry_uid in rows:
+                if self._attachment_is_damaged(key, attachment, entry_uid):
+                    attachments.append(attachment.id)
+                self.session.expunge(attachment)
+        finally:
+            await rows.close()
         return DamagedRows(entries=entries, attachments=attachments)
 
     async def remove(
@@ -74,7 +79,16 @@ class DamageCRUD(BaseCRUD):
             damaged = row is not None and entry_is_damaged(key, row)
         else:
             row = await self.session.get(AttachmentModel, row_id)
-            damaged = row is not None and await self._attachment_is_damaged(key, row)
+            entry_uid = (
+                await self.session.scalar(
+                    select(EntryModel.uid).where(EntryModel.id == row.entry_id)
+                )
+                if row is not None
+                else None
+            )
+            damaged = row is not None and self._attachment_is_damaged(
+                key, row, entry_uid
+            )
         if row is None:
             raise NotFound("No such row.")
         if not damaged:
