@@ -8,7 +8,9 @@ and Firefox installs and updates it from the listing.
 History (decision 64): the 3.9.0 Release workflow created the add-on in the **unlisted**
 channel (AMO id 3124124) while `AMO_JWT_*` were set. AMO never accepts a version number
 twice, in either channel, so 3.9.0 stays unlisted (its signed `.xpi` is on the GitHub
-release) and the next release is the first listed version, uploaded into the same add-on.
+release). 3.9.1 was then uploaded by hand, but the distribution screen was left on "On your
+own" (AMO preselects the channel of the previous version), so it became unlisted as well.
+3.9.2 is the first listed version, uploaded into the same add-on.
 Never delete or disable the add-on: its id could never be used again. Keep `AMO_JWT_*`
 unset in the `extension-release` environment.
 
@@ -127,16 +129,23 @@ No promo tile or marquee: AMO has no such fields.
      vX.Y.Z extension frontend/src/lib/brand.js LICENSE
    ```
 
-3. Versions page -> **Upload a New Version** -> "On this site" -> select
-   `ciphermoth-extension-firefox-X.Y.Z.zip` (never the `.xpi`, never a local build).
-   Validation must show 0 errors; the known warnings are listed in the reviewer notes.
+3. Versions page -> **Upload a New Version**. The first screen asks how to distribute:
+   select **On this site** yourself (AMO preselects the previous version's channel, which
+   was unlisted for 3.9.0 and 3.9.1; "On your own" signs an unlisted version whose number
+   can never be listed). Then select `ciphermoth-extension-firefox-X.Y.Z.zip` (never the
+   `.xpi`, never a local build). Validation must show 0 errors; the known warnings are
+   listed in the reviewer notes.
 4. Compatible platforms: **Firefox** only (untick Firefox for Android).
 5. Source code: **Yes**, upload `ciphermoth-extension-source-X.Y.Z.zip`.
 6. If the Describe page appears (the first listed version), fill it from the texts above.
 7. **Release notes** ("Version notes"): `What's new: https://github.com/mr-grj/ciphermoth/releases/tag/vX.Y.Z`
    plus one or two sentences from the CHANGELOG section.
 8. **Notes for Reviewers:** below, with X.Y.Z replaced. Submit Version.
-9. Afterwards: `rm -rf ~/cm-amo`.
+9. Check that it went to the listed channel: the version's page (Versions -> **Version
+   X.Y.Z**) shows the license and the release notes you entered, and once it is approved
+   https://addons.mozilla.org/firefox/addon/ciphermoth/ shows version X.Y.Z. The Edit
+   Product Page shows **Add-on Media** (screenshots) only after the first listed version.
+10. Afterwards: `rm -rf ~/cm-amo`.
 
 ## Notes for reviewers
 
