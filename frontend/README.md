@@ -17,4 +17,4 @@ React 19 + [Vite](https://vite.dev/) + MUI v9. State via easy-peasy, toasts via 
 |---|---|---|
 | `VITE_API_URL` | `http://localhost:8000/api` | Backend API base URL (embedded at build time) |
 
-For running the whole stack (backend + db + frontend) with Docker, see the [root README](../README.md).
+For running the whole stack (backend with SQLite + frontend) with Docker, see the [root README](../README.md).
