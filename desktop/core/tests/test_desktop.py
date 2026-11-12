@@ -5,8 +5,7 @@ import stat
 from urllib.parse import quote
 
 import pytest
-
-from core_client import Core, frame, multipart, REQUEST, ERROR, SHUTDOWN, CANCEL
+from core_client import CANCEL, ERROR, REQUEST, SHUTDOWN, Core, frame, multipart
 
 PASSWORD = "Desktop-Canary-Master-2026!"
 SECRET = "Desktop-secret-canary-9A!"
@@ -362,7 +361,8 @@ def test_core_has_no_listener(core):
 
     if os.name == "posix" and __import__("sys").platform.startswith("linux"):
         pytest.skip(
-            "Linux dump protection blocks per-process fd inspection; namespace check in native harness"
+            "Linux dump protection blocks per-process fd inspection; "
+            "namespace check in native harness"
         )
     assert not [
         c

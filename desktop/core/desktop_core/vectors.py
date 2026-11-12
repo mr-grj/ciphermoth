@@ -4,8 +4,9 @@ import json
 
 
 def run_all(folder):
-    import helpers
     import sqlite3
+
+    import helpers
     from storage import require_supported_sqlite
 
     require_supported_sqlite()
@@ -50,8 +51,9 @@ def run_all(folder):
             count += 1
         else:
             raise AssertionError("altered record accepted")
-    import io
     import hashlib
+    import io
+
     from backup_format import BackupReader
 
     backup = json.loads((folder / "backup-v2.json").read_text(encoding="utf-8"))

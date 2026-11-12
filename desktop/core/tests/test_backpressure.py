@@ -1,5 +1,4 @@
 import pytest
-
 from desktop_core import framing, server
 
 

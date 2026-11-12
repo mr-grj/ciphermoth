@@ -30,7 +30,8 @@ async def _call(app, header, body):
             return (
                 400,
                 [],
-                b'{"detail":"Choose a new .cmbackup filename. Existing files are never replaced."}',
+                b'{"detail":"Choose a new .cmbackup filename. '
+                b'Existing files are never replaced."}',
             )
         fd, partial = tempfile.mkstemp(
             prefix=".ciphermoth-", suffix=".partial", dir=path.parent
@@ -75,8 +76,15 @@ async def _call(app, header, body):
             value = fields[key]
             if not isinstance(value, str) or len(value) > 4096:
                 raise ValueError("invalid form field")
-            prefix += f'--{boundary}\r\nContent-Disposition: form-data; name="{key}"\r\n\r\n{value}\r\n'.encode()
-        prefix += f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="vault.cmbackup"\r\nContent-Type: application/octet-stream\r\n\r\n'.encode()
+            prefix += (
+                f'--{boundary}\r\nContent-Disposition: form-data; name="{key}"'
+                f"\r\n\r\n{value}\r\n"
+            ).encode()
+        prefix += (
+            f"--{boundary}\r\n"
+            'Content-Disposition: form-data; name="file"; filename="vault.cmbackup"'
+            "\r\nContent-Type: application/octet-stream\r\n\r\n"
+        ).encode()
         suffix = f"\r\n--{boundary}--\r\n".encode()
 
         def chunks():
@@ -110,9 +118,15 @@ async def call(app, header, body):
         if error.errno == errno.ENOSPC:
             detail = "Not enough free disk space. Free space and try again."
         elif error.errno in (errno.EACCES, errno.EPERM, errno.EROFS):
-            detail = "The selected file or folder is not accessible. Choose a writable folder."
+            detail = (
+                "The selected file or folder is not accessible. "
+                "Choose a writable folder."
+            )
         elif error.errno == errno.EEXIST:
             detail = "A file already exists there. Choose a new filename."
         else:
-            detail = "The file operation could not finish safely. Check the selected file, available disk space, and folder permissions."
+            detail = (
+                "The file operation could not finish safely. Check the selected "
+                "file, available disk space, and folder permissions."
+            )
         return 400, [], json.dumps({"detail": detail}).encode()

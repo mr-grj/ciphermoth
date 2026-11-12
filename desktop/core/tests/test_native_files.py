@@ -1,7 +1,6 @@
 import asyncio
 
 import pytest
-
 from desktop_core import asgi_bridge, native_files
 
 
