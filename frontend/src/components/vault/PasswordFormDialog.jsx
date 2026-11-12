@@ -92,6 +92,7 @@ const FormSection = ({ label, count, preview, open, onToggle, children }) => (
   <Box sx={{ borderTop: "1px solid", borderColor: "divider" }}>
     <ButtonBase
       onClick={onToggle}
+      aria-expanded={open}
       sx={{
         width: "100%",
         justifyContent: "space-between",

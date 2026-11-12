@@ -666,7 +666,7 @@ const PasswordsPage = () => {
         }}
       >
         <Box>
-          <Typography variant="h4" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+          <Typography component="h2" variant="h4" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
             The Vault
           </Typography>
           <Typography variant="body2" sx={{ color: "text.secondary", mt: 0.5 }}>

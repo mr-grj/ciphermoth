@@ -45,10 +45,23 @@ const TotpCell = ({ secret, onCopy }) => {
   return (
     <Tooltip title="Copy 2FA code">
       <Box
+        component="button"
+        type="button"
+        aria-label={`Copy 2FA code ${code.slice(0, 3)} ${code.slice(3)}`}
         onClick={() => onCopy?.(code)}
-        sx={{ display: "flex", alignItems: "center", gap: 0.75, cursor: "pointer" }}
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          gap: 0.75,
+          cursor: "pointer",
+          border: 0,
+          p: 0,
+          bgcolor: "transparent",
+          color: "inherit",
+        }}
       >
         <Typography
+          component="span"
           variant="body2"
           sx={{
             fontFamily: "'Space Mono', monospace",
@@ -59,6 +72,7 @@ const TotpCell = ({ secret, onCopy }) => {
           {code.slice(0, 3)} {code.slice(3)}
         </Typography>
         <CircularProgress
+          aria-label="2FA code time remaining"
           variant="determinate"
           value={(remaining / PERIOD) * 100}
           size={16}

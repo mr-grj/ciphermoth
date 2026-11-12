@@ -115,7 +115,7 @@ const TopMenu = () => {
                     fontFamily: "'Space Mono', monospace",
                     fontSize: 10,
                     letterSpacing: "0.08em",
-                    color: "rgba(255,255,255,0.4)",
+                    color: "rgba(255,255,255,0.5)",
                     cursor: "default",
                     display: { xs: "none", sm: "inline" },
                   }}

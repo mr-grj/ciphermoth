@@ -289,6 +289,84 @@ test("unlock in CipherMoth: the handoff through the real web app", async () => {
   await expect(after.getByPlaceholder("Search logins")).toBeVisible();
 });
 
+test("the web vault exposes its headings, favorite header and keyboard 2FA copy", async () => {
+  const session = await api(stack, "/master_password/unlock", {
+    body: { master_password: MASTER_PASSWORD },
+  });
+  expect(session.status).toBe(200);
+  const vault = await browser.context.newPage();
+  await vault.addInitScript((token) => {
+    sessionStorage.setItem("ciphermothSession", token);
+    Object.defineProperty(navigator, "clipboard", {
+      value: {
+        writeText: async (value: string) => {
+          (window as unknown as { copied: string }).copied = value;
+        },
+      },
+    });
+  }, session.body.session_token);
+  await vault.setViewportSize({ width: 1440, height: 1000 });
+  await vault.goto("https://vault.test/passwords");
+  await expect(vault.getByRole("heading", { name: "The Vault", level: 2 })).toBeVisible();
+  await expect(vault.getByRole("columnheader", { name: "Favorite" })).toHaveCount(1);
+  await expect(
+    vault.getByRole("progressbar", { name: "2FA code time remaining" }).first()
+  ).toBeVisible();
+  const copy = vault.getByRole("button", { name: /^Copy 2FA code \d{3} \d{3}$/ }).first();
+  await copy.focus();
+  await expect(copy).toBeFocused();
+  await copy.press("Enter");
+  await expect
+    .poll(() => vault.evaluate(() => (window as unknown as { copied?: string }).copied))
+    .toMatch(/^\d{6}$/);
+  await vault.close();
+});
+
+test("the web generator and optional fields expose keyboard controls and state", async () => {
+  const session = await api(stack, "/master_password/unlock", {
+    body: { master_password: MASTER_PASSWORD },
+  });
+  expect(session.status).toBe(200);
+  const vault = await browser.context.newPage();
+  await vault.addInitScript((token) => {
+    sessionStorage.setItem("ciphermothSession", token);
+  }, session.body.session_token);
+  await vault.goto("https://vault.test/passwords");
+  await vault.getByRole("button", { name: "Add", exact: true }).click();
+  const dialog = vault.getByRole("dialog");
+  await dialog.getByRole("button", { name: "Generate password", exact: true }).click();
+  const length = dialog.getByRole("slider", { name: "Length", exact: true });
+  await expect(length).toHaveValue("16");
+  await length.focus();
+  await length.press("ArrowRight");
+  await expect(length).toHaveValue("17");
+  await expect(dialog.getByLabel(/^Password/)).toHaveValue(/^.{17}$/);
+
+  const uppercase = dialog.getByRole("button", { name: "A–Z", exact: true });
+  await expect(uppercase).toHaveAttribute("aria-pressed", "true");
+  await uppercase.focus();
+  await uppercase.press("Enter");
+  await expect(uppercase).toHaveAttribute("aria-pressed", "false");
+
+  const tags = dialog.getByRole("button", { name: "Tags", exact: true });
+  await expect(tags).toHaveAttribute("aria-expanded", "false");
+  await tags.focus();
+  await tags.press("Enter");
+  await expect(tags).toHaveAttribute("aria-expanded", "true");
+  await expect(dialog.getByLabel("Tags", { exact: true })).toBeVisible();
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(dialog).toBeHidden();
+  await vault.getByRole("button", { name: "Health", exact: true }).click();
+  const health = vault.getByRole("dialog", { name: "Vault Health", exact: true });
+  const score = health.getByRole("meter", { name: "Vault Health", exact: true });
+  await expect(score).toHaveAttribute("aria-valuemin", "0");
+  await expect(score).toHaveAttribute("aria-valuemax", "100");
+  await expect(score).toHaveAttribute("aria-valuenow", /^(?:\d{1,2}|100)$/);
+  await expect(health.getByRole("progressbar")).toHaveCount(0);
+  await expect(health.getByRole("heading", { level: 4 })).toHaveCount(0);
+  await vault.close();
+});
+
 test("disconnect from the vault's Settings locks the extension", async () => {
   const web = await site("https://vault.test/login");
   await web.getByLabel("Master Password").fill(MASTER_PASSWORD);
