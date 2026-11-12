@@ -367,6 +367,67 @@ test("the web generator and optional fields expose keyboard controls and state",
   await vault.close();
 });
 
+test("the update notice keeps its visible name and respects the update opt-out", async () => {
+  const session = await api(stack, "/master_password/unlock", {
+    body: { master_password: MASTER_PASSWORD },
+  });
+  expect(session.status).toBe(200);
+  const settings = await api(stack, "/settings", {
+    method: "GET",
+    token: session.body.session_token,
+  });
+  expect(settings.status).toBe(200);
+  expect(
+    (
+      await api(stack, "/settings", {
+        method: "PATCH",
+        token: session.body.session_token,
+        body: { ...settings.body, update_check_enabled: false },
+      })
+    ).status
+  ).toBe(200);
+  const vault = await browser.context.newPage();
+  await vault.addInitScript((token) => {
+    sessionStorage.setItem("ciphermothSession", token);
+  }, session.body.session_token);
+  let checks = 0;
+  await vault.route("https://api.github.com/**", async (route) => {
+    checks += 1;
+    expect(route.request().headers()["x-ciphermoth-session"]).toBeUndefined();
+    await route.fulfill({
+      json: {
+        tag_name: "v99.0.0",
+        html_url: "https://github.com/mr-grj/ciphermoth/releases/tag/v99.0.0",
+      },
+    });
+  });
+  await vault.goto("https://vault.test/passwords");
+  await vault.getByRole("button", { name: "Settings", exact: true }).click();
+  await vault.getByRole("switch", { name: /Check for updates/ }).check();
+  await vault.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(vault.getByRole("dialog")).toBeHidden();
+  const update = vault.getByRole("button", { name: "Update", exact: true });
+  await expect(update).toBeVisible();
+  await update.focus();
+  await update.press("Enter");
+  const notice = vault.getByRole("dialog", { name: "A new moult is ready", exact: true });
+  await expect(notice.getByText("v99.0.0", { exact: true })).toBeVisible();
+  await expect(notice.getByRole("link")).toHaveAttribute("rel", "noopener noreferrer");
+  await notice.getByRole("button", { name: "Close", exact: true }).click();
+
+  await vault.getByRole("button", { name: "Settings", exact: true }).click();
+  await vault.getByRole("switch", { name: /Check for updates/ }).uncheck();
+  await vault.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(vault.getByRole("dialog")).toBeHidden();
+  const before = checks;
+  await vault.reload();
+  await expect(vault.getByRole("gridcell", { name: "GitHub", exact: true })).toBeVisible();
+  await vault.waitForTimeout(1000);
+  expect(checks).toBe(before);
+  await expect(vault.getByRole("button", { name: "Update", exact: true })).toHaveCount(0);
+  await vault.close();
+});
+
 test("disconnect from the vault's Settings locks the extension", async () => {
   const web = await site("https://vault.test/login");
   await web.getByLabel("Master Password").fill(MASTER_PASSWORD);
