@@ -13,6 +13,9 @@ on:
         required: true
         type: string
 
+permissions:
+  contents: read
+
 jobs:
   published:
     name: Published ${{ inputs.version }} (${{ matrix.platform.slug }})
@@ -29,15 +32,16 @@ jobs:
     env:
       RELEASE_VERSION: ${{ inputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       - name: Validate the release version
         run: '[[ "$RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]'
 
       - name: Install cosign
-        uses: sigstore/cosign-installer@v3
+        uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
 
       - name: Pull the published images
         run: |

@@ -12,6 +12,9 @@ on:
         type: boolean
         default: false
   workflow_call:
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY:
+        required: false
     inputs:
       release:
         type: boolean
@@ -64,7 +67,7 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -90,12 +93,24 @@ jobs:
           } > desktop-results/runner.txt 2>&1 || true
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+        with:
+          enable-cache: true
+          cache-suffix: desktop-${{ matrix.id }}-${{ inputs.release && 'release' || 'validation' }}-${{ env.OPENSSL_VERSION }}
+          cache-dependency-glob: |
+            backend/uv.lock
+            desktop/core/requirements*
+            desktop/core/build_openssl.sh
+            .github/workflows/desktop.yml
 
       - name: Install Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            desktop/package-lock.json
 
       - name: Install Rust (if missing)
         run: |
@@ -111,6 +126,16 @@ jobs:
             fi
           fi
 
+      # Partition caches across the protected release and PR validation contexts.
+      # Workspace binaries are rebuilt; no signed packages or signing files are cached.
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          workspaces: desktop/src-tauri -> target
+          key: desktop-${{ matrix.id }}-${{ inputs.release && 'release' || 'validation' }}-${{ hashFiles('.github/workflows/desktop.yml') }}
+          cache-bin: false
+          cache-workspace-crates: false
+
       - name: Linux packages
         if: runner.os == 'Linux'
         run: |
@@ -119,15 +144,37 @@ jobs:
             libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev patchelf file \
             xvfb xauth dbus-x11 lsof libfuse2
 
+      - name: Identify the OpenSSL compiler
+        if: matrix.openssl
+        id: openssl-compiler
+        run: |
+          compiler=$( { clang --version; xcrun --show-sdk-version; } | shasum -a 256 | cut -d ' ' -f 1)
+          echo "hash=$compiler" >> "$GITHUB_OUTPUT"
+
+      - name: Cache static OpenSSL
+        if: matrix.openssl
+        id: openssl-cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ runner.temp }}/openssl
+          key: openssl-v1-${{ matrix.id }}-${{ inputs.release && 'release' || 'validation' }}-${{ env.OPENSSL_VERSION }}-${{ steps.openssl-compiler.outputs.hash }}-${{ hashFiles('desktop/core/build_openssl.sh', '.github/workflows/desktop.yml') }}
+
       - name: Static OpenSSL for cryptography (macOS without wheel)
         if: matrix.openssl
+        env:
+          CACHE_HIT: ${{ steps.openssl-cache.outputs.cache-hit }}
         run: |
           start=$(date +%s)
-          OPENSSL_EXTRA_FLAGS="-mmacosx-version-min=11.0 no-module" \
-            desktop/core/build_openssl.sh "${{ matrix.openssl }}" "$RUNNER_TEMP/openssl" 2>/dev/null
-          echo "OPENSSL_DIR=$RUNNER_TEMP/openssl" >> "$GITHUB_ENV"
-          echo "OPENSSL_STATIC=1" >> "$GITHUB_ENV"
-          echo "MACOSX_DEPLOYMENT_TARGET=11.0" >> "$GITHUB_ENV"
+          if [ "$CACHE_HIT" != "true" ]; then
+            OPENSSL_EXTRA_FLAGS="-mmacosx-version-min=11.0 no-module" \
+              desktop/core/build_openssl.sh "${{ matrix.openssl }}" "$RUNNER_TEMP/openssl" 2>/dev/null
+          fi
+          test -s "$RUNNER_TEMP/openssl/lib/libcrypto.a"
+          {
+            echo "OPENSSL_DIR=$RUNNER_TEMP/openssl"
+            echo "OPENSSL_STATIC=1"
+            echo "MACOSX_DEPLOYMENT_TARGET=11.0"
+          } >> "$GITHUB_ENV"
           echo "openssl_build_s=$(( $(date +%s) - start ))" >> desktop-results/source-builds.txt
 
       - name: Static OpenSSL for cryptography (Windows without wheel)
@@ -203,7 +250,7 @@ jobs:
 
       - name: Upload verified production packages
         if: inputs.release
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: desktop-packages-${{ matrix.id }}
           path: desktop-results/packages/*
@@ -212,7 +259,7 @@ jobs:
 
       - name: Upload evidence only
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: desktop-results-${{ matrix.id }}
           path: |
