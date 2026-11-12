@@ -129,7 +129,7 @@ const TopMenu = () => {
           {userIsAuth ? (
             <>
               {updateAvailable && (
-                <Tooltip title="A new CipherMoth release is available">
+                <Tooltip title="A new CipherMoth release is available" describeChild>
                   <Chip
                     icon={<UpgradeIcon sx={{ fontSize: 18 }} />}
                     label="Update"
