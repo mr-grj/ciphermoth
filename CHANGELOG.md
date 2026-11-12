@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.9.2] - 2026-11-12
+
+The first version listed on addons.mozilla.org; nothing else changes.
+
+### Changed
+
+- **Firefox:** [addons.mozilla.org](https://addons.mozilla.org/firefox/addon/ciphermoth/) lists CipherMoth from 3.9.2. 3.9.1 reached addons.mozilla.org only as a self-distributed (unlisted) version, which AMO never lists, so its Firefox listing link stayed empty. The Chrome Web Store gets 3.9.2 too, so both stores carry the same version. The extension, the app and the server are unchanged apart from the version number.
+
 ## [3.9.1] - 2026-11-11
 
 The browser extension is in the stores.

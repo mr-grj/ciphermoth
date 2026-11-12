@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "CipherMoth",
   "short_name": "CipherMoth",
-  "version": "3.9.1",
+  "version": "3.9.2",
   "description": "Fill logins from your self-hosted CipherMoth vault, only when you ask. No account, no tracking.",
   "homepage_url": "https://github.com/mr-grj/ciphermoth",
   "icons": {
