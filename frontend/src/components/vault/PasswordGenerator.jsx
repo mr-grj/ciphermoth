@@ -26,6 +26,7 @@ const PasswordGenerator = ({ options, onChangeLength, onToggleClass, onRegenerat
           </Typography>
         </Stack>
         <Slider
+          aria-label="Length"
           size="small"
           value={options.length}
           min={8}
@@ -41,6 +42,7 @@ const PasswordGenerator = ({ options, onChangeLength, onToggleClass, onRegenerat
             label={label}
             size="small"
             onClick={() => onToggleClass(key)}
+            aria-pressed={options[key]}
             color={options[key] ? "primary" : "default"}
             variant={options[key] ? "filled" : "outlined"}
             sx={{ fontFamily: "'Space Mono', monospace", fontWeight: 600 }}

@@ -108,6 +108,21 @@ export const createColumns = ({
   {
     field: "favorite",
     headerName: "",
+    renderHeader: () => (
+      <Box
+        component="span"
+        sx={{
+          position: "absolute",
+          width: 1,
+          height: 1,
+          overflow: "hidden",
+          clip: "rect(0, 0, 0, 0)",
+          whiteSpace: "nowrap",
+        }}
+      >
+        Favorite
+      </Box>
+    ),
     width: 48,
     sortable: false,
     align: "center",

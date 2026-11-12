@@ -38,6 +38,7 @@ const ScoreGauge = ({ score }) => {
     <Stack spacing={1} sx={{ alignItems: "center" }}>
       <Box sx={{ position: "relative", display: "inline-flex" }}>
         <CircularProgress
+          aria-hidden="true"
           variant="determinate"
           value={100}
           size={120}
@@ -45,6 +46,8 @@ const ScoreGauge = ({ score }) => {
           sx={{ color: "divider" }}
         />
         <CircularProgress
+          role="meter"
+          aria-label="Vault Health"
           variant="determinate"
           value={score}
           size={120}
@@ -62,7 +65,7 @@ const ScoreGauge = ({ score }) => {
             justifyContent: "center",
           }}
         >
-          <Typography variant="h4" sx={{ fontWeight: 700, lineHeight: 1 }}>
+          <Typography component="span" variant="h4" sx={{ fontWeight: 700, lineHeight: 1 }}>
             {score}
           </Typography>
           <Typography variant="caption" sx={{ color: "text.secondary" }}>
@@ -70,7 +73,11 @@ const ScoreGauge = ({ score }) => {
           </Typography>
         </Box>
       </Box>
-      <Typography variant="subtitle2" sx={{ fontWeight: 700, color: `${color}.main` }}>
+      <Typography
+        component="p"
+        variant="subtitle2"
+        sx={{ fontWeight: 700, color: `${color}.main` }}
+      >
         {scoreLabel(score)}
       </Typography>
     </Stack>
@@ -90,6 +97,7 @@ const StatTile = ({ icon: Icon, label, count, color }) => (
   >
     <Icon fontSize="small" sx={{ color: count ? `${color}.main` : "text.disabled" }} />
     <Typography
+      component="p"
       variant="h6"
       sx={{ fontWeight: 700, lineHeight: 1.2, color: count ? "text.primary" : "text.disabled" }}
     >
@@ -107,7 +115,7 @@ const IssueGroup = ({ icon: Icon, title, hint, color, entries, onSelect }) => {
     <Box>
       <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
         <Icon fontSize="small" sx={{ color: `${color}.main` }} />
-        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+        <Typography component="h3" variant="subtitle2" sx={{ fontWeight: 700 }}>
           {title}
         </Typography>
         <Typography variant="caption" sx={{ color: "text.secondary" }}>
