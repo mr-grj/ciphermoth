@@ -1,5 +1,29 @@
 # Changelog
 
+## [3.9.3] - 2026-11-13
+
+Privacy and reliability hardening, more accessible vault controls, and faster attachment metadata and integrity checks.
+
+### Security
+
+- Update desktop TLS and supporting Rust dependencies to reviewed patch releases.
+- Keep decrypted URL and backup values out of long-lived parser caches; render terminal control characters safely and redact configured URL credentials from CLI diagnostics.
+- Exclude local configuration and private audit files from container build contexts, and strengthen extension fill-target visibility checks.
+
+### Fixed
+
+- Keep the clipboard setting visibly off when optional clipboard access is denied.
+- Refuse malformed native request headers safely, and keep security-key cancellation and timeouts scoped to their own request. Oversized key-helper replies are refused and the child is cleaned up.
+- Make TOTP copy, generator options, vault health and grid controls accessible to keyboard and assistive-technology users.
+
+### Changed
+
+- Avoid reading attachment payloads for metadata listings and avoid per-file parent queries during integrity scans, preserving integrity checks and response behavior.
+- Use a supported pinned Node LTS frontend runtime and harden CI actions, dependency caches and workflow validation.
+- Expand cryptographic, WebAuthn, native channel and browser regression coverage; correct storage, backup and CLI documentation against the implementation.
+
+Vault, backup and session formats, extension IDs and connection protocols are unchanged.
+
 ## [3.9.2] - 2026-11-12
 
 The first version listed on addons.mozilla.org; nothing else changes.
