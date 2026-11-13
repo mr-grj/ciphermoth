@@ -1,6 +1,6 @@
 {
   "name": "ciphermoth-extension",
-  "version": "3.9.2",
+  "version": "3.9.3",
   "private": true,
   "type": "module",
   "description": "Fill logins from your self-hosted CipherMoth vault.",

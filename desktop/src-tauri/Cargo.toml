@@ -1,6 +1,6 @@
 [package]
 name = "ciphermoth-desktop"
-version = "3.9.2"
+version = "3.9.3"
 edition = "2021"
 license = "MIT"
 publish = false

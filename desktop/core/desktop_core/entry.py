@@ -9,7 +9,7 @@ import sys
 import time
 from pathlib import Path
 
-CORE_VERSION = "3.9.2"
+CORE_VERSION = "3.9.3"
 
 
 async def serve(proto_in, proto_out, data_dir, applied, started):

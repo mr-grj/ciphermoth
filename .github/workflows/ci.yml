@@ -201,9 +201,8 @@ jobs:
           cp dist/packages/SHA256SUMS "$RUNNER_TEMP/SHA256SUMS"
           node scripts/verify.mjs "$RUNNER_TEMP/SHA256SUMS"
 
-      # The packages of this commit, byte-identical to what a release of it
-      # builds: the first Chrome Web Store upload is made from these
-      # (extension/store/chrome-web-store.md).
+      # Verify this commit's reproducible packages. Store submissions use the
+      # matching published release assets (extension/store/chrome-web-store.md).
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: extension-packages
