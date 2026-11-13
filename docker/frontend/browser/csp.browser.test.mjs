@@ -127,6 +127,23 @@ describe("API on another origin", () => {
 
   after(() => stopFrontend(frontend));
 
+  test("the frontend runs on a supported LTS runtime", () => {
+    const runtime = JSON.parse(
+      execFileSync("docker", [
+        "exec",
+        frontend.name,
+        "node",
+        "-p",
+        "JSON.stringify({version:process.versions.node,lts:process.release.lts})",
+      ]).toString()
+    );
+    // Review this policy when adding a major: nodejs/Release's support schedule.
+    // https://github.com/nodejs/Release/blob/main/schedule.json
+    const ends = { 22: "2027-04-30", 24: "2028-04-30", 26: "2029-04-30" };
+    const end = ends[runtime.version.split(".")[0]];
+    assert.ok(runtime.lts && end && Date.now() < Date.parse(end), JSON.stringify(runtime));
+  });
+
   test("the policy names exactly the API origin and the release check", async () => {
     const response = await fetch(frontend.url);
     const csp = response.headers.get("content-security-policy");

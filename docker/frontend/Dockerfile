@@ -1,4 +1,5 @@
-FROM node:20-alpine AS builder
+# Keep both stages on the same reviewed, supported LTS base.
+FROM node:24-alpine@sha256:116b800c3754b440ee0aa3ed2f20f5bf3d99a554bfd9adeea09ea8017f6e85f5 AS builder
 
 ARG VITE_API_URL=http://localhost:8000/api
 ARG VITE_GITHUB_REPO=mr-grj/ciphermoth
@@ -16,7 +17,7 @@ COPY frontend/ .
 RUN npm run build
 
 
-FROM node:20-alpine AS runtime
+FROM node:24-alpine@sha256:116b800c3754b440ee0aa3ed2f20f5bf3d99a554bfd9adeea09ea8017f6e85f5 AS runtime
 
 LABEL io.ciphermoth.min-updater-protocol="3"
 
