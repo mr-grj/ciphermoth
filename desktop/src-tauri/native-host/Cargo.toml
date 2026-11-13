@@ -2,6 +2,7 @@
 name = "ciphermoth-native-host"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
 publish = false
 description = "The native-messaging host of the CipherMoth browser extension: relays between the browser and the running desktop app."
 

@@ -41,7 +41,8 @@ def damaged(what: str) -> VaultDamaged:
 
 
 class _Strict(BaseModel):
-    model_config = ConfigDict(extra="forbid", strict=True)
+    # Keep plaintext record values out of pydantic's parser string cache.
+    model_config = ConfigDict(extra="forbid", strict=True, cache_strings=False)
 
 
 class StoredField(_Strict):

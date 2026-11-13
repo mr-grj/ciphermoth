@@ -174,6 +174,45 @@ mod tests {
         }
     }
 
+    #[test]
+    fn interrupted_one_byte_reads_preserve_frame_boundaries() {
+        struct Fragmented {
+            input: Cursor<Vec<u8>>,
+            interrupt: bool,
+        }
+
+        impl Read for Fragmented {
+            fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+                self.interrupt = !self.interrupt;
+                if self.interrupt {
+                    Err(io::Error::from(io::ErrorKind::Interrupted))
+                } else {
+                    self.input.read(&mut buffer[..1])
+                }
+            }
+        }
+
+        let mut bytes = framed(br#"{"t":"first"}"#);
+        bytes.extend(framed(br#"{"t":"second"}"#));
+        let mut stream = Fragmented {
+            input: Cursor::new(bytes),
+            interrupt: false,
+        };
+        assert_eq!(read_object(&mut stream).unwrap()["t"], "first");
+        assert_eq!(read_object(&mut stream).unwrap()["t"], "second");
+        assert!(matches!(read_object(&mut stream), Err(FrameError::Eof)));
+    }
+
+    #[test]
+    fn deeply_nested_json_is_refused_within_the_frame_limit() {
+        let nested = format!("{{\"t\":{}0{}}}", "[".repeat(1000), "]".repeat(1000));
+        assert!(nested.len() < MAX_MESSAGE);
+        assert!(matches!(
+            read_object(&mut Cursor::new(framed(nested.as_bytes()))),
+            Err(FrameError::NotJson)
+        ));
+    }
+
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(10_000))]
 

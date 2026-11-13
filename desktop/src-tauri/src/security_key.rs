@@ -21,12 +21,17 @@ const MAX_PIN: usize = 255;
 // The core gives up on its own (key wait and WebAuthn timeout); this is a backstop.
 const DEADLINE: Duration = Duration::from_secs(240);
 
+struct Running {
+    child: Child,
+    operation: Arc<()>,
+}
+
 pub struct SecurityKeys {
     executable: Result<PathBuf, String>,
     args: Vec<PathBuf>,
     env: Vec<(String, String)>,
     working_dir: PathBuf,
-    running: Mutex<Option<Child>>,
+    running: Mutex<Option<Running>>,
 }
 
 impl SecurityKeys {
@@ -61,6 +66,7 @@ impl SecurityKeys {
             use std::os::windows::process::CommandExt;
             command.creation_flags(0x0800_0000);
         }
+        let operation = Arc::new(());
         let mut stdout = {
             let mut running = self.running.lock().unwrap();
             if running.is_some() {
@@ -71,29 +77,38 @@ impl SecurityKeys {
                 .map_err(|_| "The security key could not be used.".to_string())?;
             let stdin = child.stdin.take();
             let stdout = child.stdout.take();
-            *running = Some(child);
+            *running = Some(Running {
+                child,
+                operation: operation.clone(),
+            });
             let (Some(mut stdin), Some(stdout)) = (stdin, stdout) else {
                 drop(running);
-                self.cancel();
+                self.cancel_operation(&operation);
                 return Err("The security key could not be used.".into());
             };
             if stdin.write_all(&body).is_err() {
                 drop(running);
-                self.cancel();
+                self.cancel_operation(&operation);
                 return Err("The security key could not be used.".into());
             }
             stdout
         };
         let watchdog = Arc::downgrade(self);
+        let watched_operation = operation.clone();
         std::thread::spawn(move || {
             std::thread::sleep(DEADLINE);
             if let Some(keys) = watchdog.upgrade() {
-                keys.cancel();
+                keys.cancel_operation(&watched_operation);
             }
         });
         let mut reply = Vec::new();
-        let _ = (&mut stdout).take(MAX_REPLY).read_to_end(&mut reply);
-        let finished = self.running.lock().unwrap().take();
+        let read = (&mut stdout).take(MAX_REPLY + 1).read_to_end(&mut reply);
+        drop(stdout);
+        if read.is_err() || reply.len() > MAX_REPLY as usize {
+            self.cancel_operation(&operation);
+            return Err("The security key could not be used.".into());
+        }
+        let finished = self.finish(&operation);
         let Some(mut child) = finished else {
             return Err("cancelled".into());
         };
@@ -115,8 +130,29 @@ impl SecurityKeys {
         })
     }
 
+    // A cancelled request can finish reading after a replacement has started.
+    // Its completion and watchdog must only consume its own child.
+    fn finish(&self, operation: &Arc<()>) -> Option<Child> {
+        let mut running = self.running.lock().unwrap();
+        if running
+            .as_ref()
+            .is_some_and(|current| Arc::ptr_eq(&current.operation, operation))
+        {
+            running.take().map(|current| current.child)
+        } else {
+            None
+        }
+    }
+
+    fn cancel_operation(&self, operation: &Arc<()>) {
+        if let Some(mut child) = self.finish(operation) {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+    }
+
     pub fn cancel(&self) {
-        if let Some(mut child) = self.running.lock().unwrap().take() {
+        if let Some(Running { mut child, .. }) = self.running.lock().unwrap().take() {
             let _ = child.kill();
             let _ = child.wait();
         }
@@ -173,6 +209,72 @@ pub fn security_key_cancel(keys: State<'_, Arc<SecurityKeys>>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn stale_key_request_completion_and_timeout_leave_the_current_child_running() {
+        let keys = SecurityKeys::new(CoreConfig {
+            executable: Err("unused by this lifecycle test".into()),
+            args: vec![],
+            env: vec![],
+            data_dir: std::env::temp_dir(),
+            log_dir: std::env::temp_dir(),
+        });
+        let old = Arc::new(());
+        let current = Arc::new(());
+        let child = Command::new("/bin/sh")
+            .args(["-c", "exec sleep 30"])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .unwrap();
+        *keys.running.lock().unwrap() = Some(Running {
+            child,
+            operation: current.clone(),
+        });
+        let stale_completion = keys.finish(&old).is_none();
+        keys.cancel_operation(&old);
+        let still_running = keys
+            .running
+            .lock()
+            .unwrap()
+            .as_mut()
+            .is_some_and(|run| run.child.try_wait().unwrap().is_none());
+        let matching = keys.finish(&current);
+        let matched = matching.is_some();
+        // Reap even when an assertion will fail; never leave the test child behind.
+        if let Some(mut child) = matching {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+        keys.cancel();
+        assert!(stale_completion);
+        assert!(still_running, "an old request stopped its replacement");
+        assert!(
+            matched,
+            "the active request could not collect its own child"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn oversized_key_replies_are_refused_and_the_child_is_reaped() {
+        let keys = SecurityKeys::new(CoreConfig {
+            executable: Ok("/bin/sh".into()),
+            args: vec!["-c".into(), "head -c 65537 /dev/zero; exec sleep 3".into()],
+            env: vec![("PATH".into(), "/usr/bin:/bin".into())],
+            data_dir: std::env::temp_dir(),
+            log_dir: std::env::temp_dir(),
+        });
+        let started = std::time::Instant::now();
+        assert!(keys.run(json!({})).is_err());
+        assert!(keys.running.lock().unwrap().is_none());
+        assert!(
+            started.elapsed() < Duration::from_secs(2),
+            "oversized reply waited for child exit"
+        );
+    }
 
     #[test]
     fn pins_are_bounded_and_empty_means_none() {

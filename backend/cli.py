@@ -1,21 +1,23 @@
 import binascii
 import contextlib
 import os
+import re
 import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Any, NoReturn
-from urllib.parse import quote, urlparse
+from urllib.parse import quote
 
 import httpx
 import typer
 from rich.console import Console
-from rich.markup import escape
+from rich.markup import escape as _markup_escape
 from rich.table import Table
 
 from helpers import generate_totp
+from url_parse import split_url
 
 app = typer.Typer(
     name="ciphermoth",
@@ -57,12 +59,34 @@ _NO_UNLOCK_ROUTE = (
 )
 
 
+_TERMINAL_CONTROL = re.compile(r"[\x1b\x80-\x9f]")
+
+
+def _safe_markup(value: str) -> str:
+    # Rich's markup escaping alone passes terminal controls through to a pipe.
+    visible = _TERMINAL_CONTROL.sub(lambda match: f"\\x{ord(match[0]):02x}", value)
+    return _markup_escape(visible)
+
+
 def _api_url() -> str:
     return os.environ.get("CIPHERMOTH_API_URL", "http://localhost:8000/api").rstrip("/")
 
 
+def _display_api_url() -> str:
+    # Proxy credentials and URL metadata must not be copied into diagnostics.
+    address = _api_url()
+    try:
+        parts = split_url(address)
+    except ValueError:
+        return "<configured API>"
+    if "@" not in parts.netloc and not parts.query and not parts.fragment:
+        return address
+    authority = parts.netloc.rsplit("@", 1)[-1]
+    return f"{parts.scheme}://{authority}{parts.path}"
+
+
 def _die(msg: str) -> NoReturn:
-    _err.print(f"[red]✗[/red]  {escape(msg)}")
+    _err.print(f"[red]✗[/red]  {_safe_markup(msg)}")
     raise typer.Exit(1)
 
 
@@ -90,13 +114,13 @@ def _check(resp: httpx.Response) -> None:
 
 
 def _warn_plaintext_transport() -> None:
-    parsed = urlparse(_api_url())
+    parsed = split_url(_api_url())
     host = parsed.hostname or ""
     if parsed.scheme == "https" or host in _LOCAL_HOSTS:
         return
 
     _err.print(
-        f"[yellow]![/yellow]  {escape(host)} is reached over plain HTTP, so your "
+        f"[yellow]![/yellow]  {_safe_markup(host)} is reached over plain HTTP, so your "
         f"master password crosses the network unencrypted. Put the API behind HTTPS."
     )
 
@@ -105,7 +129,7 @@ def _features(client: httpx.Client) -> list[str] | None:
     try:
         resp = client.get("/meta")
     except httpx.ConnectError:
-        _die(f"Cannot reach the API at {_api_url()!r}. Is the service running?")
+        _die(f"Cannot reach the API at {_display_api_url()!r}. Is the service running?")
     except httpx.HTTPError:
         return None
     if not resp.is_success:
@@ -138,7 +162,7 @@ def _security_key_answer(challenge: dict) -> dict:
         except SecurityKeyPinInvalid as error:
             if attempt == 2:
                 _die(str(error))
-            _err.print(f"[red]✗[/red]  {escape(str(error))}")
+            _err.print(f"[red]✗[/red]  {_safe_markup(str(error))}")
         except SecurityKeyError as error:
             _die(str(error))
     _die("The security key could not be used.")
@@ -171,7 +195,10 @@ class _Vault:
                 body["security_key"] = _security_key_answer(resp.json())
             return self.client.post(path, json=body)
         except httpx.ConnectError:
-            _die(f"Cannot reach the API at {_api_url()!r}. Is the service running?")
+            _die(
+                f"Cannot reach the API at {_display_api_url()!r}. "
+                "Is the service running?"
+            )
 
     def _security_key_required(self) -> bool:
         if _SECURITY_KEYS not in self.features:
@@ -204,7 +231,7 @@ class _Vault:
         if self._has_no_unlock_route(resp):
             if self.meta_known:
                 _die(_SERVER_TOO_OLD)
-            _die(_NO_UNLOCK_ROUTE.format(url=_api_url()))
+            _die(_NO_UNLOCK_ROUTE.format(url=_display_api_url()))
 
         _check(resp)
         data = resp.json()
@@ -347,14 +374,14 @@ def _print_details(item: dict) -> None:
     rows = _detail_rows(item)
     width = max([_LABEL_WIDTH, *(len(label) + 2 for label, _ in rows)])
 
-    _out.print(f"\n  [bold cyan]{escape(item['password_name'])}[/bold cyan]")
+    _out.print(f"\n  [bold cyan]{_safe_markup(item['password_name'])}[/bold cyan]")
 
     for label, value in rows:
         head, *rest = str(value).split("\n")
         padding = " " * (width - len(label))
-        _out.print(f"  [dim]{escape(label)}[/dim]{padding}{escape(head)}")
+        _out.print(f"  [dim]{_safe_markup(label)}[/dim]{padding}{_safe_markup(head)}")
         for line in rest:
-            _out.print(f"  {' ' * width}{escape(line)}")
+            _out.print(f"  {' ' * width}{_safe_markup(line)}")
 
     _out.print()
 
@@ -377,8 +404,8 @@ def pw_list() -> None:
 
     for item in items:
         table.add_row(
-            escape(item["password_name"]),
-            escape(item.get("description") or "-"),
+            _safe_markup(item["password_name"]),
+            _safe_markup(item.get("description") or "-"),
         )
 
     _out.print(table)
@@ -435,7 +462,7 @@ def pw_create(
 
     _check(resp)
 
-    _ok(f"Created [cyan]{escape(name)}[/cyan]")
+    _ok(f"Created [cyan]{_safe_markup(name)}[/cyan]")
 
 
 @pw_app.command(
@@ -497,7 +524,7 @@ def pw_update(name: Annotated[str, typer.Argument(help="Entry name.")]) -> None:
 
     _check(resp)
 
-    _ok(f"Updated [cyan]{escape(name)}[/cyan]")
+    _ok(f"Updated [cyan]{_safe_markup(name)}[/cyan]")
 
 
 @pw_app.command(
@@ -522,7 +549,7 @@ def pw_delete(
         if _BULK not in vault.features:
             _die("Deleting several entries at once needs CipherMoth 3.3.0 or newer.")
         if not yes:
-            _out.print("\n".join(f"  {escape(name)}" for name in names))
+            _out.print("\n".join(f"  {_safe_markup(name)}" for name in names))
             typer.confirm(f"Move these {len(names)} entries to trash?", abort=True)
         resp = vault.send(
             "POST",
@@ -578,7 +605,7 @@ def pw_move(
     result = resp.json()
     count = result.get("count", 0)
     moved = (
-        f"Moved {_count(count)} to [cyan]{escape(folder)}[/cyan]"
+        f"Moved {_count(count)} to [cyan]{_safe_markup(folder)}[/cyan]"
         if folder is not None
         else f"Took {_count(count)} out of their folder"
     )
@@ -605,7 +632,7 @@ def _delete_one(name: str, yes: bool) -> None:
 
     _check(resp)
 
-    _ok(f"Moved [cyan]{escape(name)}[/cyan] to trash")
+    _ok(f"Moved [cyan]{_safe_markup(name)}[/cyan] to trash")
 
 
 @pw_app.command(
@@ -618,7 +645,7 @@ def pw_history(name: Annotated[str, typer.Argument(help="Entry name.")]) -> None
 
     history = item.get("password_history") or []
     if not history:
-        _out.print(f"[dim]No earlier passwords for {escape(name)}.[/dim]")
+        _out.print(f"[dim]No earlier passwords for {_safe_markup(name)}.[/dim]")
         return
 
     table = Table(show_header=True, header_style="bold", box=None, padding=(0, 2, 0, 0))
@@ -626,10 +653,10 @@ def pw_history(name: Annotated[str, typer.Argument(help="Entry name.")]) -> None
     table.add_column("Password")
     for entry in history:
         table.add_row(
-            escape(_local_time(entry.get("changed_at"))),
-            escape(str(entry.get("value", ""))),
+            _safe_markup(_local_time(entry.get("changed_at"))),
+            _safe_markup(str(entry.get("value", ""))),
         )
-    _out.print(f"\n  [bold cyan]{escape(name)}[/bold cyan]")
+    _out.print(f"\n  [bold cyan]{_safe_markup(name)}[/bold cyan]")
     _out.print(table)
 
 
@@ -664,8 +691,8 @@ def pw_trash() -> None:
     for item in items:
         table.add_row(
             str(item.get("id", "-")),
-            escape(item["password_name"]),
-            escape(item.get("description") or "-"),
+            _safe_markup(item["password_name"]),
+            _safe_markup(item.get("description") or "-"),
             (item.get("deleted") or "-")[:19].replace("T", " "),
         )
 
@@ -690,7 +717,7 @@ def pw_restore(
 
     _check(resp)
 
-    _ok(f"Restored [cyan]{escape(name)}[/cyan]")
+    _ok(f"Restored [cyan]{_safe_markup(name)}[/cyan]")
 
 
 @pw_app.command(
@@ -721,7 +748,7 @@ def pw_purge(
 
     _check(resp)
 
-    _ok(f"Permanently deleted [cyan]{escape(name)}[/cyan]")
+    _ok(f"Permanently deleted [cyan]{_safe_markup(name)}[/cyan]")
 
 
 def _trash_params(vault: _Vault, name: str, entry_id: int | None) -> dict[str, int]:
@@ -784,7 +811,7 @@ def cmd_backup(
         if staged is not None:
             staged.unlink(missing_ok=True)
 
-    _ok(f"Backup saved to [cyan]{escape(str(dest))}[/cyan]")
+    _ok(f"Backup saved to [cyan]{_safe_markup(str(dest))}[/cyan]")
 
 
 @app.command(
@@ -838,7 +865,7 @@ def cmd_recover() -> None:
     _ok("Master password reset. Every other session was logged out.")
     _out.print(
         "\n  Your new recovery code (the old one no longer works):\n\n"
-        f"    [bold]{escape(data['recovery_code'])}[/bold]\n\n"
+        f"    [bold]{_safe_markup(data['recovery_code'])}[/bold]\n\n"
         "  Write it down and keep it offline. Anyone holding it can open the vault."
     )
 
@@ -926,10 +953,10 @@ def cmd_browsers(
     table.add_column("Last used", style="dim")
     for item in sessions:
         table.add_row(
-            escape(str(item.get("id", "-"))),
-            escape(str(item.get("browser", "-"))),
-            escape(_local_time(item.get("created"))),
-            escape(_local_time(item.get("last_used"))),
+            _safe_markup(str(item.get("id", "-"))),
+            _safe_markup(str(item.get("browser", "-"))),
+            _safe_markup(_local_time(item.get("created"))),
+            _safe_markup(_local_time(item.get("last_used"))),
         )
     _out.print(table)
 
@@ -965,7 +992,9 @@ def _report_import(payload: dict) -> None:
         rows = payload.get(f"{key}_rows", [])
         for row in rows:
             name = f" ({row['name']})" if row.get("name") else ""
-            _err.print(f"   {escape(row['where'] + name)}: {escape(row['reason'])}")
+            _err.print(
+                f"   {_safe_markup(row['where'] + name)}: {_safe_markup(row['reason'])}"
+            )
         if count > len(rows):
             _err.print(f"   and {count - len(rows)} more")
 

@@ -29,10 +29,11 @@ import ipaddress
 import re
 from dataclasses import dataclass
 from functools import cache
-from urllib.parse import urlsplit
 
 import idna
 from fido2 import rpid
+
+from url_parse import split_url
 
 _SCHEME = re.compile(r"^([A-Za-z][A-Za-z0-9+.\-]*):(.*)$", re.DOTALL)
 _PORT_ONLY = re.compile(r"^\d+(?:[/?#]|$)")
@@ -113,7 +114,7 @@ def normalize(url: object) -> Origin | None:
         scheme = "https"
         value = f"https://{value}"
     try:
-        parts = urlsplit(value)
+        parts = split_url(value)
         port = parts.port
     except ValueError:
         return None

@@ -1,6 +1,6 @@
 # CipherMoth vault format 2 and backup format 2
 
-This is the specification of how CipherMoth stores a vault on disk (vault format 2, SQLite schema 3) and how it writes a complete encrypted backup (backup format 2, `.cmbackup`). It is written for reviewers and for anyone implementing a second reader (the planned desktop core runs this same Python code; a future JavaScript, Rust or mobile core would implement this document against `testdata/vectors/vault-v2.json` and `backup-v2.json`).
+This is the specification of how CipherMoth stores a vault on disk (vault format 2, SQLite schema 3) and how it writes a complete encrypted backup (backup format 2, `.cmbackup`). It is written for reviewers and for anyone implementing a second reader (the desktop core runs this same Python code; a future JavaScript, Rust or mobile core would implement this document against `testdata/vectors/vault-v2.json` and `backup-v2.json`).
 
 The reference implementation is `backend/helpers.py` (every primitive and every associated-data construction), `backend/crud/master_password.py` (unlock and rotation), `backend/crud/password.py` and `backend/crud/attachment.py` (records), `backend/crud/backup.py` (backups) and `backend/storage.py` (file identity).
 

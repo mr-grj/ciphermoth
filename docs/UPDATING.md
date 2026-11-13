@@ -72,7 +72,7 @@ docker compose -f docker-compose.prod.yml exec backend ciphermoth-admin snapshot
 
 - **Consistent while CipherMoth runs.** The copy goes through SQLite's online backup API, so it includes every committed change, also those still in the write-ahead log (`vault.db-wal`), and never a half-written one. Copying `vault.db` with `cp` or `docker cp` while CipherMoth runs is **not** safe: the file alone can miss recent changes.
 - **Checked.** A snapshot is written to a temporary file, checked with SQLite's `integrity_check` and `foreign_key_check` and for the vault's identity, flushed to disk, and only then renamed into `/data/snapshots/vault-<time>.db` (mode `0600`). It is one self-contained file with no `-wal` or `-shm` next to it.
-- **As safe as the vault.** A snapshot holds the same ciphertext as the vault and opens only with the master password that was current when it was taken. Like the vault, it shows only counts, timestamps and sizes, never entry content (see [VAULT_FORMAT.md](VAULT_FORMAT.md#4-sqlite-layout-schema-2)).
+- **As safe as the vault.** A snapshot holds the same ciphertext as the vault and opens only with the master password that was current when it was taken. Like the vault, it shows only counts, timestamps and sizes, never entry content (see [VAULT_FORMAT.md](VAULT_FORMAT.md#4-sqlite-layout-schema-3)).
 - Snapshots stay in the volume until you delete them. To keep one elsewhere, copy it out (it is a finished file, so this is safe):
 
   ```shell

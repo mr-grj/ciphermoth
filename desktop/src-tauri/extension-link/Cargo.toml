@@ -2,6 +2,7 @@
 name = "ciphermoth-extension-link"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
 publish = false
 description = "The link between the CipherMoth browser extension and the desktop app: framing, the paired channel, local IPC and native-host manifests."
 

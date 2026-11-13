@@ -61,6 +61,23 @@ jobs:
               raise SystemExit(f"Frontend base changed upstream; review {tag}@{current} and update the pin.")
           PY
 
+  rust-audit:
+    name: Rust dependency audit
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked --version 0.23.0
+
+      - name: Audit the locked desktop dependencies
+        working-directory: desktop/src-tauri
+        run: cargo audit
+
   stress:
     name: Stress tests (fuzzing, process kills)
     runs-on: ubuntu-latest

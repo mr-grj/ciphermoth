@@ -108,6 +108,8 @@
       stage.append(outer);
     },
     "hf-filter-opacity": () => stage.append(loginForm("", "filter:opacity(0.02)")),
+    "hf-url-filter-ancestor": () => stage.append(loginForm("", "filter:url(#filter-ref)")),
+    "hf-url-filter-fields": () => stage.append(loginForm("", "", "filter:url(#filter-ref)")),
     "hf-size-0": () => stage.append(loginForm("", "", "width:0;height:0;padding:0;border:0")),
     "hf-size-1": () => stage.append(loginForm("", "", "width:1px;height:1px;padding:0;border:0")),
     "hf-offscreen": () => stage.append(loginForm("", "position:absolute;left:-10000px;top:0")),

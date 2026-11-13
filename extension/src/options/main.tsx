@@ -450,7 +450,12 @@ const Preferences = ({ status, reload }: { status: Status; reload: () => void })
           type="checkbox"
           checked={status.strictClipboard}
           disabled={status.phase === "setup"}
-          onChange={(e) => void toggleStrict((e.target as HTMLInputElement).checked)}
+          onChange={(e) => {
+            const on = e.currentTarget.checked;
+            // Keep the displayed choice tied to the saved setting while permission is pending.
+            e.currentTarget.checked = status.strictClipboard;
+            void toggleStrict(on);
+          }}
         />
       </div>
       {status.mode === "desktop" ? (

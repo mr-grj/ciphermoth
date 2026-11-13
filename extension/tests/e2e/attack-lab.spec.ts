@@ -124,6 +124,8 @@ test.describe("2. Hidden-field harvesting", () => {
     "hf-opacity-0",
     "hf-opacity-ancestor",
     "hf-filter-opacity",
+    "hf-url-filter-ancestor",
+    "hf-url-filter-fields",
     "hf-size-0",
     "hf-size-1",
     "hf-offscreen",
