@@ -2,6 +2,14 @@
 .idea
 .DS_Store
 
+# Local credentials and private audit notes must never reach a build context.
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+CLAUDE.md
+docs/architecture
+
 # Python
 **/__pycache__
 **/*.pyc

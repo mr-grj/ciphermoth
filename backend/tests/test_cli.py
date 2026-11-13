@@ -6,6 +6,7 @@ import re
 import shutil
 import stat
 import subprocess
+import sys
 import threading
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
@@ -119,6 +120,46 @@ async def test_cli_entry_lifecycle(api: str) -> None:
     ok(cli(api, "password", "delete", "recovery codes", "--yes"))
     ok(cli(api, "password", "purge", "recovery codes", "--yes"))
     assert "The trash is empty" in ok(cli(api, "password", "trash"))
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        "\x1b[31mterminal canary",
+        "\x1b[0mterminal canary",
+        "\x9b0mterminal canary",
+    ],
+    ids=["escape-color", "escape-reset", "c1-reset"],
+)
+async def test_cli_terminal_controls_are_visible_text_without_changing_values(
+    api: str, key: dict[str, str], payload: str
+) -> None:
+    _api_create(
+        api,
+        key,
+        {
+            "password_name": "terminal canary",
+            "password_value": payload,
+            "username": payload,
+            "description": payload,
+            "custom_fields": [{"label": payload, "value": payload, "hidden": False}],
+        },
+    )
+    for output in (
+        ok(cli(api, "password", "list")),
+        ok(cli(api, "password", "get", "terminal canary")),
+    ):
+        assert all(ord(c) != 27 and not 128 <= ord(c) < 160 for c in output)
+        assert "\\x1b" in output or "\\x9b" in output
+    stored = httpx.get(f"{api}/passwords/terminal%20canary", headers=key).json()
+    assert stored["password_value"] == payload
+    assert stored["username"] == payload
+    assert stored["description"] == payload
+    assert stored["custom_fields"][0] == {
+        "label": payload,
+        "value": payload,
+        "hidden": False,
+    }
 
 
 async def test_cli_backup_import_and_csv(api: str, tmp_path: Path) -> None:
@@ -959,6 +1000,85 @@ def test_cli_points_at_the_api_url_when_nothing_answers_there() -> None:
     assert "Traceback" not in result.output
     paths = [path for _, path, _ in requests]
     assert paths == ["/meta", "/master_password/unlock"]
+
+
+@pytest.mark.parametrize("failure", ["meta-connect", "unlock-connect", "not-found"])
+def test_cli_diagnostics_do_not_echo_url_credentials_or_metadata(
+    monkeypatch: pytest.MonkeyPatch, failure: str
+) -> None:
+    import cli as backend_cli
+
+    original = httpx.Client
+    requests: list[httpx.Request] = []
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        if failure == "meta-connect" or (
+            failure == "unlock-connect" and request.method == "POST"
+        ):
+            raise httpx.ConnectError("synthetic connection failure", request=request)
+        if failure == "unlock-connect":
+            return httpx.Response(200, json=SERVERS["sessions"])
+        return httpx.Response(404, json={"detail": "Not Found"})
+
+    def client(*args: Any, **kwargs: Any) -> httpx.Client:
+        return original(*args, **kwargs, transport=httpx.MockTransport(respond))
+
+    monkeypatch.setattr(backend_cli.httpx, "Client", client)
+    address = (
+        "http://UrlUserCanary:UrlPasswordCanary@vault.invalid/api"
+        "?token=UrlQueryCanary#UrlFragmentCanary"
+    )
+    result = runner.invoke(
+        cli_app,
+        ["password", "list"],
+        input=MASTER_PASSWORD + "\n",
+        env={"CIPHERMOTH_API_URL": address, "COLUMNS": "200"},
+    )
+    assert result.exit_code == 1
+    assert all(
+        value not in result.output
+        for value in (
+            "UrlUserCanary",
+            "UrlPasswordCanary",
+            "UrlQueryCanary",
+            "UrlFragmentCanary",
+        )
+    )
+    assert "http://vault.invalid/api" in result.output
+    assert requests
+    assert all(
+        request.headers.get("authorization", "").startswith("Basic ")
+        for request in requests
+    )
+
+
+def test_cli_unexpected_errors_do_not_render_secret_locals() -> None:
+    canary = "Traceback-Password-Canary-2026!"
+    code = (
+        "import cli\n"
+        "def fail(self):\n"
+        "    raise RuntimeError('synthetic authenticator fault')\n"
+        "cli._Vault._security_key_required = fail\n"
+        "cli.app()\n"
+    )
+    with _fake_server(lambda handler: handler.send(200, SERVERS["sessions"])) as (
+        api,
+        _,
+    ):
+        result = subprocess.run(
+            [sys.executable, "-c", code, "password", "list"],
+            input=canary + "\n",
+            capture_output=True,
+            text=True,
+            timeout=30,
+            cwd=Path(__file__).resolve().parents[1],
+            env={**os.environ, "CIPHERMOTH_API_URL": api, "COLUMNS": "200"},
+        )
+    assert result.returncode != 0
+    output = result.stdout + result.stderr
+    assert "synthetic authenticator fault" in output
+    assert canary not in output
 
 
 @pytest.mark.parametrize("meta", ["unreachable", "broken"])

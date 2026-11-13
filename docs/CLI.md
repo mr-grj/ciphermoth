@@ -153,12 +153,13 @@ Backup password (Enter if it is the current master password):
 
 ```shell
 cip backup -o /tmp
-docker compose -f docker-compose.prod.yml cp backend:/tmp/ciphermoth_backup_20260314_120000.cmbackup .
+# Use the exact unique filename printed by the command above:
+docker compose -f docker-compose.prod.yml cp backend:/tmp/<printed-backup-filename>.cmbackup .
 ```
 
 The **Backup** button in the web UI downloads the same file straight to your machine, which is usually easier.
 
-Backup format 2 stores entry metadata and attachments in authenticated frames. A complete backup is limited to 1 GiB and 1,000,001 frames; each entry frame is limited to 64 MiB and each attachment to 5 MiB. The vault refuses changes that would exceed the complete-backup limits, so supported operations cannot silently create data that this version cannot back up. See [the vault format specification](VAULT_FORMAT.md) for details.
+Backup format 2 stores a settings envelope, then one authenticated frame per entry followed by that entry’s attachment frames. A complete backup is limited to 1 GiB and 1,000,001 frames; the envelope and each entry frame are limited to 64 MiB, and each attachment to 5 MiB. The vault refuses changes that would exceed the complete-backup limits, so supported operations cannot silently create data that this version cannot back up. See [the vault format specification](VAULT_FORMAT.md) for details.
 
 ## Vault snapshots (`ciphermoth-admin`)
 
@@ -181,7 +182,7 @@ It follows the same zero-trust rules as the web UI, and it's small enough to rea
 - **Backups are written `0600`**, readable only by you, on top of being encrypted (AES-256-GCM under Argon2id with the backup's own salt and your master password). Downloads stream into a uniquely named `.partial` file; only a completed, flushed transfer is published as `.cmbackup`, without replacing an existing file. Interrupted transfers are removed on normal error or cancellation; after a process kill, a `.partial` file is incomplete and must not be used as a backup. Imports also stream from disk, so the CLI does not load a whole large backup into memory. The backup password `import` asks for is the master password the vault had when the backup was made; press Enter if it is the current one. It is prompted, never an argument.
 - **You get warned about plaintext transport.** If `CIPHERMOTH_API_URL` points at a remote host over plain `http://`, the CLI says so before prompting, because your master password would cross the network unencrypted. Put the API behind HTTPS, or reach it over a VPN or SSH tunnel.
 
-A note on entry names: any name works, including ones containing `/` (the CLI checks that the server routes them correctly and refuses them on older servers rather than risk acting on a different entry). New entries can't be named `.`, `..` or `trash`, because those can't be addressed in a web address; existing ones still work from the CLI, except that `get` and `update` can't open an entry named `trash`. Rename it in the web UI.
+A note on entry names: any name works, including ones containing `/` (the CLI checks that the server routes them correctly and refuses them on older servers rather than risk acting on a different entry). New entries can't be named `.`, `..` or `trash`, because those can't be addressed in a web address; existing ones still work from the CLI, except that `get` and `update` can't open an entry named `trash`. The current web editor also keeps names fixed. Keep an encrypted backup before resolving such a legacy name through the API; neither editor currently provides a rename command.
 
 ## Rate limits
 

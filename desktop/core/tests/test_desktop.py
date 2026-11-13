@@ -310,6 +310,18 @@ def test_large_backup_roundtrip(core, tmp_path):
         b"[]",
         b'{"method":"GET","path":"relative"}',
         b'{"method":"TRACE","path":"/api/meta"}',
+        b'{"method":[],"path":"/api/meta"}',
+        b'{"method":{},"path":"/api/meta"}',
+        b'{"unused":' + b"[" * 30000 + b"0" + b"]" * 30000 + b"}",
+    ],
+    ids=[
+        "invalid-json",
+        "not-object",
+        "relative-path",
+        "bad-method",
+        "list-method",
+        "object-method",
+        "deep-json",
     ],
 )
 def test_malformed_frames(core, header):

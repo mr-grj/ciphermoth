@@ -121,7 +121,7 @@ class BadRequest(Exception):
 def parse_request(header_bytes: bytes) -> tuple[str, str, str, list[tuple[str, str]]]:
     try:
         header = json.loads(header_bytes)
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+    except (UnicodeDecodeError, json.JSONDecodeError, RecursionError) as exc:
         raise BadRequest("header is not JSON") from exc
     if not isinstance(header, dict):
         raise BadRequest("header is not an object")
@@ -129,7 +129,7 @@ def parse_request(header_bytes: bytes) -> tuple[str, str, str, list[tuple[str, s
     path = header.get("path")
     query = header.get("query", "")
     headers = header.get("headers", [])
-    if method not in METHODS:
+    if not isinstance(method, str) or method not in METHODS:
         raise BadRequest("method")
     if (
         not isinstance(path, str)
@@ -236,7 +236,7 @@ class CoreServer:
                 if isinstance(decoded, dict) and "native" in decoded
                 else parse_request(header)
             )
-        except (BadRequest, ValueError) as exc:
+        except (BadRequest, ValueError, RecursionError) as exc:
             self.error(request_id, "bad_request", str(exc))
             return
         task = asyncio.create_task(self._handle(request_id, request, body))

@@ -85,6 +85,9 @@ export function fillLogin(request: FillRequest): FillResult {
       // Masks and filters hide a field without changing what a click reaches.
       const mask = style.maskImage || style.getPropertyValue("-webkit-mask-image");
       if (mask && mask !== "none") return false;
+      // An SVG filter can erase alpha without affecting hit-testing or opacity.
+      // Its referenced filter graph cannot be judged from the computed style.
+      if (/url\(/i.test(style.filter)) return false;
       for (const match of (style.filter || "").matchAll(/opacity\(([\d.]+)(%?)\)/g)) {
         opacity *= Number.parseFloat(match[1] ?? "1") / (match[2] ? 100 : 1);
       }

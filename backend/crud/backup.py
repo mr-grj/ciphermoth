@@ -126,7 +126,8 @@ def _stamp(value: datetime) -> str:
 
 
 class _Strict(BaseModel):
-    model_config = ConfigDict(extra="forbid", strict=True)
+    # JSON parsing must not intern decrypted backup strings beyond the request.
+    model_config = ConfigDict(extra="forbid", strict=True, cache_strings=False)
 
     @field_validator("*")
     @classmethod

@@ -87,6 +87,21 @@ test("onboarding: connect to the vault from the options page", async () => {
   });
 });
 
+test("denied clipboard permission leaves its setting visibly off", async () => {
+  const options = await site(`chrome-extension://${browser.extensionId}/options.html`);
+  const strict = options.getByRole("checkbox", { name: "Only clear what CipherMoth copied" });
+  await expect(strict).not.toBeChecked();
+  await options.evaluate(() => {
+    Object.defineProperty(chrome.permissions, "request", {
+      value: () => Promise.resolve(false),
+    });
+  });
+  await strict.click();
+  await expect(strict).not.toBeChecked();
+  const stored = await browser.worker.evaluate(() => chrome.storage.local.get("config"));
+  expect(stored.config).toMatchObject({ strictClipboard: false });
+});
+
 test("unlock with the master password, and a wrong one is refused", async () => {
   const popup = await openPopup(browser, null);
   await unlockInPopup(popup, "Not-The-Password-1");

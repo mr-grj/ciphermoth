@@ -371,6 +371,61 @@ mod tests {
     }
 
     #[test]
+    fn every_ciphertext_bit_and_truncation_is_authenticated() {
+        let key = [0x57; 32];
+        let plaintext = b"synthetic-channel-canary";
+        let ciphertext = seal(&key, TO_APP, 0, plaintext);
+        let mut app = Channel::new(Zeroizing::new(key), Side::App);
+        for length in 0..ciphertext.len() {
+            assert_eq!(
+                app.open(0, &ciphertext[..length]),
+                Err(ChannelError::Refused)
+            );
+        }
+        for position in 0..ciphertext.len() {
+            for bit in 0..8 {
+                let mut changed = ciphertext.clone();
+                changed[position] ^= 1 << bit;
+                assert_eq!(app.open(0, &changed), Err(ChannelError::Refused));
+            }
+        }
+        let mut extended = ciphertext.clone();
+        extended.push(0);
+        assert_eq!(app.open(0, &extended), Err(ChannelError::Refused));
+        // Refused frames cannot consume a counter and desynchronize the peer.
+        assert_eq!(app.open(0, &ciphertext).unwrap(), plaintext);
+    }
+
+    #[test]
+    fn connection_context_and_message_budget_are_enforced() {
+        let pairing = [0x34; 32];
+        let id = [1; 16];
+        let extension_nonce = [2; 16];
+        let app_nonce = [3; 16];
+        let key = connection_key(&pairing, &id, &extension_nonce, &app_nonce);
+        let ciphertext = seal(&key, TO_APP, 0, b"synthetic");
+        for changed_key in [
+            connection_key(&[0x35; 32], &id, &extension_nonce, &app_nonce),
+            connection_key(&pairing, &[4; 16], &extension_nonce, &app_nonce),
+            connection_key(&pairing, &id, &[4; 16], &app_nonce),
+            connection_key(&pairing, &id, &extension_nonce, &[4; 16]),
+        ] {
+            assert_eq!(
+                open(&changed_key, TO_APP, 0, &ciphertext),
+                Err(ChannelError::Refused)
+            );
+        }
+        let mut sender = Channel::new(key.clone(), Side::Extension);
+        let mut receiver = Channel::new(key, Side::App);
+        sender.sent = MAX_MESSAGES - 1;
+        receiver.received = MAX_MESSAGES - 1;
+        let (counter, last) = sender.seal(b"last").unwrap();
+        assert_eq!(receiver.open(counter, &last).unwrap(), b"last");
+        assert_eq!(sender.seal(b"over budget"), Err(ChannelError::Exhausted));
+        assert!(receiver.open(MAX_MESSAGES, &last).is_err());
+    }
+
+    #[test]
     fn a_middle_that_swaps_keys_shows_different_codes() {
         // Each side completes an exchange with the attacker instead of the other.
         let (ext, app, attacker) = (Exchange::new(), Exchange::new(), Exchange::new());

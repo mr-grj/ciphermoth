@@ -1,4 +1,6 @@
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs
+
+from url_parse import split_url
 
 _MIN_MASTER_PASSWORD_LENGTH = 12
 _MIN_CHARACTER_CLASSES = 2
@@ -94,7 +96,7 @@ def normalize_totp_secret(raw: str | None) -> str | None:
 
     value = raw.strip()
     if value.lower().startswith("otpauth://"):
-        secret = parse_qs(urlparse(value).query).get("secret", [""])[0]
+        secret = parse_qs(split_url(value).query).get("secret", [""])[0]
         value = secret
 
     value = value.replace(" ", "").upper().rstrip("=")
