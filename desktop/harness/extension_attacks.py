@@ -13,6 +13,7 @@ own host (only it can reach the pipe the same way), so the probes that need a
 raw endpoint run on Unix only.
 """
 
+import errno
 import json
 import os
 import socket
@@ -144,7 +145,10 @@ def before_pairing(root: Path, report_path: Path, host: str) -> list[str]:
             )
             closed = extra.receive() is None
             extra.close()
-        except (BrokenPipeError, ConnectionResetError):
+        except OSError as error:
+            # macOS can report ENOTCONN when the refused peer closes before hello.
+            if error.errno not in (errno.EPIPE, errno.ECONNRESET, errno.ENOTCONN):
+                raise
             closed = True
         assert closed, "a ninth connection was served"
         for r in held:
