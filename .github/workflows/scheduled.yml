@@ -31,7 +31,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 20
+          node-version: 24
 
       - name: Audit frontend dependencies
         run: node scripts/npm_audit.mjs frontend
@@ -41,6 +41,25 @@ jobs:
 
       - name: Audit the browser extension's dependencies
         run: node scripts/npm_audit.mjs extension
+
+      - name: Check the pinned frontend base for updates
+        run: |
+          python3 - <<'PY'
+          import re
+          import subprocess
+          from pathlib import Path
+
+          refs = re.findall(r"^FROM (node:\S+)", Path("docker/frontend/Dockerfile").read_text(), re.M)
+          if len(refs) != 2 or len(set(refs)) != 1:
+              raise SystemExit("Review both frontend Node base references together.")
+          tag, _, pinned = refs[0].partition("@")
+          current = subprocess.check_output(
+              ["docker", "buildx", "imagetools", "inspect", tag, "--format", "{{.Manifest.Digest}}"],
+              text=True, timeout=60,
+          ).strip()
+          if pinned != current:
+              raise SystemExit(f"Frontend base changed upstream; review {tag}@{current} and update the pin.")
+          PY
 
   stress:
     name: Stress tests (fuzzing, process kills)
