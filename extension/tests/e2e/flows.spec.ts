@@ -256,6 +256,11 @@ test("a login for another site asks first", async () => {
     "This login is saved for github.test. Fill it on gitlab.test?"
   );
   expect(await page.inputValue("#pass")).toBe("");
+  await expect(popup.getByRole("button", { name: "Cancel" })).toBeFocused();
+  await popup.keyboard.press("Enter");
+  await expect(popup.getByRole("alertdialog")).not.toBeVisible();
+  expect(await page.inputValue("#pass")).toBe("");
+  await row(popup, "GitHub").click();
   await popup.getByRole("button", { name: "Fill anyway" }).click();
   await expect.poll(() => page.inputValue("#pass")).toBe(GITHUB_PASSWORD);
 });

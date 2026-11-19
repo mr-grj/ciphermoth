@@ -420,10 +420,14 @@ const Unlocked = ({
   const [codes, setCodes] = useState<Record<number, { code: string; until: number }>>({});
   const [now, setNow] = useState(Date.now());
   const searchRef = useRef<HTMLInputElement>(null);
+  const mismatchCancelRef = useRef<HTMLButtonElement>(null);
   const loaded = Boolean(listing);
   useEffect(() => {
     if (loaded) searchRef.current?.focus();
   }, [loaded]);
+  useEffect(() => {
+    if (prompt?.kind === "mismatch") mismatchCancelRef.current?.focus();
+  }, [prompt?.kind]);
 
   const fail = useCallback(
     (err: unknown) => {
@@ -684,14 +688,10 @@ const Unlocked = ({
                 it on <strong>{page?.host}</strong>?
               </p>
               <div class="buttons">
-                <button class="button" onClick={() => setPrompt(null)}>
+                <button class="button" ref={mismatchCancelRef} onClick={() => setPrompt(null)}>
                   Cancel
                 </button>
-                <button
-                  class="button primary"
-                  ref={focusOnMount}
-                  onClick={() => void doFill(prompt.login, true)}
-                >
+                <button class="button primary" onClick={() => void doFill(prompt.login, true)}>
                   Fill anyway
                 </button>
               </div>
