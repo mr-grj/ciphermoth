@@ -5,7 +5,7 @@
 ### Changed
 
 - Every release also attaches its installers under names without a version (`CipherMoth_darwin-aarch64.dmg`, ...), identical to the versioned files and listed in `SHA256SUMS`, so the README's download links always point at the latest release.
-
+- A shorter README with direct downloads and current screenshots. The self-hosting reference (configuration, servers, proxies) moved from CONTRIBUTING.md to [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md), and the detailed security model from the README to [SECURITY.md](SECURITY.md#security-at-a-glance).
 
 ## [3.9.3] - 2026-11-13
 

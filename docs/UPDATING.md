@@ -2,7 +2,7 @@
 
 ## Desktop updates
 
-Download from [GitHub Releases](https://github.com/mr-grj/ciphermoth/releases/latest), choosing your CPU architecture. The desktop app includes its own Python runtime. No development tools or account are needed.
+Pick the file for your system in the [README's download table](../README.md#download); every link there points at the [latest release](https://github.com/mr-grj/ciphermoth/releases/latest). The desktop app includes its own Python runtime. No development tools or account are needed.
 
 - **macOS:** open the DMG, drag CipherMoth to Applications, then launch the copied app. The app is ad-hoc signed for bundle integrity, but has no Apple Developer ID or notarization. Gatekeeper may block an internet download. After trying to open it, use **System Settings → Privacy & Security → Open Anyway** if macOS offers it and you trust the release. Managed Macs may disallow that exception. Do not disable Gatekeeper or remove quarantine globally. [Apple explains these exceptions](https://support.apple.com/en-us/102445).
 - **Windows:** run the NSIS installer for x64 or ARM64. It installs for the current user. There is no Authenticode verified publisher; SmartScreen may warn. Inspect **More info**, confirm the download source, and choose **Run anyway** only if offered and you trust it. Organizational policies, Smart App Control or antivirus may block it; do not disable them to install CipherMoth. [Microsoft explains Smart App Control](https://support.microsoft.com/en-us/windows/security/threat-malware-protection/smart-app-control-frequently-asked-questions).

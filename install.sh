@@ -147,8 +147,8 @@ EOF
     info "Use it from anywhere: ${BOLD}sudo ln -s $(pwd)/cip /usr/local/bin/cip${NC}"
   fi
   printf '\n'
-  warn "There is no password recovery. Write your master password down somewhere safe,"
-  warn "and take a backup once you've added a few entries."
+  warn "Nobody can reset a forgotten master password. Create a recovery code in"
+  warn "Settings -> Security, and take a backup once you've added a few entries."
   info "Before every update: ${BOLD}docker compose -f docker-compose.prod.yml exec backend ciphermoth-admin snapshot${NC}"
 }
 

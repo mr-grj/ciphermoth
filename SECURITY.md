@@ -25,6 +25,27 @@ Things that are out of scope:
 - Vulnerabilities in third-party dependencies that don't directly affect ciphermoth - please report those upstream
 - Self-XSS or anything only exploitable by someone already authenticated with their own master password
 
+## Security at a glance
+
+**CipherMoth has not been independently audited.** It's a personal project I use myself and built carefully, with the crypto kept small and readable on purpose, but it has not been through a formal third-party security review. It's designed for personal use on hardware you trust, not as a public, multi-tenant service holding other people's secrets. Weigh that accordingly.
+
+How it works (the full specification is [docs/VAULT_FORMAT.md](docs/VAULT_FORMAT.md)):
+
+- Each vault has a random 256-bit **vault key**, stored only wrapped (AES-256-GCM) under a key derived from your master password with **Argon2id** (OWASP 2024 interactive profile, a random salt per vault). A password commitment derived through the same Argon2id work rejects wrong passwords without a cheaper guessing path. New vaults require a master password of 12 or more characters mixing at least two character types, enforced by the Python core.
+- **Everything you put in an entry is encrypted** with AES-256-GCM: its name, username, password or note, website, 2FA secret, description, tags, folder, custom fields, password history, favorite flag and type, and each attachment's name, type and bytes. Every encrypted value is bound to its own record, so it cannot be swapped into another entry without being detected. Entries are found by name through a keyed hash (HMAC-SHA256), never a plaintext copy.
+- **What the vault file still shows** without your master password: how many entries and attachments there are, which ones are in the trash, timestamps, attachment sizes, approximate entry sizes, which entries share a name (an entry and its trashed copies) and your timeout settings. This is encryption of each entry, not of the whole file.
+- Changing the master password creates a new vault key and re-encrypts everything, so the old password and the old key open nothing in the vault afterwards (older snapshots and backups keep the password they were made with).
+- An optional [security key](#security-keys) becomes part of the key itself, an optional [recovery code](#the-recovery-code) can reset a forgotten master password, and optional [biometric unlock](#biometric-unlock) adds a device-bound way in.
+- Python owns the keys and gives the UI only an **opaque session token**. The desktop app has no network listener: its bundled Python core talks to Rust through private pipes, and locking clears the owned clipboard and stops the process holding the keys. The Docker edition keeps keys in its server process and the browser's token in `sessionStorage` ([why](#where-the-web-ui-keeps-its-session-and-why)).
+- A strict Content-Security-Policy restricts the UI. Update checks send no vault contents, passwords, session tokens or entry metadata.
+- **Backups** (`.cmbackup`) are complete and authenticated, encrypted with AES-256-GCM under Argon2id with their own random salt and your master password. A wrong password or a damaged or cut-off file changes nothing on restore. Check that a browser download actually saved the file; the app cannot verify that.
+- The Docker UI and API listen on `127.0.0.1` by default; exposing them to other machines is an explicit setting.
+- The password generator uses `crypto.getRandomValues` with rejection sampling, never `Math.random()`.
+
+**It protects against** someone who steals the vault file, a snapshot, a backup or the disk (they get ciphertext and the counts and timestamps listed above, and each password guess costs a full Argon2id run), someone who edits the file without your master password (changes to encrypted data are detected and the vault refuses to show it), accidental server-side exposure (the server never persists the master password, the vault key or session tokens), and casual inspection of stored data. A session token that leaks works only until that session ends; it never reveals the key.
+
+**It does not protect against** malware or a keylogger on the device you unlock from, a weak master password, exposing the instance on the public internet without `https`, someone with write access to the vault file rolling it back to an older copy or deleting entries, or forgetting your master password without a recovery code. Run it on a machine and network you trust, use a strong master password, and keep a backup.
+
 ## What the Python core knows
 
 So you can judge reports (and your own deployment) against what CipherMoth actually does:
@@ -115,4 +136,4 @@ Optional (Chrome, Brave and Firefox; other Chromium browsers should work), for t
 
 ## One thing worth knowing
 
-CipherMoth is built to run on a machine you trust and control - your home server, a VPS behind a firewall, a Raspberry Pi in your closet. It is not built to sit directly on the open internet without a reverse proxy, HTTPS, and some thought about who can reach it. If you're deploying it that way, the README has guidance. If something goes wrong because it was exposed without those precautions, that's a configuration problem, not a vulnerability.
+CipherMoth is built to run on a machine you trust and control - your home server, a VPS behind a firewall, a Raspberry Pi in your closet. It is not built to sit directly on the open internet without a reverse proxy, HTTPS, and some thought about who can reach it. If you're deploying it that way, the [self-hosting guide](docs/SELF-HOSTING.md#putting-it-on-a-real-server) has guidance. If something goes wrong because it was exposed without those precautions, that's a configuration problem, not a vulnerability.

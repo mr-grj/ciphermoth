@@ -1,14 +1,36 @@
-# Contributing & running it your way
+# Contributing to CipherMoth
 
-This doc is for people who want to **hack on CipherMoth** or **self-host it their own way**, on a real server, behind a proxy, with custom ports. If you just want to run it on your machine, the [README quick start](./README.md#get-started) is all you need; come back here when you want more.
+Thanks for wanting to help. CipherMoth is a one-person project, so issues, ideas, docs fixes and pull requests are all genuinely welcome. If you want to run CipherMoth on a server rather than hack on it, you want the [self-hosting guide](docs/SELF-HOSTING.md) instead.
 
-## Desktop development
+**Security problems go to a [private advisory](https://github.com/mr-grj/ciphermoth/security/advisories/new), never a public issue.** See [SECURITY.md](SECURITY.md).
 
-For the native application, see [desktop/README.md](desktop/README.md). [desktop/RELEASING.md](desktop/RELEASING.md) covers reproducible release builds, updater signing and recovery. The sections below cover the shared core and Docker edition.
+## Find your way around
 
-## Development
+| Folder | What lives there | Stack |
+|---|---|---|
+| [`backend/`](backend) | The vault core: crypto, storage, sessions, the HTTP API and the `ciphermoth` CLI | Python 3.13, FastAPI, SQLAlchemy 2.0, SQLite 3.53, uv |
+| [`frontend/`](frontend) | The UI shared by the desktop app and the web app | React 19, Vite, MUI, easy-peasy |
+| [`desktop/`](desktop) | The native app around the UI and a bundled Python core | Tauri 2, Rust, PyInstaller |
+| [`extension/`](extension) | The browser extension | Manifest V3, TypeScript, Preact, esbuild, Playwright |
+| [`docker/`](docker) | Release images and their smoke tests | Docker, Compose v2 |
+| [`testdata/`](testdata) | Frozen test vectors and vaults shared by every implementation | |
+| [`docs/`](docs) | User guides and the [vault format specification](docs/VAULT_FORMAT.md) | |
 
-Clone the repo, then start the dev stack. It builds from your working tree and hot-reloads, and it's a throwaway sandbox with its own vault, completely separate from any real vault.
+A few rules keep the code reviewable: all cryptography lives in `backend/helpers.py`; business logic lives in `backend/crud/`, never in the HTTP handlers; and the CLI is a second front end, so a feature that changes the API usually needs a matching change in `backend/cli.py` and [docs/CLI.md](docs/CLI.md).
+
+Each part has its own development guide:
+
+- **Desktop app:** [desktop/README.md](desktop/README.md) (`make desktop-setup`, then `make desktop-dev`). [desktop/RELEASING.md](desktop/RELEASING.md) covers release builds and updater signing.
+- **Browser extension:** [docs/EXTENSION.md](docs/EXTENSION.md#development).
+- **Web app and server:** below.
+
+## Prerequisites
+
+[uv](https://docs.astral.sh/uv/) for the backend (`uv sync --group dev` inside `backend/`), Node.js with npm for the frontend (`npm install` inside `frontend/`), and Docker for the dev stack. The desktop app also needs Rust; its guide lists the rest.
+
+## The web app and server
+
+Start the dev stack. It builds from your working tree and hot-reloads, and it's a throwaway sandbox with its own vault, completely separate from any real vault.
 
 ```shell
 make dev     # build + start with hot-reload
@@ -95,64 +117,10 @@ How writes stay correct without row locks: `GET`, `HEAD` and the routes listed i
 
 The file records its schema in `PRAGMA user_version` (`storage.SCHEMA_VERSION`, currently 3). Schema 2 is upgraded at startup after an automatic snapshot; schema 1, newer and unknown schemas are refused without changing the file. Ordered steps in `storage._UPGRADES` run in one write transaction. Each future schema change must include an upgrade step, a raised `SCHEMA_VERSION`, and a test that upgrades a vault written by the previous release.
 
-## Configuration
+## Pull requests
 
-Everything is optional, the defaults work fine for local use.
-
-**Backend:**
-
-| Variable | Default | Description |
-|---|---|---|
-| `CORS_ORIGINS` | `["http://localhost:3000"]` | Allowed frontend origins |
-| `DISABLE_DOCS` | `false` | Set `true` to hide `/docs` and `/redoc` |
-| `DEBUG` | `false` | FastAPI debug mode |
-| `CIPHERMOTH_DATA_DIR` | `data` (`/data` in the image) | Folder that holds `vault.db` and `snapshots/`, created `0700` |
-| `CIPHERMOTH_RATE_LIMIT` | unset | Overrides every route's own limit (e.g. `200/hour`). Unlocking defaults to `30/hour`; each CLI command unlocks once, so raise this if a batch of them trips it |
-
-**Frontend:**
-
-| Variable | Default | Description |
-|---|---|---|
-| `VITE_API_URL` | `http://localhost:8000/api` | Backend API base URL: an `http(s)` URL, a `//host` URL, or a path such as `/api` when a proxy serves the API on the UI's own origin. The image allows browser connections only to this origin (plus GitHub's release address for the update check). A value with another scheme or with characters that could rewrite the policy or the app is refused: the UI then shows a page explaining what to fix. With an IPv6 address the policy can only restrict the scheme (`http:`/`https:`), so prefer a host name. In Compose it comes from `CIPHERMOTH_API_URL` |
-
-**CLI:**
-
-| Variable | Default | Description |
-|---|---|---|
-| `CIPHERMOTH_API_URL` | `http://localhost:8000/api` | Backend API base URL (baked to `http://localhost/api` inside the backend image) |
-| `CIPHERMOTH_COMPOSE_FILE` | `<cip's folder>/docker-compose.prod.yml` | Compose file the `cip` wrapper drives |
-
-The CLI warns before prompting if `CIPHERMOTH_API_URL` points at a remote host over plain HTTP, since the master password would cross the network unencrypted. See [docs/CLI.md](./docs/CLI.md).
-
-## Putting it on a real server
-
-CipherMoth is built to run on a machine you trust, your home server, a VPS behind a firewall, a Raspberry Pi in your closet, not to sit naked on the open internet. If you're deploying it somewhere reachable:
-
-- Set `CIPHERMOTH_FRONTEND_ORIGIN` / `CORS_ORIGINS` to your actual domain and enable `DISABLE_DOCS=true`
-- Put everything behind a reverse proxy (nginx, Caddy) with HTTPS, and have it pass request paths through **unchanged** (see below)
-- Keep the `vault_data` volume on a local disk: SQLite's write-ahead log needs shared memory on one host, so network file systems and synced folders are not supported
-- To keep the vault in a host folder instead of the volume, mount it and point `CIPHERMOTH_DATA_DIR` at it, and give the folder to the backend's user first (`sudo chown -R 1000:1000 <folder>`); otherwise the backend refuses to start and says so. Docker Desktop (macOS, Windows) does not enforce host-folder ownership, so this only bites on Linux
-
-`docker-compose.prod.yml` publishes the UI and API on `127.0.0.1` only. That is what you want when the reverse proxy runs on the same host: the proxy can reach CipherMoth, nothing else on the network can. If other machines need to reach the ports directly (a proxy on another box, a LAN, a VPN such as Tailscale), set `CIPHERMOTH_BIND_ADDRESS=0.0.0.0` in your `.env`, or a specific interface address, and make sure HTTPS sits in front. Installs from before v1.4.6 keep whatever their own copy of the compose file says until it is replaced.
-
-**Pass request paths through unchanged.** Entry names can contain `/`, which clients send as `%2F`. A proxy that decodes `%2F` before forwarding turns a request for the entry `x/purge` into a request to purge the entry `x`. Caddy's `reverse_proxy` (also inside `handle_path`) and nginx's `proxy_pass http://127.0.0.1:8000;` (no path after the address) pass the path unchanged. nginx's `proxy_pass http://127.0.0.1:8000/;` or `.../api/;` (with a path, including any path-prefix setup) decodes it. Since v1.4.7 the web UI and CLI also name the entry in a header, so the API refuses such a rewritten request instead of acting on another entry, but older clients get no such protection and the entries stay unreachable until the proxy is fixed.
-
-Vault sessions live in the backend's memory. Run exactly one backend process (the image's `uvicorn --workers 1`); with several workers a session opened by one would be unknown to the others. A second backend on the same volume refuses to start (it cannot take the vault folder's lock). The session token travels in the `x-ciphermoth-session` header, which proxies forward by default; don't log it, because it opens the vault until the session ends. `Authorization` is left to the proxy, so Basic auth or a forward-auth login in front of CipherMoth keeps working.
-
-One thing to know about rate limiting behind a proxy: the limits are keyed on the client IP, which the app reads from the network connection. Behind a reverse proxy every request looks like it comes from the proxy, so the limits become global instead of per client. If you want per-client rate limiting, configure your proxy to preserve the real client address (and only trust `X-Forwarded-For` from the proxy itself).
-
-## Staying up to date
-
-CipherMoth notices when a newer release is out and shows an **Update** chip in the app bar. The check runs **in your browser** against GitHub's public API, the server never phones home, and you can turn it off under Settings, "Check for updates", if you'd rather your instance talk to nobody at all.
-
-**Updating:** take a snapshot, then pull and restart:
-
-```shell
-docker compose -f docker-compose.prod.yml exec backend ciphermoth-admin snapshot
-docker compose -f docker-compose.prod.yml pull && \
-docker compose -f docker-compose.prod.yml up -d
-```
-
-`CIPHERMOTH_VERSION` in your `.env` (or `latest`) decides which release runs. Docker updates remain manual. The desktop edition uses the signed Tauri update flow described in [docs/UPDATING.md](docs/UPDATING.md#desktop-updates).
-
-Details, snapshots, restores and moving from a PostgreSQL release: [docs/UPDATING.md](docs/UPDATING.md).
+- Keep a pull request focused on one change, and say why in its description.
+- Run `make check` and `make test` before you push; CI runs the same checks plus the desktop and extension suites.
+- Add or update tests with the change. For anything touching storage, crypto or sessions, read the matching section of [docs/VAULT_FORMAT.md](docs/VAULT_FORMAT.md) first and point out in the PR anything that could weaken a guarantee.
+- Commit messages follow the style already in the history: `fix: ...`, `feat: ...`, `docs: ...`, `test: ...`, in the imperative.
+- User-facing changes get a line in [CHANGELOG.md](CHANGELOG.md), and the README or docs if setup changes.
