@@ -30,6 +30,9 @@ concurrency:
 env:
   PYTHON_VERSION: "3.13.15"
   OPENSSL_VERSION: "4.0.1"
+  OPENSSL_SHA256: "2db3f3a0d6ea4b59e1f094ace2c8cd536dffb87cdc39084c5afa1e6f7f37dd09"
+  VCPKG_TAG: "2026.10.16"
+  VCPKG_COMMIT: "9eec002df1cd109f8f104cd966a763daf9751489"
   WEBKIT_DISABLE_DMABUF_RENDERER: "1"
   LIBGL_ALWAYS_SOFTWARE: "1"
 
@@ -116,19 +119,13 @@ jobs:
             frontend/package-lock.json
             desktop/package-lock.json
 
-      - name: Install Rust (if missing)
+      # The hosted runner image is part of the trusted build environment.  Do
+      # not widen that boundary by downloading and executing an unverified
+      # rustup bootstrap script when the image is incomplete.
+      - name: Require the runner Rust bootstrap
         run: |
-          if ! command -v rustup >/dev/null 2>&1; then
-            if [ "$RUNNER_OS" = "Windows" ]; then
-              case "$PROCESSOR_ARCHITECTURE" in ARM64) triple=aarch64-pc-windows-msvc ;; *) triple=x86_64-pc-windows-msvc ;; esac
-              curl -fsSL -o rustup-init.exe "https://static.rust-lang.org/rustup/dist/$triple/rustup-init.exe"
-              ./rustup-init.exe -y --profile minimal
-              echo "$USERPROFILE/.cargo/bin" >> "$GITHUB_PATH"
-            else
-              curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal
-              echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
-            fi
-          fi
+          command -v rustup >/dev/null 2>&1
+          rustup --version
 
       # Partition caches across the protected release and PR validation contexts.
       # Workspace binaries are rebuilt; no signed packages or signing files are cached.
@@ -186,15 +183,27 @@ jobs:
         shell: pwsh
         run: |
           $sw = [Diagnostics.Stopwatch]::StartNew()
-          if (-not (Test-Path C:\vcpkg\vcpkg.exe)) {
-            git clone --depth 1 https://github.com/microsoft/vcpkg C:\vcpkg
-            C:\vcpkg\bootstrap-vcpkg.bat -disableMetrics
+          $vcpkgRoot = Join-Path $env:RUNNER_TEMP "ciphermoth-vcpkg-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          git clone --depth 1 --branch $env:VCPKG_TAG https://github.com/microsoft/vcpkg $vcpkgRoot
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to clone the pinned vcpkg release"
           }
-          C:\vcpkg\vcpkg.exe install "openssl:${{ matrix.vcpkg_openssl }}" --disable-metrics
-          "OPENSSL_DIR=C:\vcpkg\installed\${{ matrix.vcpkg_openssl }}" | Out-File -FilePath $env:GITHUB_ENV -Append
+          $actualCommit = (git -C $vcpkgRoot rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or $actualCommit -cne $env:VCPKG_COMMIT) {
+            throw "Unexpected vcpkg source commit: $actualCommit"
+          }
+          & "$vcpkgRoot\bootstrap-vcpkg.bat" -disableMetrics
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to bootstrap the pinned vcpkg release"
+          }
+          & "$vcpkgRoot\vcpkg.exe" install "openssl:${{ matrix.vcpkg_openssl }}" --disable-metrics
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to install OpenSSL from the pinned vcpkg release"
+          }
+          "OPENSSL_DIR=$vcpkgRoot\installed\${{ matrix.vcpkg_openssl }}" | Out-File -FilePath $env:GITHUB_ENV -Append
           "OPENSSL_STATIC=1" | Out-File -FilePath $env:GITHUB_ENV -Append
           "vcpkg_openssl_s=$([int]$sw.Elapsed.TotalSeconds)" | Out-File -FilePath desktop-results/source-builds.txt -Append
-          C:\vcpkg\vcpkg.exe list openssl | Out-File -FilePath desktop-results/source-builds.txt -Append
+          & "$vcpkgRoot\vcpkg.exe" list openssl | Out-File -FilePath desktop-results/source-builds.txt -Append
 
       - name: Build and verify production core
         timeout-minutes: 15
