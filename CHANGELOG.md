@@ -2,10 +2,23 @@
 
 ## [Unreleased]
 
+## [3.9.4] - 2026-11-19
+
+Release supply-chain and browser-extension safety hardening.
+
+### Security
+
+- Pin and verify the Rust bootstrap, vcpkg source and OpenSSL source archive used by desktop release builds instead of executing mutable or independently unverified inputs.
+- Keep the production updater private key out of compilation, dependency scripts, tests and QA. It now exists only in a private temporary file during canonical artifact signing and is deleted immediately afterwards.
+- Attach GitHub OIDC build-provenance attestations to every verified desktop and browser-extension release file. These improve first-install provenance but do not replace Apple notarization or Windows Authenticode.
+- Make **Cancel** the keyboard default when a login saved for one origin is selected on another origin; cross-origin filling still requires an explicit **Fill anyway** click.
+
 ### Changed
 
 - Every release also attaches its installers under names without a version (`CipherMoth_darwin-aarch64.dmg`, ...), identical to the versioned files and listed in `SHA256SUMS`, so the README's download links always point at the latest release.
 - A shorter README with direct downloads and current screenshots. The self-hosting reference (configuration, servers, proxies) moved from CONTRIBUTING.md to [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md), and the detailed security model from the README to [SECURITY.md](SECURITY.md#security-at-a-glance).
+
+Vault, backup and session formats, extension IDs and connection protocols are unchanged.
 
 ## [3.9.3] - 2026-11-13
 
