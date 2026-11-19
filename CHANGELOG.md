@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- Every release also attaches its installers under names without a version (`CipherMoth_darwin-aarch64.dmg`, ...), identical to the versioned files and listed in `SHA256SUMS`, so the README's download links always point at the latest release.
+
+
 ## [3.9.3] - 2026-11-13
 
 Privacy and reliability hardening, more accessible vault controls, and faster attachment metadata and integrity checks.

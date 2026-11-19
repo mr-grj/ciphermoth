@@ -4,6 +4,7 @@ import argparse
 import datetime
 import hashlib
 import json
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -12,6 +13,9 @@ TARGETS = {
     for system in ("darwin", "windows", "linux")
     for arch in ("aarch64", "x86_64")
 }
+# Installers also get a versionless copy (CipherMoth_<target>.<suffix>), so
+# releases/latest/download/<name> links keep working across releases.
+INSTALLERS = {"dmg", "exe", "deb", "AppImage"}
 
 
 def generate(root, version, commit, verifier, public_key):
@@ -38,6 +42,11 @@ def generate(root, version, commit, verifier, public_key):
             assert path.stat().st_size == row["bytes"]
             assert hashlib.sha256(path.read_bytes()).hexdigest() == row["sha256"]
             expected.add(path.name)
+            suffix = path.name.removeprefix(f"CipherMoth_{version}_{target}.")
+            if suffix in INSTALLERS:
+                latest = root / f"CipherMoth_{target}.{suffix}"
+                shutil.copyfile(path, latest)
+                expected.add(latest.name)
             if row["updater"]:
                 assert target not in platforms
                 sig = Path(str(path) + ".sig")
