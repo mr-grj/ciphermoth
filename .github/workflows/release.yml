@@ -258,6 +258,8 @@ jobs:
     environment: desktop-release
     permissions:
       contents: write
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -299,6 +301,10 @@ jobs:
             sha256sum "$file" >> ../release-assets/SHA256SUMS
           done
           cd ../release-assets && sha256sum -c SHA256SUMS
+      - name: Attest the verified release files
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-path: release-assets/*
       - name: Stage and publish the complete stable release
         env:
           GH_TOKEN: ${{ github.token }}

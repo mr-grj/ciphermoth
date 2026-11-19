@@ -6,6 +6,9 @@ from pathlib import Path
 WORKFLOW = (
     Path(__file__).parents[2] / ".github" / "workflows" / "desktop.yml"
 ).read_text()
+RELEASE_WORKFLOW = (
+    Path(__file__).parents[2] / ".github" / "workflows" / "release.yml"
+).read_text()
 
 
 def test_desktop_build_never_runs_an_unverified_rust_bootstrap() -> None:
@@ -38,3 +41,27 @@ def test_openssl_source_uses_a_reviewed_digest() -> None:
     assert "OPENSSL_SHA256:?" in build_script
     assert "openssl.tar.gz.sha256" not in build_script
     assert '[ "$expected" = "$actual" ]' in build_script
+
+
+def test_protected_signing_key_is_scoped_to_the_artifact_step() -> None:
+    """Compilers, tests, and QA harnesses must never receive the release key."""
+    configure = WORKFLOW.index("- name: Configure updater signing")
+    build = WORKFLOW.index("- name: Build production application")
+    signing = WORKFLOW.index("- name: Collect and sign production packages")
+    install = WORKFLOW.index("- name: Install and test the actual production package")
+    assert configure < build < signing < install
+    assert "RELEASE_KEY:" not in WORKFLOW[configure:build]
+    assert "RELEASE_KEY:" not in WORKFLOW[build:signing]
+    assert "RELEASE_KEY:" in WORKFLOW[signing:install]
+
+
+def test_verified_first_install_files_receive_build_attestations() -> None:
+    """Unsigned OS installers still need identity-bound first-install provenance."""
+    publish = RELEASE_WORKFLOW[RELEASE_WORKFLOW.index("\n  publish:") :]
+    verify = publish.index("- name: Verify every signature and generate the manifest")
+    attest = publish.index("- name: Attest the verified release files")
+    release = publish.index("- name: Stage and publish the complete stable release")
+    assert verify < attest < release
+    assert "      id-token: write" in publish
+    assert "      attestations: write" in publish
+    assert "subject-path: release-assets/*" in publish
