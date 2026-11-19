@@ -218,7 +218,6 @@ jobs:
       - name: Configure updater signing
         env:
           RELEASE_SIGNING: ${{ inputs.release }}
-          RELEASE_KEY: ${{ inputs.release && secrets.TAURI_SIGNING_PRIVATE_KEY || '' }}
         run: |
           cd desktop && npm ci && cd ..
           python desktop/release/configure_signing.py
@@ -229,8 +228,14 @@ jobs:
           cd desktop && npm run tauri build -- --bundles "${{ matrix.bundles }}" --ci
           cd src-tauri && cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace
           cargo build --release --example verify_update
-          cd "$GITHUB_WORKSPACE"
-          python desktop/release/artifacts.py --out desktop-results/packages --version "$(node -p 'require("./desktop/package.json").version')"
+
+      - name: Collect and sign production packages
+        env:
+          RELEASE_SIGNING: ${{ inputs.release }}
+          RELEASE_KEY: ${{ inputs.release && secrets.TAURI_SIGNING_PRIVATE_KEY || '' }}
+        run: |
+          python desktop/release/artifacts.py --out desktop-results/packages \
+            --version "$(node -p 'require("./desktop/package.json").version')"
 
       - name: Install and test the actual production package
         run: python desktop/harness/production.py --packages "$PWD/desktop-results/packages" --out "$PWD/desktop-results/production"

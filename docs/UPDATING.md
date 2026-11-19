@@ -9,6 +9,20 @@ Pick the file for your system in the [README's download table](../README.md#down
 - **Linux AppImage:** store the file somewhere writable by your user, make it executable (`chmod +x <file>.AppImage`), and open it. AppImage may require your distribution's FUSE compatibility package. Built-in updates replace this AppImage in place; do not keep it in a system-owned folder.
 - **Debian/Ubuntu `.deb`:** use `sudo apt install ./<file>.deb`. To update, quit CipherMoth and install the newer package the same way. Built-in AppImage installation is disabled for this edition. There is no CipherMoth apt repository.
 
+Before first installation, verify the downloaded file's identity-bound build
+attestation with the GitHub CLI (replace the filename with the one you downloaded):
+
+```shell
+gh attestation verify CipherMoth_3.9.3_darwin-aarch64.dmg --repo mr-grj/ciphermoth
+```
+
+Also download `SHA256SUMS` from the same release and compare the listed digest
+for that filename with `sha256sum <file>` (Linux), `shasum -a 256 <file>`
+(macOS), or `Get-FileHash <file> -Algorithm SHA256` (PowerShell). The attestation
+binds the digest to CipherMoth's GitHub release workflow; the checksum detects a
+damaged download. Neither substitutes for Apple notarization or a Microsoft
+Authenticode publisher certificate.
+
 When **Settings → Check for updates** is on, CipherMoth checks after you unlock. A discreet **Update** chip opens the release version and notes. **Download and install** is your confirmation: the native Tauri 2 updater downloads over HTTPS from GitHub Releases, verifies the embedded trusted key and signed version/platform filename, locks the vault, closes Python, installs and restarts. You can cancel the download before installation starts. Closing the notice installs nothing. Turn checks off in Settings to stop contacting GitHub.
 
 Checks send no vault contents, master password, session token or entry metadata. GitHub receives ordinary connection information, such as your IP address. Offline checks and rejected downloads leave the app usable. OS restrictions can still prevent installation: cryptographic updater authorization is separate from Apple/Microsoft publisher approval. Do not bypass a system policy to make an update work.

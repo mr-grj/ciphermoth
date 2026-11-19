@@ -10,6 +10,7 @@ import os
 import platform
 import shutil
 import subprocess
+from contextlib import contextmanager
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -28,7 +29,37 @@ def target():
     return f"{system}-{arch}"
 
 
-def collect(bundle, out, version, qa=False):
+@contextmanager
+def signing_key():
+    """Expose the production key only while canonical artifacts are signed."""
+    release = os.environ.get("RELEASE_SIGNING") == "true"
+    protected = os.environ.pop("RELEASE_KEY", None)
+    if not release:
+        if protected:
+            raise RuntimeError(
+                "A protected signing key was supplied to a validation build"
+            )
+        yield None
+        return
+    if not protected:
+        raise RuntimeError("Protected production signing secret is missing")
+    previous_umask = os.umask(0o077)
+    root = Path(os.environ["RUNNER_TEMP"]) / "ciphermoth-release-signing"
+    key = root / "updater.key"
+    try:
+        root.mkdir(mode=0o700, exist_ok=False)
+        try:
+            key.write_text(protected)
+            del protected
+            yield key
+        finally:
+            key.unlink(missing_ok=True)
+            root.rmdir()
+    finally:
+        os.umask(previous_umask)
+
+
+def collect(bundle, out, version, qa=False, signing_key_path=None):
     bundle = bundle.resolve()
     out = out.resolve()
     out.mkdir(parents=True, exist_ok=True)
@@ -74,11 +105,14 @@ def collect(bundle, out, version, qa=False):
                 str(dest),
             ]
             env = dict(os.environ)
-            key_path = env.pop("TAURI_SIGNING_PRIVATE_KEY")
+            disposable_key_path = env.pop("TAURI_SIGNING_PRIVATE_KEY", None)
+            key_path = signing_key_path or disposable_key_path
+            assert key_path is not None, "A signing key path is required"
             assert Path(key_path).is_file(), (
                 "Signing requires an owner-controlled key file"
             )
-            env["TAURI_SIGNING_PRIVATE_KEY_PATH"] = key_path
+            env.pop("RELEASE_KEY", None)
+            env["TAURI_SIGNING_PRIVATE_KEY_PATH"] = str(key_path)
             result = subprocess.run(
                 command, cwd=ROOT / "desktop", env=env, capture_output=True
             )
@@ -127,4 +161,11 @@ if __name__ == "__main__":
     parser.add_argument("--version", required=True)
     parser.add_argument("--qa", action="store_true")
     args = parser.parse_args()
-    collect(args.bundle, args.out, args.version, args.qa)
+    with signing_key() as protected_key:
+        collect(
+            args.bundle,
+            args.out,
+            args.version,
+            args.qa,
+            signing_key_path=protected_key,
+        )
