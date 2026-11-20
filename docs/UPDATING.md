@@ -13,7 +13,7 @@ Before first installation, verify the downloaded file's identity-bound build
 attestation with the GitHub CLI (replace the filename with the one you downloaded):
 
 ```shell
-gh attestation verify CipherMoth_3.9.4_darwin-aarch64.dmg --repo mr-grj/ciphermoth
+gh attestation verify CipherMoth_3.9.5_darwin-aarch64.dmg --repo mr-grj/ciphermoth
 ```
 
 Also download `SHA256SUMS` from the same release and compare the listed digest

@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [3.9.5] - 2026-11-20
+
+Release-pipeline correction. v3.9.4 was tagged but never published: its release
+workflow stopped when the updater verification gate rejected a disposable QA
+package whose signing key did not match its embedded public key. This release
+contains everything intended for 3.9.4.
+
+### Fixed
+
+- Pair disposable desktop updater fixtures with their disposable public key in
+  production release jobs. Missing or incomplete QA key pairs now fail closed,
+  while the production updater configuration is restored after fixture tests.
+
 ## [3.9.4] - 2026-11-19
 
 Release supply-chain and browser-extension safety hardening.
