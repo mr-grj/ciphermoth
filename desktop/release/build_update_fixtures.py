@@ -21,6 +21,25 @@ FILES = [
 ]
 
 
+def configure_disposable_updater_key():
+    """Pair QA builds with the public half of their disposable signing key."""
+    private_value = os.environ.get("TAURI_SIGNING_PRIVATE_KEY")
+    if not private_value:
+        raise RuntimeError("Disposable QA signing key is missing")
+    private = Path(private_value)
+    public = Path(str(private) + ".pub")
+    if not private.is_file() or not public.is_file():
+        raise RuntimeError("Disposable QA signing key pair is incomplete")
+    public_value = public.read_text().strip()
+    if not public_value:
+        raise RuntimeError("Disposable QA public key is empty")
+
+    config_path = ROOT / "desktop/src-tauri/tauri.conf.json"
+    config = json.loads(config_path.read_text())
+    config["plugins"]["updater"]["pubkey"] = public_value
+    config_path.write_text(json.dumps(config, indent=2) + "\n")
+
+
 def negative_signatures(destination):
     artifact = next(
         p
@@ -101,6 +120,7 @@ def main():
                             count=1,
                         ).encode()
                     )
+            configure_disposable_updater_key()
             subprocess.run(
                 [
                     sys.executable,
